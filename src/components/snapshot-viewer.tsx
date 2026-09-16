@@ -19,10 +19,17 @@ export default function SnapshotViewer({
   const d = getDb();
   const snapshots = d
     .prepare(
-      `SELECT id, version, fetched_at, title, LENGTH(html) AS size FROM snapshots
+      `SELECT id, version, fetched_at, title, screenshot, LENGTH(html) AS size FROM snapshots
        WHERE source_id = ? ORDER BY version DESC`
     )
-    .all(sourceId) as { id: number; version: number; fetched_at: string; title: string | null; size: number }[];
+    .all(sourceId) as {
+    id: number;
+    version: number;
+    fetched_at: string;
+    title: string | null;
+    screenshot: string | null;
+    size: number;
+  }[];
 
   if (diff) {
     const [a, b] = diff.split("-").map(Number);
@@ -88,12 +95,34 @@ export default function SnapshotViewer({
         )}
       </div>
       {html ? (
-        <iframe
-          title="website snapshot"
-          sandbox=""
-          srcDoc={html}
-          className="h-[70vh] w-full rounded-lg border border-white/15 bg-white"
-        />
+        row?.screenshot ? (
+          <div className="space-y-2">
+            <img
+              src={`/api/sources/${sourceId}/screenshot?version=${version}`}
+              alt={`Snapshot v${version}`}
+              className="w-full rounded-lg border border-white/15 bg-white"
+            />
+            <p className="text-xs text-slate-500">
+              Visual screenshot · captured{" "}
+              {row.fetched_at ? new Date(row.fetched_at).toLocaleString() : "—"} ·{" "}
+              <a
+                href={`/api/sources/${sourceId}/snapshots?version=${version}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-300 hover:underline"
+              >
+                open raw HTML
+              </a>
+            </p>
+          </div>
+        ) : (
+          <iframe
+            title="website snapshot"
+            sandbox=""
+            srcDoc={html}
+            className="h-[70vh] w-full rounded-lg border border-white/15 bg-white"
+          />
+        )
       ) : (
         <p className="text-sm text-slate-500">
           No snapshot yet — run “Check now” to capture the first snapshot.

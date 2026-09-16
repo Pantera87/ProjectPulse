@@ -12,6 +12,7 @@ import {
 import { findRuleHit } from "../rules";
 import { getAI } from "../ai";
 import { fetchText } from "../http";
+import { captureScreenshot } from "../screenshots";
 import {
   insertUpdate,
   indexForSearch,
@@ -54,6 +55,23 @@ export async function checkWebsite(
   const firstCheck = !source.last_content_hash;
 
   if (!firstCheck && newHash === source.last_content_hash) {
+    // Backfill a visual screenshot for the latest snapshot if missing
+    // (e.g. first check after upgrading to the screenshot feature).
+    const last = d
+      .prepare(
+        `SELECT version, screenshot FROM snapshots WHERE source_id = ? ORDER BY version DESC LIMIT 1`
+      )
+      .get(source.id) as { version: number; screenshot: string | null } | undefined;
+    if (last && !last.screenshot) {
+      const rel = `screenshots/${source.id}-v${last.version}.png`;
+      if (await captureScreenshot(source.url, rel)) {
+        d.prepare(`UPDATE snapshots SET screenshot = ? WHERE source_id = ? AND version = ?`).run(
+          rel,
+          source.id,
+          last.version
+        );
+      }
+    }
     touchSource(d, source.id, {
       last_checked_at: new Date().toISOString(),
       last_error: null,
@@ -82,6 +100,16 @@ export async function checkWebsite(
     page.title || null
   );
   pruneSnapshots(d, source.id);
+
+  // Visual screenshot of the rendered page for this snapshot version (best-effort)
+  const shotRel = `screenshots/${source.id}-v${version}.png`;
+  if (await captureScreenshot(source.url, shotRel)) {
+    d.prepare(`UPDATE snapshots SET screenshot = ? WHERE source_id = ? AND version = ?`).run(
+      shotRel,
+      source.id,
+      version
+    );
+  }
 
   let updatesCreated = 0;
 

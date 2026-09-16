@@ -21,6 +21,13 @@ export default function SourceCard({ source, muted }: { source: SourceRow; muted
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            {source.type === "github" && source.logo && (
+              <img
+                src={`/api/sources/${source.id}/logo`}
+                alt=""
+                className="h-5 w-5 rounded"
+              />
+            )}
             <Link
               href={detailHref}
               className="font-medium text-slate-100 transition hover:text-violet-300"

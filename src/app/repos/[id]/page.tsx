@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDb, type SourceRow } from "@/lib/db";
+import fs from "node:fs";
+import path from "node:path";
+import { getDb, dataDir, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
 import SourceActions from "@/components/source-actions";
 import EditMeta from "@/components/edit-meta";
@@ -20,6 +22,10 @@ export default async function RepoDetailPage({
     .prepare("SELECT * FROM sources WHERE id = ? AND type = 'github'")
     .get(Number(id)) as SourceRow | undefined;
   if (!source) notFound();
+
+  const hasRepoShot = fs.existsSync(
+    path.join(dataDir(), `screenshots/github-${source.id}.png`)
+  );
 
   const updates = d
     .prepare(
@@ -42,7 +48,16 @@ export default async function RepoDetailPage({
         <Link href="/repos" className="text-sm text-indigo-300 hover:underline">
           ← GitHub
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
+        <div className="mt-1 flex items-center gap-3">
+          {source.logo && (
+            <img
+              src={`/api/sources/${source.id}/logo`}
+              alt=""
+              className="h-10 w-10 rounded-lg border border-white/15 bg-white/5"
+            />
+          )}
+          <h1 className="text-xl font-semibold">{source.name || source.url}</h1>
+        </div>
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
         <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">
           {source.url}
@@ -58,6 +73,31 @@ export default async function RepoDetailPage({
         lastCheckedAt={source.last_checked_at}
         lastError={source.last_error}
       />
+
+      <section className="glass space-y-3 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Repository screenshot</h2>
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-indigo-300 hover:underline"
+          >
+            Open on GitHub →
+          </a>
+        </div>
+        {hasRepoShot ? (
+          <img
+            src={`/api/sources/${source.id}/screenshot?repo=1`}
+            alt="GitHub repository page"
+            className="w-full rounded-lg border border-white/15 bg-white"
+          />
+        ) : (
+          <p className="text-sm text-slate-500">
+            No screenshot yet — run “Check now” to capture the repository page.
+          </p>
+        )}
+      </section>
 
       <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Watch rules</h2>

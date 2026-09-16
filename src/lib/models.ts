@@ -103,6 +103,7 @@ const PATCHABLE = [
   "muted_until",
   "rules_json",
   "notes",
+  "logo",
 ] as const;
 
 export type PatchableSourceField = (typeof PATCHABLE)[number];
@@ -148,6 +149,7 @@ export function sourceToPlain(
     rules: rulesOf(s),
     state: stateOf(s),
     created_at: s.created_at,
+    logo: s.logo,
   };
 }
 

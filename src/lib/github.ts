@@ -28,6 +28,7 @@ export interface GhRepo {
   pushed_at: string;
   archived: boolean;
   stargazers_count: number;
+  owner: { login: string; avatar_url: string };
 }
 
 export interface GhRelease {

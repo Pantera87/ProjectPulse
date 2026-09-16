@@ -40,6 +40,8 @@ export interface SourceRow {
   rules_json: string;
   state_json: string;
   created_at: string;
+  /** repo avatar / project logo, relative to DATA_DIR (github sources) */
+  logo: string | null;
 }
 
 export interface SnapshotRow {
@@ -50,6 +52,8 @@ export interface SnapshotRow {
   html: string;
   content_hash: string;
   title: string | null;
+  /** rendered PNG screenshot, relative to DATA_DIR (nullable for old rows) */
+  screenshot: string | null;
 }
 
 export interface UpdateRow {
@@ -145,4 +149,21 @@ function migrate(d: Database.Database) {
       kind, ref_id, title, body, tokenize="porter unicode61"
     );
   `);
+  // Columns added after initial release — guard for existing databases.
+  addColumnIfMissing(d, "snapshots", "screenshot", "TEXT");
+  addColumnIfMissing(d, "sources", "logo", "TEXT");
+}
+
+function addColumnIfMissing(
+  d: Database.Database,
+  table: string,
+  column: string,
+  definition: string
+) {
+  const cols = d
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }

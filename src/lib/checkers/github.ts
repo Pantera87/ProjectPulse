@@ -15,6 +15,7 @@ import {
 } from "../models";
 import { truncate } from "../text";
 import { notify } from "../notifiers";
+import { captureScreenshot, downloadFile, fileIsStale } from "../screenshots";
 import type { CheckResult } from "./website";
 
 const pushCap = <T,>(arr: T[], item: T, cap: number): T[] =>
@@ -81,6 +82,18 @@ export async function checkGithub(
       touchSource(d, source.id, {
         name: `${source.name || meta.full_name} [archived]`,
       });
+
+    // --- Project logo (repo avatar) + visual screenshot of the repo page ---
+    const logoRel = `logos/${source.id}.png`;
+    if (await downloadFile(meta.owner.avatar_url, logoRel)) {
+      touchSource(d, source.id, { logo: logoRel });
+    }
+    const shotRel = `screenshots/github-${source.id}.png`;
+    if (fileIsStale(shotRel, 30)) {
+      await captureScreenshot(`https://github.com/${owner}/${repo}`, shotRel, {
+        github: true,
+      });
+    }
 
     // --- Releases ---
     const releases = await github.releases(owner, repo);
