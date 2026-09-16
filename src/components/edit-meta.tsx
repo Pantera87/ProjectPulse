@@ -1,0 +1,60 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
+interface Props {
+  sourceId: number;
+  initial: { name: string | null; goal: string | null; category: string | null; notes: string | null };
+}
+
+const cls =
+  "w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500";
+
+export default function EditMeta({ sourceId, initial }: Props) {
+  const [name, setName] = useState(initial.name ?? "");
+  const [goal, setGoal] = useState(initial.goal ?? "");
+  const [category, setCategory] = useState(initial.category ?? "");
+  const [notes, setNotes] = useState(initial.notes ?? "");
+  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    await fetch(`/api/sources/${sourceId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, goal, category, notes }),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    router.refresh();
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-2 sm:grid-cols-2">
+      <label className="text-xs text-slate-400">
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} className={cls} />
+      </label>
+      <label className="text-xs text-slate-400">
+        Category (free text, e.g. gpu, ml-inference)
+        <input value={category} onChange={(e) => setCategory(e.target.value)} className={cls} />
+      </label>
+      <label className="text-xs text-slate-400 sm:col-span-2">
+        Goal (one line — auto-extracted, editable)
+        <input value={goal} onChange={(e) => setGoal(e.target.value)} className={cls} />
+      </label>
+      <label className="text-xs text-slate-400 sm:col-span-2">
+        Notes
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={cls} />
+      </label>
+      <div className="flex items-center gap-2">
+        <button type="submit" className="rounded bg-sky-600 px-4 py-1.5 text-sm text-white hover:bg-sky-500">
+          Save
+        </button>
+        {saved && <span className="text-xs text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}

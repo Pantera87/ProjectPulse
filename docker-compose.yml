@@ -1,0 +1,37 @@
+services:
+  projectpulse:
+    build: .
+    image: projectpulse:latest
+    container_name: projectpulse
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data          # SQLite DB + snapshots — survives container upgrades
+    environment:
+      # --- required ---
+      # none (works out of the box)
+      # --- optional ---
+      # GITHUB_TOKEN: "ghp_xxx"        # raises GitHub API limit 60 → 5000 req/h
+      # AUTH_PASSWORD: "secret"        # enables a login screen
+      # WEBHOOK_URL: "http://host/hook" # forwards each new update as JSON
+      # AI_ENABLED: "true"             # set "false" to force heuristics
+      # OLLAMA_URL: "http://ollama:11434"   # enable AI summaries (see below)
+      # OLLAMA_MODEL: "qwen2.5:1.5b"
+      # SCHEDULER_INTERVAL_MINUTES: "5"
+      # SNAPSHOT_KEEP_VERSIONS: "10"
+    restart: unless-stopped
+
+  # --- Optional: local AI for summaries / goal extraction / semantic matching ---
+  # Uncomment to run Ollama next to ProjectPulse, then set
+  # OLLAMA_URL: "http://ollama:11434" in the projectpulse environment above
+  # and run: docker compose exec ollama ollama pull qwen2.5:1.5b
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+
+volumes:
+  ollama_data:

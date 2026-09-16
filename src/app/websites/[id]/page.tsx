@@ -1,0 +1,76 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getDb, type SourceRow } from "@/lib/db";
+import { rulesOf } from "@/lib/models";
+import SourceActions from "@/components/source-actions";
+import EditMeta from "@/components/edit-meta";
+import RuleEditor from "@/components/rule-editor";
+import SnapshotViewer from "@/components/snapshot-viewer";
+
+export const dynamic = "force-dynamic";
+
+interface Params {
+  id: string;
+  v?: string;
+  diff?: string;
+}
+
+export default async function WebsiteDetailPage({
+  params,
+}: {
+  params: Promise<Params>;
+}) {
+  const { id, v, diff } = await params;
+  const d = getDb();
+  const source = d
+    .prepare("SELECT * FROM sources WHERE id = ? AND type = 'website'")
+    .get(Number(id)) as SourceRow | undefined;
+  if (!source) notFound();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link href="/websites" className="text-sm text-sky-400 hover:underline">
+          ← Websites
+        </Link>
+        <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
+        {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
+        <p className="mt-1 text-xs text-slate-500">{source.url}</p>
+      </div>
+
+      <SourceActions
+        id={source.id}
+        type={source.type}
+        watchEnabled={source.watch_enabled === 1}
+        mutedUntil={source.muted_until}
+        intervalHours={source.check_interval_hours}
+        lastCheckedAt={source.last_checked_at}
+        lastError={source.last_error}
+      />
+
+      <SnapshotViewer sourceId={source.id} baseHref={`/websites/${id}`} v={v} diff={diff} />
+
+      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <h2 className="font-semibold">Details</h2>
+        <EditMeta
+          sourceId={source.id}
+          initial={{
+            name: source.name,
+            goal: source.goal,
+            category: source.category,
+            notes: source.notes,
+          }}
+        />
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <h2 className="font-semibold">Update rules (keywords)</h2>
+        <p className="text-xs text-slate-500">
+          When any keyword appears in newly added page content, the update gets the
+          rule&apos;s priority. Example: keywords “rocm, amd” with priority critical.
+        </p>
+        <RuleEditor sourceId={source.id} type={source.type} rules={rulesOf(source)} />
+      </section>
+    </div>
+  );
+}
