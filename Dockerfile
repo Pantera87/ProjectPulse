@@ -1,12 +1,14 @@
 # ---- Stage 1: install dependencies ----
-FROM node:24-slim AS deps
+# Full node image (python3 + build tools) so better-sqlite3 can compile
+# its native binding when no prebuilt binary is available.
+FROM node:24 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY next.config.ts tsconfig.json postcss.config.mjs ./
 COPY src src
 RUN npm ci
 
-# ---- Stage 2: build the app ----
+# ---- Stage 2: build the app (slim, reuses node_modules from deps) ----
 FROM node:24-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
