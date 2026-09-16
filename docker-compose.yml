@@ -12,9 +12,14 @@ services:
       # GITHUB_TOKEN: "ghp_xxx"            # raises GitHub API limit 60 → 5000 req/h
       # AUTH_PASSWORD: "secret"            # enables a login screen
       # WEBHOOK_URL: "http://host/hook"     # forwards each new update as JSON
-      # AI_ENABLED: "true"                 # set "false" to force heuristics
-      # OLLAMA_URL: "http://ollama:11434"  # enable AI summaries (see below)
+      # AI_ENABLED: "true"                 # set "false" to force heuristics (hard kill-switch)
+      # OLLAMA_URL: "http://ollama:11434"  # Ollama (local models; auto-downloads on first use)
       # OLLAMA_MODEL: "qwen2.5:1.5b"
+      # OLLAMA_KEEP_ALIVE: "5"     # auto-unload the model N minutes after use ("never" = keep loaded)
+      # OPENAI_URL: "https://api.openai.com/v1"   # any OpenAI-compatible endpoint
+      # OPENAI_API_KEY: "sk-..."
+      # ANTHROPIC_API_KEY: "sk-ant-..."
+      # MCP_URL: "http://host:port/mcp"           # remote MCP server (Streamable HTTP)
       # SCHEDULER_INTERVAL_MINUTES: "5"
       # SNAPSHOT_KEEP_VERSIONS: "10"
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
@@ -23,6 +28,11 @@ services:
       AI_ENABLED: ${AI_ENABLED:-}
       OLLAMA_URL: ${OLLAMA_URL:-}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-}
+      OPENAI_URL: ${OPENAI_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MCP_URL: ${MCP_URL:-}
       SCHEDULER_INTERVAL_MINUTES: ${SCHEDULER_INTERVAL_MINUTES:-}
       SNAPSHOT_KEEP_VERSIONS: ${SNAPSHOT_KEEP_VERSIONS:-}
     restart: unless-stopped

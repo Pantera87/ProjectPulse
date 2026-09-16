@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb, type SourceType, type WatchRule } from "@/lib/db";
 import { indexForSearch } from "@/lib/models";
 import { parseGithubRef } from "@/lib/github";
+import { ensureProjectSummaryById } from "@/lib/project-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -83,5 +84,8 @@ export async function POST(req: Request) {
     );
   const id = Number(info.lastInsertRowid);
   indexForSearch(d, "source", id, name ?? url, body.goal ?? "");
+  // AI project summary (background — also auto-downloads the Ollama model
+  // if AI is enabled but the model is not on the machine yet).
+  ensureProjectSummaryById(id);
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -59,6 +59,12 @@ export default async function RepoDetailPage({
           <h1 className="text-xl font-semibold">{source.name || source.url}</h1>
         </div>
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
+        {source.project_summary && (
+          <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+            <span className="font-semibold text-violet-300">AI summary · </span>
+            {source.project_summary}
+          </div>
+        )}
         <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">
           {source.url}
         </a>

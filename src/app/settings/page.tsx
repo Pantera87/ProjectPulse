@@ -1,11 +1,13 @@
 import { getDb } from "@/lib/db";
 import { schedulerStatus } from "@/lib/scheduler";
-import { getAI } from "@/lib/ai";
+import { aiState, readAIConfig } from "@/lib/ai";
+import { CATALOG, hardwareHint } from "@/lib/ollama";
 import RestoreForm from "@/components/restore-form";
+import AISettings from "@/components/ai-settings";
 
 export const dynamic = "force-dynamic";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
   const d = getDb();
   const counts = d
     .prepare(
@@ -16,7 +18,9 @@ export default function SettingsPage() {
     )
     .get() as { sources: number; snapshots: number; updates: number };
   const sched = schedulerStatus();
-  const ai = getAI();
+  const ai = await aiState();
+  const cfg = readAIConfig();
+  const catalog = CATALOG.map((m) => ({ ...m, hint: hardwareHint(m) }));
 
   return (
     <div className="space-y-6">
@@ -45,12 +49,24 @@ export default function SettingsPage() {
       </section>
 
       <section className="glass space-y-2 p-4">
-        <h2 className="font-semibold">AI enhancements</h2>
-        <p className="text-sm text-slate-400">
-          {ai.enabled
-            ? `Ollama connected (model: ${process.env.OLLAMA_MODEL}). Change summaries, goal extraction and semantic keyword matching are active.`
-            : "Disabled. Set OLLAMA_URL (e.g. http://localhost:11434) and optionally OLLAMA_MODEL to enable change summaries, goal extraction and semantic keyword matching. Everything works without it."}
-        </p>
+        <h2 className="font-semibold">AI</h2>
+        <AISettings
+          initial={ai}
+          initialConfig={{
+            provider: cfg.provider,
+            model: cfg.model,
+            ollamaUrl: cfg.ollamaUrl || (cfg.provider === "ollama" ? "http://localhost:11434" : ""),
+            openaiUrl: cfg.openaiUrl,
+            openaiKey: cfg.openaiKey,
+            anthropicKey: cfg.anthropicKey,
+            mcpUrl: cfg.mcpUrl,
+            mcpTool: cfg.mcpTool,
+            mcpArg: cfg.mcpArg,
+            ollamaKeepAlive: cfg.ollamaKeepAlive,
+          }}
+          catalog={catalog}
+          authEnabled={Boolean(process.env.AUTH_PASSWORD)}
+        />
       </section>
 
       <section className="glass space-y-2 p-4">

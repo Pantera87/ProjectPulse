@@ -5,6 +5,7 @@ import "./globals.css";
 import { ensureStartup } from "@/lib/startup";
 import { getDb } from "@/lib/db";
 import SearchBox from "@/components/search-box";
+import AiStatus from "@/components/ai-status";
 import Aurora from "@/components/aurora";
 import NavLinks from "@/components/nav-links";
 
@@ -55,6 +56,7 @@ function Nav() {
         </Link>
         <NavLinks unread={unread} critical={critical} />
         <div className="ml-auto flex items-center gap-2">
+          <AiStatus />
           <SearchBox />
         </div>
       </div>

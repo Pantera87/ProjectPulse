@@ -104,6 +104,7 @@ const PATCHABLE = [
   "rules_json",
   "notes",
   "logo",
+  "project_summary",
 ] as const;
 
 export type PatchableSourceField = (typeof PATCHABLE)[number];
@@ -150,6 +151,7 @@ export function sourceToPlain(
     state: stateOf(s),
     created_at: s.created_at,
     logo: s.logo,
+    project_summary: s.project_summary,
   };
 }
 

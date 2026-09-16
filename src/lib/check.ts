@@ -5,22 +5,37 @@ import { checkGithub } from "./checkers/github";
 import { checkRss } from "./checkers/rss";
 import { getDb } from "./db";
 import type { CheckResult } from "./checkers/website";
+import { summarizeProjectForSource } from "./project-summary";
 
 /** Run the appropriate checker for a source row. */
 export async function checkSource(
   d: Database.Database,
   source: SourceRow
 ): Promise<CheckResult> {
+  let result: CheckResult;
   switch (source.type) {
     case "website":
-      return checkWebsite(d, source);
+      result = await checkWebsite(d, source);
+      break;
     case "github":
-      return checkGithub(d, source);
+      result = await checkGithub(d, source);
+      break;
     case "rss":
-      return checkRss(d, source);
+      result = await checkRss(d, source);
+      break;
     default:
       return { ok: false, changed: false, updatesCreated: 0, error: "Unknown type" };
   }
+  // Backfill the AI project summary when it's missing (e.g. AI was disabled
+  // or the model still downloading when the source was added).
+  if (result.ok && !source.project_summary) {
+    try {
+      await summarizeProjectForSource(d, source);
+    } catch {
+      // best-effort — retried on the next check
+    }
+  }
+  return result;
 }
 
 export async function checkSourceById(id: number): Promise<CheckResult> {

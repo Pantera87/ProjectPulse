@@ -42,6 +42,8 @@ export interface SourceRow {
   created_at: string;
   /** repo avatar / project logo, relative to DATA_DIR (github sources) */
   logo: string | null;
+  /** AI-generated summary of what the project is (set on add / first check) */
+  project_summary: string | null;
 }
 
 export interface SnapshotRow {
@@ -148,10 +150,33 @@ function migrate(d: Database.Database) {
     CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
       kind, ref_id, title, body, tokenize="porter unicode61"
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
   // Columns added after initial release — guard for existing databases.
   addColumnIfMissing(d, "snapshots", "screenshot", "TEXT");
   addColumnIfMissing(d, "sources", "logo", "TEXT");
+  addColumnIfMissing(d, "sources", "project_summary", "TEXT");
+}
+
+export function getSetting(d: Database.Database, key: string): string | null {
+  const row = d
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(d: Database.Database, key: string, value: string | null) {
+  if (value === null || value === "") {
+    d.prepare("DELETE FROM settings WHERE key = ?").run(key);
+  } else {
+    d.prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    ).run(key, value);
+  }
 }
 
 function addColumnIfMissing(

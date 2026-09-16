@@ -81,6 +81,42 @@ export async function captureScreenshot(
         // page keeps loading — fine, screenshot what we have
       }
       await new Promise((r) => setTimeout(r, 400));
+      if (opts.github) {
+        // Frame the start of the README: scroll it to the top of the viewport
+        // (just below the sticky tab bar) so the screenshot shows the
+        // README's logo/banner and opening text instead of the file list.
+        // README images are lazy-loaded, so wait for network activity to
+        // settle again after scrolling before shooting.
+        try {
+          await page.evaluate(() => {
+            const readme =
+              document.querySelector("#readme .markdown-body") ??
+              document.querySelector("#readme") ??
+              document.querySelector("article.markdown-body");
+            if (!readme) return;
+            // Height of whatever sticks to the top (tab bar / file nav)
+            // so the first README line isn't hidden behind it.
+            const stickyH = Array.from(document.querySelectorAll("*"))
+              .filter(
+                (e) =>
+                  getComputedStyle(e).position === "sticky" &&
+                  e.getBoundingClientRect().width > 500
+              )
+              .reduce((m, e) => Math.max(m, e.getBoundingClientRect().height), 0);
+            const top =
+              window.scrollY + readme.getBoundingClientRect().top - stickyH;
+            window.scrollTo(0, top);
+          });
+          try {
+            await page.waitForNetworkIdle({ idleTime: 800, timeout: 6000 });
+          } catch {
+            // images keep loading — screenshot what we have
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        } catch {
+          // no README / page layout differs — screenshot at current position
+        }
+      }
       await page.screenshot({ path: abs, type: "png" });
       return true;
     } finally {

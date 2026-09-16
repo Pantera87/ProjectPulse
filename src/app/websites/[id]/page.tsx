@@ -35,6 +35,12 @@ export default async function WebsiteDetailPage({
         </Link>
         <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
+        {source.project_summary && (
+          <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+            <span className="font-semibold text-violet-300">AI summary · </span>
+            {source.project_summary}
+          </div>
+        )}
         <p className="mt-1 text-xs text-slate-500">{source.url}</p>
       </div>
 

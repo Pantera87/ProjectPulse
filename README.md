@@ -82,18 +82,53 @@ apply.
 |---|---|
 | `AUTH_PASSWORD` | enables a login screen (single shared password) |
 | `WEBHOOK_URL` | POSTs every new update as JSON `{title, url, priority, kind, …}` |
-| `OLLAMA_URL` / `OLLAMA_MODEL` | AI summaries of changes, goal extraction, semantic keyword matching (see below) |
+| `OLLAMA_URL` / `OLLAMA_MODEL` | AI via local Ollama (see [AI](#ai-optional)) |
+| `OLLAMA_KEEP_ALIVE` | minutes a model stays loaded after use before Ollama frees the RAM (default 5; also settable in Settings) |
+| `OPENAI_URL` / `OPENAI_API_KEY` | AI via any OpenAI-compatible endpoint |
+| `ANTHROPIC_API_KEY` | AI via Anthropic (Claude) |
+| `MCP_URL` | AI via a remote MCP server (Streamable HTTP) |
 | `GITHUB_TOKEN` | higher GitHub API rate limit |
 | `SCHEDULER_INTERVAL_MINUTES` | scheduler wake-up cadence (default 5) |
 | `SNAPSHOT_KEEP_VERSIONS` | snapshot history depth (default 10) |
 
 ### AI (optional)
-Set `OLLAMA_URL` (a separate Ollama container ships commented out in
-`docker-compose.yml`) to enable: one-line summaries of website changes, goal
-extraction from pages without descriptions, and semantic keyword matching
-("added AMD GPU support" matches a `rocm` rule). All AI calls are
-background/non-blocking with heuristic fallbacks — the app is fully
-functional without it.
+AI powers four features: one-line **summaries of changes**, **goal
+extraction** from pages without descriptions, **semantic keyword matching**
+("added AMD GPU support" matches a `rocm` rule), and a short **project
+summary** generated when a project is added (shown on project cards and
+detail pages). All AI calls are background/non-blocking with heuristic
+fallbacks — the app is fully functional without it.
+
+**Providers** (Settings → AI, or env as defaults):
+
+| Provider | What it needs | Notes |
+|---|---|---|
+| **Ollama** (default) | `OLLAMA_URL` (separate Ollama container ships commented out in `docker-compose.yml`) | Tiny local models (`qwen2.5:1.5b` default). Models load on first use. |
+| **OpenAI-compatible** | base URL (+ key for hosted APIs) | OpenAI, LM Studio, vLLM, Ollama's `/v1`, any gateway. |
+| **Anthropic** | API key | Claude via the Messages API. |
+| **MCP** | MCP server URL (Streamable HTTP) | Run the AI on another machine (e.g. a desktop with a GPU) and point ProjectPulse at an MCP server there; tool + argument are auto-detected (or set explicitly). |
+
+**Model manager** (Ollama): Settings → AI lists a curated catalog of small
+models with their size, context and a hardware-fit hint for *this* server
+(based on system RAM — Node cannot read VRAM). Status per model:
+*installed / loaded / downloading %*, with one-click **Download** (manual).
+
+**Auto-download (the only automatic download):** if AI is enabled and the
+selected Ollama model is not on the machine, ProjectPulse starts the pull
+automatically the next time AI is used (e.g. when you add a project); the
+navbar badge then shows the download percentage, and the pending summary is
+retried on the next scheduled check. Every other model is downloaded
+manually.
+
+`AI_ENABLED=false` is a hard kill-switch (the UI toggle can re-enable only
+when this is not set). A **Test connection** button in Settings runs a
+trivial generation through the active provider. The navbar badge always
+shows the AI state: off / not configured / downloading / ready (model
+loaded).
+
+> If you store API keys in Settings and the app has no `AUTH_PASSWORD`,
+> anyone with network access can read them — enable the shared password for
+> non-localhost deployments.
 
 ## Local development
 
@@ -109,7 +144,11 @@ npm run build      # production build
 - `src/lib/checkers/{website,github,rss}.ts` — per-type checkers
 - `src/lib/rules.ts` — keyword rule engine (word-boundary, negation, priorities)
 - `src/lib/scheduler.ts` + `src/instrumentation.ts` — in-process scheduler
-- `src/lib/ai.ts` — AI provider seam (heuristic default, Ollama optional)
+- `src/lib/ai.ts` — AI provider seam (Ollama, OpenAI-compatible, Anthropic,
+  MCP) with per-feature fallbacks; `src/lib/ollama.ts` — Ollama client,
+  model catalog + hardware hints, download registry
+- `src/lib/project-summary.ts` — gathers project context and stores the AI
+  summary (triggered on add + backfilled on first check)
 - `src/lib/notifiers.ts` — notifier seam (webhook implementation)
 - `src/middleware.ts` — optional password auth gate
 - API routes under `src/app/api/` mirror the pages; UI is Next.js App Router

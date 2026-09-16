@@ -51,6 +51,14 @@ export default function SourceCard({ source, muted }: { source: SourceRow; muted
               {source.goal}
             </p>
           )}
+          {source.project_summary && (
+            <p
+              className="mt-1 line-clamp-2 text-xs text-violet-300/90"
+              title={source.project_summary}
+            >
+              <span className="font-semibold">AI</span> · {source.project_summary}
+            </p>
+          )}
         </div>
         {source.type !== "rss" && (
           <SourceActions
