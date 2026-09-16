@@ -8,17 +8,23 @@ services:
     volumes:
       - ./data:/data          # SQLite DB + snapshots — survives container upgrades
     environment:
-      # --- required ---
-      # none (works out of the box)
-      # --- optional ---
-      # GITHUB_TOKEN: "ghp_xxx"        # raises GitHub API limit 60 → 5000 req/h
-      # AUTH_PASSWORD: "secret"        # enables a login screen
-      # WEBHOOK_URL: "http://host/hook" # forwards each new update as JSON
-      # AI_ENABLED: "true"             # set "false" to force heuristics
-      # OLLAMA_URL: "http://ollama:11434"   # enable AI summaries (see below)
+      # --- optional (uncomment/fill in here, or put them in a .env file next to this file) ---
+      # GITHUB_TOKEN: "ghp_xxx"            # raises GitHub API limit 60 → 5000 req/h
+      # AUTH_PASSWORD: "secret"            # enables a login screen
+      # WEBHOOK_URL: "http://host/hook"     # forwards each new update as JSON
+      # AI_ENABLED: "true"                 # set "false" to force heuristics
+      # OLLAMA_URL: "http://ollama:11434"  # enable AI summaries (see below)
       # OLLAMA_MODEL: "qwen2.5:1.5b"
       # SCHEDULER_INTERVAL_MINUTES: "5"
       # SNAPSHOT_KEEP_VERSIONS: "10"
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      AI_ENABLED: ${AI_ENABLED:-}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      SCHEDULER_INTERVAL_MINUTES: ${SCHEDULER_INTERVAL_MINUTES:-}
+      SNAPSHOT_KEEP_VERSIONS: ${SNAPSHOT_KEEP_VERSIONS:-}
     restart: unless-stopped
 
   # --- Optional: local AI for summaries / goal extraction / semantic matching ---
