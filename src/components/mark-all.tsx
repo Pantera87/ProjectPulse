@@ -22,7 +22,7 @@ export default function MarkAllRead() {
         });
         if (res.ok) router.refresh();
       }}
-      className="rounded border border-slate-600 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
+      className="btn-ghost px-3 py-1 text-xs"
     >
       Mark all read
     </button>

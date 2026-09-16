@@ -5,6 +5,8 @@ import "./globals.css";
 import { ensureStartup } from "@/lib/startup";
 import { getDb } from "@/lib/db";
 import SearchBox from "@/components/search-box";
+import Aurora from "@/components/aurora";
+import NavLinks from "@/components/nav-links";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,15 +22,6 @@ export const metadata: Metadata = {
   title: "ProjectPulse",
   description: "Track project websites, GitHub repos and feeds for updates",
 };
-
-const NAV = [
-  { href: "/", label: "Dashboard" },
-  { href: "/websites", label: "Websites" },
-  { href: "/repos", label: "GitHub" },
-  { href: "/feeds", label: "Feeds" },
-  { href: "/updates", label: "Updates" },
-  { href: "/settings", label: "Settings" },
-];
 
 function Nav() {
   let unread = 0;
@@ -48,29 +41,19 @@ function Nav() {
     // DB not ready (first boot) — render without badge
   }
   return (
-    <nav className="border-b border-slate-800 bg-slate-950/60">
-      <div className="mx-auto flex max-w-6xl items-center gap-1 px-4 py-3">
-        <Link href="/" className="mr-4 font-semibold text-sky-400">
-          ● ProjectPulse
+    <nav className="sticky top-0 z-40 border-b border-white/10 bg-[#060814]/70 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
+        <Link
+          href="/"
+          className="mr-4 flex items-center gap-2 font-semibold text-white"
+        >
+          <span
+            className="h-2.5 w-2.5 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 shadow-[0_0_12px_2px_rgba(139,92,246,0.6)]"
+            aria-hidden="true"
+          />
+          <span className="grad-text">ProjectPulse</span>
         </Link>
-        {NAV.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
-          >
-            {item.label}
-            {item.href === "/updates" && unread > 0 && (
-              <span
-                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                  critical > 0 ? "bg-red-600 text-white" : "bg-slate-700 text-slate-200"
-                }`}
-              >
-                {unread}
-              </span>
-            )}
-          </Link>
-        ))}
+        <NavLinks unread={unread} critical={critical} />
         <div className="ml-auto flex items-center gap-2">
           <SearchBox />
         </div>
@@ -86,10 +69,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#0b1120]">
+      <body className="min-h-full flex flex-col">
+        <Aurora />
         <Nav />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-        <footer className="mx-auto w-full max-w-6xl px-4 pb-4 text-xs text-slate-600">
+        <footer className="mx-auto w-full max-w-6xl px-4 pb-4 text-xs text-slate-500">
           ProjectPulse — local project tracker. Data lives in the <code>/data</code> volume.
         </footer>
       </body>

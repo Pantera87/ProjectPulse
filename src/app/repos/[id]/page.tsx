@@ -39,12 +39,12 @@ export default async function RepoDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/repos" className="text-sm text-sky-400 hover:underline">
+        <Link href="/repos" className="text-sm text-indigo-300 hover:underline">
           ← GitHub
         </Link>
         <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
-        <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline">
+        <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">
           {source.url}
         </a>
       </div>
@@ -59,7 +59,7 @@ export default async function RepoDetailPage({
         lastError={source.last_error}
       />
 
-      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Watch rules</h2>
         <p className="text-xs text-slate-500">
           Critical rules (e.g. keywords “amd, rocm, hip”) flag matching releases,
@@ -70,7 +70,7 @@ export default async function RepoDetailPage({
         <RuleEditor sourceId={source.id} type="github" rules={rulesOf(source)} />
       </section>
 
-      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Details</h2>
         <EditMeta
           sourceId={source.id}
@@ -95,20 +95,18 @@ export default async function RepoDetailPage({
             {updates.map((u) => (
               <li
                 key={u.id}
-                className={`flex flex-wrap items-center gap-2 rounded border px-3 py-2 text-sm ${
+                className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm backdrop-blur-md ${
                   u.priority === "critical"
-                    ? "border-red-800 bg-red-950/60"
+                    ? "border-rose-500/40 bg-rose-500/10"
                     : u.priority === "high"
-                      ? "border-amber-800 bg-amber-950/40"
-                      : "border-slate-800 bg-slate-900"
+                      ? "border-amber-400/40 bg-amber-400/10"
+                      : "border-white/10 bg-white/5"
                 } ${u.read_at ? "opacity-60" : ""}`}
               >
-                <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">
-                  {u.kind}
-                </span>
+                <span className="badge">{u.kind}</span>
                 <span className="font-medium">{u.title}</span>
                 {u.url && (
-                  <a href={u.url} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline">
+                  <a href={u.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">
                     link
                   </a>
                 )}

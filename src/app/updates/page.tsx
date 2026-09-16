@@ -6,8 +6,7 @@ import SourceFilter from "@/components/source-filter";
 
 export const dynamic = "force-dynamic";
 
-const chip = (active: boolean) =>
-  `rounded px-1.5 py-0.5 ${active ? "bg-sky-600 text-white" : "hover:bg-slate-800"}`;
+const chip = (active: boolean) => `chip ${active ? "chip-active" : ""}`;
 
 export default async function UpdatesPage({
   searchParams,
@@ -100,7 +99,7 @@ export default async function UpdatesPage({
       )}
       <p className="text-xs text-slate-600">
         Showing {rows.length} update{rows.length === 1 ? "" : "s"}.{" "}
-        <Link href="/" className="text-sky-500 hover:underline">
+        <Link href="/" className="text-indigo-300 hover:underline">
           Back to dashboard
         </Link>
       </p>

@@ -22,7 +22,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Settings</h1>
 
-      <section className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-2 p-4">
         <h2 className="font-semibold">Data</h2>
         <p className="text-sm text-slate-400">
           {counts.sources} sources · {counts.snapshots} snapshots · {counts.updates}{" "}
@@ -31,7 +31,7 @@ export default function SettingsPage() {
         <RestoreForm />
       </section>
 
-      <section className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-2 p-4">
         <h2 className="font-semibold">Scheduler</h2>
         <p className="text-sm text-slate-400">
           Status: {sched.running ? "running" : "stopped"} · checks every{" "}
@@ -44,7 +44,7 @@ export default function SettingsPage() {
         </p>
       </section>
 
-      <section className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-2 p-4">
         <h2 className="font-semibold">AI enhancements</h2>
         <p className="text-sm text-slate-400">
           {ai.enabled
@@ -53,7 +53,7 @@ export default function SettingsPage() {
         </p>
       </section>
 
-      <section className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-2 p-4">
         <h2 className="font-semibold">Alerts</h2>
         <p className="text-sm text-slate-400">
           {process.env.WEBHOOK_URL

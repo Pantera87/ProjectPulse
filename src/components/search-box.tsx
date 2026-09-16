@@ -19,7 +19,7 @@ export default function SearchBox() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search projects, updates…"
-        className="w-52 rounded border border-slate-700 bg-slate-900 px-2.5 py-1 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 sm:w-64"
+        className="input-glass w-52 text-sm sm:w-64"
       />
     </form>
   );

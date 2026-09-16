@@ -20,7 +20,7 @@ export default function MarkReadButton({
         });
         router.refresh();
       }}
-      className="rounded border border-slate-600 px-2 py-0.5 text-xs text-slate-300 hover:bg-slate-800"
+      className="btn-ghost px-2 py-0.5 text-xs"
     >
       {isRead ? "Mark unread" : "Mark read"}
     </button>

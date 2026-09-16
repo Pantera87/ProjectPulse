@@ -3,9 +3,9 @@ import type { SourceRow } from "@/lib/db";
 import SourceActions from "./source-actions";
 
 const TYPE_BADGE: Record<string, string> = {
-  website: "bg-sky-950 text-sky-300 border-sky-800",
-  github: "bg-slate-800 text-slate-200 border-slate-600",
-  rss: "bg-orange-950 text-orange-300 border-orange-800",
+  website: "border-sky-400/30 bg-sky-400/10 text-sky-300",
+  github: "border-violet-400/30 bg-violet-400/10 text-violet-300",
+  rss: "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-300",
 };
 
 export default function SourceCard({ source, muted }: { source: SourceRow; muted: boolean }) {
@@ -17,28 +17,24 @@ export default function SourceCard({ source, muted }: { source: SourceRow; muted
         : `/websites/${source.id}`;
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+    <div className="glass glass-hover p-3.5">
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={detailHref}
-              className="font-medium text-slate-100 hover:text-sky-300"
+              className="font-medium text-slate-100 transition hover:text-violet-300"
             >
               {source.name || source.url}
             </Link>
             <span
-              className={`rounded border px-1.5 py-0.5 text-[10px] uppercase ${TYPE_BADGE[source.type]}`}
+              className={`badge border ${TYPE_BADGE[source.type] ?? TYPE_BADGE.website}`}
             >
               {source.type}
             </span>
-            {source.category && (
-              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
-                {source.category}
-              </span>
-            )}
+            {source.category && <span className="badge">{source.category}</span>}
             {muted && (
-              <span className="rounded bg-amber-950 px-1.5 py-0.5 text-[10px] text-amber-400">
+              <span className="badge border-amber-400/40 bg-amber-400/10 text-amber-300">
                 muted
               </span>
             )}

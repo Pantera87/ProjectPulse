@@ -6,9 +6,16 @@ import SourceCard from "@/components/source-card";
 export const dynamic = "force-dynamic";
 
 const PRIORITY_STYLES: Record<string, string> = {
-  critical: "bg-red-950/60 border-red-800",
-  high: "bg-amber-950/40 border-amber-800",
-  normal: "bg-slate-900 border-slate-800",
+  critical: "border-rose-500/40 bg-rose-500/10 shadow-[0_0_22px_-8px_rgba(244,63,94,0.5)]",
+  high: "border-amber-400/40 bg-amber-400/10",
+  normal: "border-white/10 bg-white/5",
+};
+
+const STAT_STYLES: Record<string, string> = {
+  critical: "glass glass-hover border-rose-500/40",
+  high: "glass glass-hover border-amber-400/40",
+  normal: "glass glass-hover",
+  total: "glass glass-hover border-violet-400/40",
 };
 
 export default function DashboardPage() {
@@ -67,18 +74,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
           [
-            ["critical", "Critical", counts.critical ?? 0, PRIORITY_STYLES.critical],
-            ["high", "High", counts.high ?? 0, PRIORITY_STYLES.high],
-            ["normal", "Normal", counts.normal ?? 0, PRIORITY_STYLES.normal],
-            ["total", "Unread total", counts.total ?? 0, "bg-slate-900 border-slate-700"],
-          ] as [string, string, number, string][]
-        ).map(([key, label, value, cls]) => (
+            ["critical", "Critical", counts.critical ?? 0],
+            ["high", "High", counts.high ?? 0],
+            ["normal", "Normal", counts.normal ?? 0],
+            ["total", "Unread total", counts.total ?? 0],
+          ] as [string, string, number][]
+        ).map(([key, label, value]) => (
           <Link
             key={key}
             href={key === "total" ? "/updates" : `/updates?priority=${key}`}
-            className={`rounded-lg border p-4 ${cls} hover:brightness-125`}
+            className={`${STAT_STYLES[key]} p-4`}
           >
-            <div className="text-3xl font-semibold">{value}</div>
+            <div className="grad-text text-3xl font-semibold">{value}</div>
             <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
           </Link>
         ))}
@@ -88,7 +95,7 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recent updates</h2>
-          <Link href="/updates" className="text-sm text-sky-400 hover:underline">
+          <Link href="/updates" className="text-sm text-indigo-300 hover:underline">
             View all →
           </Link>
         </div>
@@ -101,7 +108,7 @@ export default function DashboardPage() {
             {recent.map((u) => (
               <li
                 key={u.id}
-                className={`rounded border px-3 py-2 ${PRIORITY_STYLES[u.priority] ?? PRIORITY_STYLES.normal} ${
+                className={`rounded-xl border px-3 py-2 backdrop-blur-md ${PRIORITY_STYLES[u.priority] ?? PRIORITY_STYLES.normal} ${
                   u.read_at ? "opacity-60" : ""
                 }`}
               >
@@ -155,9 +162,9 @@ export default function DashboardPage() {
 export function PriorityDot({ priority }: { priority: string }) {
   const color =
     priority === "critical"
-      ? "bg-red-500"
+      ? "bg-rose-500 shadow-[0_0_8px_1px_rgba(244,63,94,0.6)]"
       : priority === "high"
-        ? "bg-amber-500"
+        ? "bg-amber-400 shadow-[0_0_8px_1px_rgba(251,191,36,0.5)]"
         : "bg-slate-500";
   return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />;
 }

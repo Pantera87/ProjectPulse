@@ -30,7 +30,7 @@ export default async function WebsiteDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/websites" className="text-sm text-sky-400 hover:underline">
+        <Link href="/websites" className="text-sm text-indigo-300 hover:underline">
           ← Websites
         </Link>
         <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
@@ -50,7 +50,7 @@ export default async function WebsiteDetailPage({
 
       <SnapshotViewer sourceId={source.id} baseHref={`/websites/${id}`} v={v} diff={diff} />
 
-      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Details</h2>
         <EditMeta
           sourceId={source.id}
@@ -63,7 +63,7 @@ export default async function WebsiteDetailPage({
         />
       </section>
 
-      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Update rules (keywords)</h2>
         <p className="text-xs text-slate-500">
           When any keyword appears in newly added page content, the update gets the

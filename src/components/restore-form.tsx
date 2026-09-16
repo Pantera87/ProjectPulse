@@ -37,13 +37,13 @@ export default function RestoreForm() {
       />
       <button
         onClick={() => fileRef.current?.click()}
-        className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+        className="btn-ghost px-3 py-1.5 text-sm"
       >
         Upload backup JSON
       </button>
       <a
         href="/api/backup"
-        className="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+        className="btn-ghost px-3 py-1.5 text-sm"
       >
         Download backup
       </a>

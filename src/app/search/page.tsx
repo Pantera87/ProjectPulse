@@ -25,7 +25,7 @@ export default async function SearchPage({
         ) : (
           <ul className="space-y-2">
             {sources.map((s) => (
-              <li key={s.id} className="rounded border border-slate-800 bg-slate-900 px-3 py-2">
+              <li key={s.id} className="glass px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Link
                     href={
@@ -35,18 +35,12 @@ export default async function SearchPage({
                           ? `/updates?source_id=${s.id}`
                           : `/websites/${s.id}`
                     }
-                    className="font-medium hover:text-sky-300"
+                    className="font-medium hover:text-violet-300"
                   >
                     {s.name || s.url}
                   </Link>
-                  <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">
-                    {s.type}
-                  </span>
-                  {s.category && (
-                    <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
-                      {s.category}
-                    </span>
-                  )}
+                  <span className="badge">{s.type}</span>
+                  {s.category && <span className="badge">{s.category}</span>}
                 </div>
                 {s.goal && <p className="mt-1 text-xs text-slate-400">{s.goal}</p>}
               </li>

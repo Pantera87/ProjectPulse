@@ -24,8 +24,7 @@ const SOURCE_OPTIONS: Record<string, string[]> = {
   rss: ["feed"],
 };
 
-const inputCls =
-  "w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-200";
+const inputCls = "input-glass w-full";
 
 export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
   const [rules, setRules] = useState<Rule[]>(initial);
@@ -60,12 +59,12 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
   return (
     <div className="space-y-3">
       {rules.map((r, i) => (
-        <div key={r.id} className="rounded border border-slate-800 bg-slate-900 p-3 space-y-2">
+        <div key={r.id} className="glass space-y-2 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={r.priority}
               onChange={(e) => update(i, { priority: e.target.value as Rule["priority"] })}
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="input-glass"
             >
               <option value="critical">critical</option>
               <option value="high">high</option>
@@ -77,7 +76,7 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
                 update(i, { keywords: e.target.value.split(",").map((s) => s.trim()) })
               }
               placeholder="keywords, e.g. rocm, amd, hip"
-              className="min-w-52 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+              className="input-glass min-w-52 flex-1"
             />
             {type === "github" && (
               <input
@@ -86,12 +85,12 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
                   update(i, { labels: e.target.value.split(",").map((s) => s.trim()) })
                 }
                 placeholder="issue labels (optional)"
-                className="w-44 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+                className="input-glass w-44"
               />
             )}
             <button
               onClick={() => setRules((rs) => rs.filter((_, j) => j !== i))}
-              className="rounded border border-red-800 px-2 py-1 text-xs text-red-400"
+              className="btn-ghost px-2 py-1 text-xs !border-red-500/40 !text-red-300 hover:!bg-red-500/15"
             >
               Remove
             </button>
@@ -110,6 +109,7 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
                           : r.sources.filter((s) => s !== o),
                       })
                     }
+                    className="accent-violet-500"
                   />
                   {o}
                 </label>
@@ -121,7 +121,7 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
                 update(i, { negate: e.target.value.split(",").map((s) => s.trim()) })
               }
               placeholder="negate keywords (optional)"
-              className="w-48 rounded border border-slate-800 bg-slate-950 px-2 py-1 text-xs"
+              className="input-glass w-48 text-xs"
             />
           </div>
         </div>
@@ -139,13 +139,13 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
               },
             ])
           }
-          className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-300"
+          className="btn-ghost px-3 py-1 text-sm"
         >
           + Add rule
         </button>
         <button
           onClick={save}
-          className="rounded bg-sky-600 px-4 py-1 text-sm text-white hover:bg-sky-500"
+          className="btn-primary px-4 py-1 text-sm"
         >
           Save rules
         </button>

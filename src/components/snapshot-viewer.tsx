@@ -39,12 +39,12 @@ export default function SnapshotViewer({
           })
         : "(snapshot no longer available)";
     return (
-      <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <Link href={baseHref} className="text-sm text-sky-400 hover:underline">
+      <section className="glass space-y-3 p-4">
+        <Link href={baseHref} className="text-sm text-indigo-300 hover:underline">
           ← Back
         </Link>
         <h2 className="font-semibold">Diff v{a} → v{b}</h2>
-        <pre className="max-h-[70vh] overflow-auto whitespace-pre text-xs text-slate-300">
+        <pre className="max-h-[70vh] overflow-auto whitespace-pre rounded-lg border border-white/10 bg-[#080c20]/70 p-3 text-xs text-slate-300">
           {patch}
         </pre>
       </section>
@@ -61,7 +61,7 @@ export default function SnapshotViewer({
     : null;
 
   return (
-    <section className="space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+    <section className="glass space-y-3 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold">Snapshot (read offline)</h2>
         {snapshots.length > 0 && (
@@ -70,11 +70,7 @@ export default function SnapshotViewer({
               <Link
                 key={s.version}
                 href={s.version === version ? baseHref : `${baseHref}?v=${s.version}`}
-                className={`rounded px-2 py-0.5 text-xs ${
-                  s.version === version
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                }`}
+                className={`chip ${s.version === version ? "chip-active" : ""}`}
                 title={new Date(s.fetched_at).toLocaleString()}
               >
                 v{s.version}
@@ -85,7 +81,7 @@ export default function SnapshotViewer({
         {snapshots.length >= 2 && (
           <Link
             href={`${baseHref}?diff=${snapshots[1].version}-${snapshots[0].version}`}
-            className="text-sm text-sky-400 hover:underline"
+            className="text-sm text-indigo-300 hover:underline"
           >
             Diff v{snapshots[1].version} → v{snapshots[0].version}
           </Link>
@@ -96,7 +92,7 @@ export default function SnapshotViewer({
           title="website snapshot"
           sandbox=""
           srcDoc={html}
-          className="h-[70vh] w-full rounded border border-slate-800 bg-white"
+          className="h-[70vh] w-full rounded-lg border border-white/15 bg-white"
         />
       ) : (
         <p className="text-sm text-slate-500">

@@ -8,8 +8,7 @@ interface Props {
   initial: { name: string | null; goal: string | null; category: string | null; notes: string | null };
 }
 
-const cls =
-  "w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500";
+const cls = "input-glass w-full";
 
 export default function EditMeta({ sourceId, initial }: Props) {
   const [name, setName] = useState(initial.name ?? "");
@@ -50,7 +49,7 @@ export default function EditMeta({ sourceId, initial }: Props) {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={cls} />
       </label>
       <div className="flex items-center gap-2">
-        <button type="submit" className="rounded bg-sky-600 px-4 py-1.5 text-sm text-white hover:bg-sky-500">
+        <button type="submit" className="btn-primary px-4 py-1.5 text-sm">
           Save
         </button>
         {saved && <span className="text-xs text-emerald-400">Saved</span>}

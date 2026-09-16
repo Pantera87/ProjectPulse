@@ -19,7 +19,7 @@ export default function SourceFilter({
         else url.searchParams.delete("source_id");
         router.push(url.toString());
       }}
-      className="rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm"
+      className="input-glass px-2 py-1 text-sm"
     >
       <option value="">all sources</option>
       {sources.map((s) => (

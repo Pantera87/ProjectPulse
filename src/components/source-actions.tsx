@@ -52,17 +52,17 @@ export default function SourceActions({
           })
         }
         disabled={busy !== null}
-        className="rounded bg-sky-600 px-3 py-1 text-white hover:bg-sky-500 disabled:opacity-50"
+        className="btn-primary px-3 py-1 text-sm"
       >
         {busy === "check" ? "Checking…" : "Check now"}
       </button>
       <button
         onClick={() => act("watch", () => patch({ watch_enabled: watchEnabled ? 0 : 1 }))}
         disabled={busy !== null}
-        className={`rounded border px-3 py-1 ${
+        className={`btn-ghost px-3 py-1 text-sm ${
           watchEnabled
-            ? "border-emerald-600 text-emerald-400"
-            : "border-slate-600 text-slate-400"
+            ? "border-emerald-400/50 text-emerald-300"
+            : ""
         }`}
       >
         {watchEnabled ? "Tracking: on" : "Tracking: off"}
@@ -72,8 +72,8 @@ export default function SourceActions({
           act("mute", () => patch({ muted_until: muted ? "clear" : new Date(Date.now() + 30 * 86400_000).toISOString() }))
         }
         disabled={busy !== null}
-        className={`rounded border px-3 py-1 ${
-          muted ? "border-amber-600 text-amber-400" : "border-slate-600 text-slate-400"
+        className={`btn-ghost px-3 py-1 text-sm ${
+          muted ? "border-amber-400/50 text-amber-300" : ""
         }`}
       >
         {muted ? "Unmute (30d)" : "Mute 30d"}
@@ -81,7 +81,7 @@ export default function SourceActions({
       <button
         onClick={() => act("interval", () => patch({ check_interval_hours: nextInterval(intervalHours) }))}
         disabled={busy !== null}
-        className="rounded border border-slate-600 px-3 py-1 text-slate-300"
+        className="btn-ghost px-3 py-1 text-sm"
         title="Click to change check interval"
       >
         every {intervalHours >= 24 ? `${Math.round(intervalHours / 24)}d` : `${intervalHours}h`}
@@ -95,11 +95,11 @@ export default function SourceActions({
             });
         }}
         disabled={busy !== null}
-        className="rounded border border-red-800 px-3 py-1 text-red-400"
+        className="btn-ghost px-3 py-1 text-sm !border-red-500/40 !text-red-300 hover:!bg-red-500/15"
       >
         Delete
       </button>
-      <Link href={detail} className="text-sky-400 hover:underline">
+      <Link href={detail} className="text-indigo-300 hover:underline">
         Details →
       </Link>
       {lastCheckedAt && (

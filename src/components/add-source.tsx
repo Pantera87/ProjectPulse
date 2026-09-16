@@ -44,25 +44,25 @@ export default function AddSourceForm({ type }: { type: "website" | "github" | "
   return (
     <form
       onSubmit={onSubmit}
-      className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3"
+      className="glass flex flex-wrap items-center gap-2 p-3"
     >
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder={PLACEHOLDERS[type]}
-        className="min-w-52 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
+        className="input-glass min-w-52 flex-1"
         required
       />
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Name (optional)"
-        className="w-40 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
+        className="input-glass w-40"
       />
       <select
         value={interval}
         onChange={(e) => setInterval(Number(e.target.value))}
-        className="rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200"
+        className="input-glass"
         title="Check interval"
       >
         <option value={1}>every 1 h</option>
@@ -75,7 +75,7 @@ export default function AddSourceForm({ type }: { type: "website" | "github" | "
       <button
         type="submit"
         disabled={busy}
-        className="rounded bg-sky-600 px-4 py-1.5 text-sm text-white hover:bg-sky-500 disabled:opacity-50"
+        className="btn-primary px-4 py-1.5 text-sm"
       >
         {busy ? "Adding…" : "Add"}
       </button>
