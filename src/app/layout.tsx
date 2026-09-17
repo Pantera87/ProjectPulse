@@ -46,13 +46,18 @@ function Nav() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
         <Link
           href="/"
-          className="mr-4 flex items-center gap-2 font-semibold text-white"
+          className="mr-4 flex items-center gap-2"
+          aria-label="ProjectPulse home"
         >
-          <span
-            className="h-2.5 w-2.5 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 shadow-[0_0_12px_2px_rgba(139,92,246,0.6)]"
+          <img
+            src="/logo.png"
+            alt=""
             aria-hidden="true"
+            className="h-8 w-8 shrink-0"
           />
-          <span className="grad-text">ProjectPulse</span>
+          <span className="grad-text text-sm font-semibold leading-none">
+            ProjectPulse
+          </span>
         </Link>
         <NavLinks unread={unread} critical={critical} />
         <div className="ml-auto flex items-center gap-2">

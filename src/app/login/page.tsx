@@ -33,12 +33,16 @@ function LoginInner() {
         onSubmit={onSubmit}
         className="glass w-full max-w-sm space-y-4 p-6"
       >
-        <div className="text-center">
-          <span
-            className="mx-auto mb-2 block h-3 w-3 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 shadow-[0_0_14px_3px_rgba(139,92,246,0.6)]"
+        <div className="mx-auto mb-3 flex w-44 flex-col items-center">
+          <img
+            src="/logo.png"
+            alt=""
             aria-hidden="true"
+            className="h-12 w-12"
           />
-          <h1 className="grad-text text-lg font-semibold">ProjectPulse login</h1>
+          <h1 className="grad-text -mt-1.5 text-center text-lg font-semibold leading-none">
+            ProjectPulse login
+          </h1>
         </div>
         <input
           type="password"

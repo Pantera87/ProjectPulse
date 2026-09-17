@@ -62,7 +62,7 @@ function derive(s: AIState | null): Display {
     if (pull && pull.status === "downloading")
       return {
         dot: "animate-pulse bg-sky-400",
-        label: `AI · ${model} · ${Math.round(pull.progress * 100)}%`,
+        label: `AI · ${Math.round(pull.progress * 100)}%`,
         title: `Model ${model} is being downloaded — AI summaries will appear once it finishes.`,
       };
     // Green only with a VERIFIED live connection: the Ollama snapshot must
@@ -71,49 +71,47 @@ function derive(s: AIState | null): Display {
     if (!o || !o.reachable)
       return {
         dot: "bg-amber-400",
-        label: `AI · ${model} (offline)`,
+        label: "AI (offline)",
         title:
           "Ollama server unreachable. Check that it is running — and on WSL/Docker hosts use http://127.0.0.1:11434 (not localhost) in Settings → AI.",
       };
     if (!o.modelInstalled)
       return {
         dot: "bg-amber-400",
-        label: `AI · ${model} (download)`,
+        label: "AI (download)",
         title: `Model ${model} must be downloaded. It will be fetched automatically on first AI use — or download it now in Settings → AI.`,
       };
     if (o.modelLoaded)
       return {
         dot: "bg-emerald-400",
-        label: `AI · ${model} loaded`,
+        label: "AI loaded",
         title: `AI active — ${model} is loaded in memory (Ollama).`,
       };
     return {
       dot: "bg-emerald-400",
-      label: `AI · ${model}`,
+      label: "AI",
       title: `AI active — Ollama is reachable and ${model} is installed (loaded into memory on first use).`,
     };
   }
   // Remote providers (OpenAI-compatible, Anthropic, MCP): green only when the
   // last live check PASSED (reachable === true), yellow when it failed,
   // pulsing yellow while the first check is still pending (null).
-  const label = s.provider === "mcp" ? "AI · MCP" : `AI · ${s.provider}`;
-  const sub = s.model ? ` · ${s.model}` : "";
   if (s.reachable === false)
     return {
       dot: "bg-amber-400",
-      label: `${label}${sub} (offline)`,
+      label: "AI (offline)",
       title: `${s.provider} endpoint not reachable — check the URL/key in Settings → AI.`,
     };
   if (s.reachable !== true)
     return {
       dot: "animate-pulse bg-amber-400",
-      label: `${label}${sub} (checking…)`,
+      label: "AI (checking…)",
       title: "Checking the provider endpoint — the badge turns green once it answers.",
     };
   return {
     dot: "bg-emerald-400",
-    label: label + sub,
-    title: `AI active via ${s.provider} provider — endpoint is reachable.`,
+    label: "AI",
+    title: `AI active via ${s.provider} provider${s.model ? ` (${s.model})` : ""} — endpoint is reachable.`,
   };
 }
 
@@ -142,10 +140,10 @@ export default function AiStatus() {
     <Link
       href="/settings"
       title={d.title}
-      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
+      className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300 transition hover:bg-white/10 hover:text-white"
     >
-      <span className={`h-2 w-2 rounded-full ${d.dot}`} aria-hidden="true" />
-      <span className="max-w-[220px] truncate font-medium">{d.label}</span>
+      <span className={`h-1.5 w-1.5 rounded-full ${d.dot}`} aria-hidden="true" />
+      <span className="max-w-[140px] truncate font-medium">{d.label}</span>
     </Link>
   );
 }
