@@ -36,7 +36,7 @@
 - **GitHub tracking** — releases/tags, milestones, issue-label watching, and README/commit keyword scans.
 - **Feeds** — RSS/Atom feeds as first-class sources.
 - **Priority keyword rules** — word-boundary matching with negation and priorities (e.g. flag anything mentioning *kernel, linux* as *critical*), plus an optional AI semantic second pass.
-- **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content, with a keyword-hint fallback without AI.
+- **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content: keyword hints first, and when no keyword matches the AI reads the full page/feed content.
 - **Optional AI** — change summaries, goal extraction, semantic keyword matching, category assignment, and project summaries. Local Ollama, OpenAI-compatible, Anthropic, or MCP providers; the app is fully functional without it.
 - **Updates feed** — priority-sorted, digest time windows, muting, full-text search (SQLite FTS5), and JSON backup/restore.
 
@@ -92,18 +92,19 @@ apply.
 
 Every source type gets a two-level classification, auto-assigned:
 
-- **Generic category** — the broad domain/family (e.g. `cnc`)
-- **Subcategory** — the specific one (e.g. `cnc-controller-firmware`)
+- **Generic category** — the broad domain/family (e.g. `ai`)
+- **Subcategory** — the specific one (e.g. `inference-engine`)
 
 - AI assigns both levels when available; the dashboard groups projects by category.
 - **GitHub** sources use a priority cascade over the repo's own signals: its
   **topics** first, then topics + **about** section, and only when neither
   gives a confident answer is the **full README** ingested (the stored AI
   summary can substitute for the README when it is already present).
-- **Websites and feeds** are read from their full page/feed text whenever the
-  stored goal/summary is too thin to classify from (a project name alone is
-  not content).
-- **Without AI**, a keyword-hint fallback assigns only the generic category —
+- **Websites and feeds**: keywords are checked first (fast, no AI latency);
+  when no keyword matches, the AI reads the full page/feed text and assigns
+  both levels. The full content is fetched whenever the stored goal/summary
+  is too thin to classify from (a project name alone is not content).
+- **Without AI**, the keyword-hint pass assigns only the generic category —
   not very accurate, so those are marked with a "guessed" hint in the UI.
 - Missing levels are **backfilled automatically on every check** (a
   subcategory left empty is completed by AI on a later check), and keyword

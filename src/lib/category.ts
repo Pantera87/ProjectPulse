@@ -2,19 +2,21 @@
  * Category backfill: give a tracked source a short two-level classification
  * of its intended use (dashboard groups by the generic level): a GENERIC
  * category (broad domain/family, e.g. "cnc") plus a more specific subcategory
- * (e.g. "cnc-controller-firmware"). AI-first when available — for GITHUB
- * sources the model classifies in a priority cascade: the repo's TOPICS
- * first, then topics + ABOUT section, and only when neither yields a
+ * (e.g. "cnc-controller-firmware").
+ *
+ * Websites and feeds: KEYWORDS are checked first (text.ts `suggestCategory`
+ * over the name/goal/summary — and the full page/feed content when that is
+ * thin) — cheap and instant, no AI latency. Only when no keyword matches
+ * does the AI classify: it sees the stored summary/goal AND, when those are
+ * too thin to classify from, the FULL content of the project (whole page
+ * text for websites, feed text for RSS), handed over as a RAG document where
+ * the provider supports it (Ollama ≥ 0.6.2) — reusing existing category
+ * slugs for consistency and returning both levels in one call. For GITHUB
+ * sources the model classifies in a priority cascade instead: the repo's
+ * TOPICS first, then topics + ABOUT section, and only when neither yields a
  * confident answer is the full README ingested (the stored AI summary
- * substitutes for the README when it is already rich). For other source
- * types the model sees the stored summary/goal AND, when those are too thin
- * to classify from, the FULL content of the project (whole page text for
- * websites, feed text for RSS), handed over as a RAG
- * document where the provider supports it (Ollama ≥ 0.6.2) — reusing
- * existing category slugs for consistency and returning both levels in one
- * call. Falls back to the keyword-hint heuristic (text.ts `suggestCategory`,
- * run over the same content, topics-first for GitHub) when AI is off,
- * unconfigured or unsure.
+ * substitutes for the README when it is already rich); the keyword heuristic
+ * runs over the same tier order when AI is off, unconfigured or unsure.
  *
  * Weak models given only a project name tend to echo the name as the
  * category — a reply that simply mirrors the project name is rejected, and
@@ -337,9 +339,31 @@ export async function ensureCategoryForSource(
   if (row.category && row.subcategory) return row.category;
 
   if (!row.category) {
+    // Keywords first: cheap and instant, no AI latency. A match stores a
+    // quick (flagged) generic guess — the upgrade pass (above here at a
+    // later check) re-classifies it with AI and completes the subcategory.
+    const kw = heuristicCategory(text);
+    if (kw) {
+      touchSource(d, row.id, {
+        category: kw,
+        subcategory: null,
+        category_source: "heuristic",
+      });
+      indexForSearch(
+        d,
+        "source",
+        row.id,
+        row.name ?? row.url,
+        `${row.goal ?? ""} ${kw}`
+      );
+      return kw;
+    }
+
+    // No keywords matched — the AI reads the whole project (full page/feed
+    // content, handed over as a RAG document where supported) and returns
+    // both levels in one call.
     let cat: string | null = null;
     let sub: string | null = null;
-    let catSource: string | null = null;
     const ai = getAI();
     if (ai.enabled) {
       try {
@@ -347,25 +371,17 @@ export async function ensureCategoryForSource(
         if (r && !echoesName(r, row.name)) {
           cat = r.category;
           sub = r.subcategory;
-          catSource = "ai";
         }
       } catch {
-        // best-effort — fall through to the heuristic
+        // best-effort — retried on the next check
       }
-    }
-    if (!cat) {
-      // Keyword fallback: generic category only, not very accurate —
-      // run over the full content (not just the goal), and flagged in the
-      // UI via category_source.
-      cat = heuristicCategory(text);
-      catSource = "heuristic";
     }
     if (!cat) return null;
 
     touchSource(d, row.id, {
       category: cat,
       subcategory: sub,
-      category_source: catSource,
+      category_source: "ai",
     });
     // Category is part of the source's search body — keep the index in sync.
     indexForSearch(
@@ -402,24 +418,40 @@ export async function ensureCategoryForSource(
   return row.category;
 }
 
-/** Fire-and-forget entry point (used when a project is added / checked). */
+/**
+ * Fire-and-forget entry point (used when a project is added). Right after
+ * adding, the first attempt can come up empty — the AI model may still be
+ * loading or downloading, or the page fetch may have hit a transient error.
+ * Waiting for the next scheduled check could take up to a week, so while the
+ * source still has NO category at all, retry twice more (~30 s apart). A
+ * keyword-guessed category is left alone here — the upgrade pass at a later
+ * check refines it with AI.
+ */
 export function ensureCategoryById(id: number): void {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   void (async () => {
-    try {
-      const d = getDb();
-      const row = d
-        .prepare("SELECT * FROM sources WHERE id = ?")
-        .get(id) as SourceRow | undefined;
-      if (
-        row &&
-        (!row.category ||
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const d = getDb();
+        const row = d
+          .prepare("SELECT * FROM sources WHERE id = ?")
+          .get(id) as SourceRow | undefined;
+        if (!row) return;
+        if (
+          !row.category ||
           !row.subcategory ||
           row.category_source === "heuristic" ||
-          categoryMirrorsName(row))
-      )
-        await ensureCategoryForSource(d, row);
-    } catch {
-      // best-effort — the next scheduled check retries
+          categoryMirrorsName(row)
+        )
+          await ensureCategoryForSource(d, row);
+      } catch {
+        // best-effort — the next scheduled check retries
+      }
+      const fresh = getDb()
+        .prepare("SELECT * FROM sources WHERE id = ?")
+        .get(id) as SourceRow | undefined;
+      if (fresh?.category || attempt === 2 || !getAI().enabled) return;
+      await sleep(30_000);
     }
   })();
 }

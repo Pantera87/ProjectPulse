@@ -5,6 +5,7 @@ import type {
   WatchRule,
   Priority,
   UpdateKind,
+  UpdateRow,
 } from "./db";
 import { getDb } from "./db";
 
@@ -54,7 +55,10 @@ export function insertUpdate(
       JSON.stringify(args.payload ?? {}),
       nowIso()
     );
-  return Number(info.lastInsertRowid);
+  const id = Number(info.lastInsertRowid);
+  // New updates are searchable via FTS from the moment they are created.
+  indexForSearch(d, "update", id, args.title, args.summary ?? "");
+  return id;
 }
 
 export function indexForSearch(
@@ -161,7 +165,7 @@ export function sourceToPlain(
 
 export function search(q: string): {
   sources: SourceRow[];
-  updates: { id: number; title: string }[];
+  updates: UpdateRow[];
 } {
   const d = getDb();
   const safe = q.replace(/['"]/g, "").trim();
@@ -171,13 +175,16 @@ export function search(q: string): {
       `SELECT s.* FROM sources s WHERE s.name LIKE ? OR s.goal LIKE ? OR s.url LIKE ?`
     )
     .all(`%${safe}%`, `%${safe}%`, `%${safe}%`) as SourceRow[];
-  let updates: { id: number; title: string }[] = [];
+  let updates: UpdateRow[] = [];
   try {
     updates = d
       .prepare(
-        `SELECT ref_id AS id, title FROM search_index WHERE search_index MATCH ? LIMIT 50`
+        `SELECT u.* FROM search_index si
+         JOIN updates u ON u.id = si.ref_id
+         WHERE si.kind = 'update' AND search_index MATCH ?
+         ORDER BY u.created_at DESC LIMIT 50`
       )
-      .all(fts) as { id: number; title: string }[];
+      .all(fts) as UpdateRow[];
   } catch {
     // invalid fts query — ignore
   }

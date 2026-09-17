@@ -180,6 +180,21 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "project_summary", "TEXT");
   addColumnIfMissing(d, "sources", "subcategory", "TEXT");
   addColumnIfMissing(d, "sources", "category_source", "TEXT");
+  // One-time backfill: index existing updates into the FTS search table so
+  // they become searchable (new updates are indexed at insert time).
+  if (getSetting(d, "fts_update_backfill_v1") !== "1") {
+    d.prepare(`DELETE FROM search_index WHERE kind = 'update'`).run();
+    const rows = d
+      .prepare(`SELECT id, title, COALESCE(summary, '') AS summary FROM updates`)
+      .all() as { id: number; title: string; summary: string }[];
+    const ins = d.prepare(
+      `INSERT INTO search_index (kind, ref_id, title, body) VALUES ('update', ?, ?, ?)`
+    );
+    d.transaction(() => {
+      for (const r of rows) ins.run(r.id, r.title, r.summary);
+    })();
+    setSetting(d, "fts_update_backfill_v1", "1");
+  }
 }
 
 export function getSetting(d: Database.Database, key: string): string | null {
