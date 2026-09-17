@@ -75,7 +75,7 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
               onChange={(e) =>
                 update(i, { keywords: e.target.value.split(",").map((s) => s.trim()) })
               }
-              placeholder="keywords, e.g. rocm, amd, hip"
+              placeholder="keywords, comma-separated"
               className="input-glass min-w-52 flex-1"
             />
             {type === "github" && (

@@ -2,6 +2,7 @@ import { getDb, type SourceRow } from "@/lib/db";
 import { isMuted } from "@/lib/check";
 import SourceCard from "@/components/source-card";
 import AddSourceForm from "@/components/add-source";
+import RefreshAll from "@/components/refresh-all";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,10 @@ export default function WebsitesPage() {
     .all() as SourceRow[];
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Websites</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Websites</h1>
+        <RefreshAll />
+      </div>
       <AddSourceForm type="website" />
       {rows.length === 0 ? (
         <p className="text-sm text-slate-500">

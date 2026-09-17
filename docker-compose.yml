@@ -4,17 +4,18 @@ services:
     image: projectpulse:latest
     container_name: projectpulse
     ports:
-      - "3000:3000"
+      - "4701:4701"
     volumes:
       - ./data:/data          # SQLite DB + snapshots — survives container upgrades
     environment:
+      TZ: ${TZ:-UTC}
       # --- optional (uncomment/fill in here, or put them in a .env file next to this file) ---
       # GITHUB_TOKEN: "ghp_xxx"            # raises GitHub API limit 60 → 5000 req/h
       # AUTH_PASSWORD: "secret"            # enables a login screen
       # WEBHOOK_URL: "http://host/hook"     # forwards each new update as JSON
       # AI_ENABLED: "true"                 # set "false" to force heuristics (hard kill-switch)
-      # OLLAMA_URL: "http://ollama:11434"  # Ollama (local models; auto-downloads on first use)
-      # OLLAMA_MODEL: "qwen2.5:1.5b"
+      # OLLAMA_URL: "http://ollama:11434"  # default in Docker (bundled ollama service)
+      # OLLAMA_MODEL: "qwen2.5:7b"           # model pre-pulled by the ollama-init service
       # OLLAMA_KEEP_ALIVE: "5"     # auto-unload the model N minutes after use ("never" = keep loaded)
       # OPENAI_URL: "https://api.openai.com/v1"   # any OpenAI-compatible endpoint
       # OPENAI_API_KEY: "sk-..."
@@ -26,7 +27,7 @@ services:
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       WEBHOOK_URL: ${WEBHOOK_URL:-}
       AI_ENABLED: ${AI_ENABLED:-}
-      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}   # bundled ollama service (below)
       OLLAMA_MODEL: ${OLLAMA_MODEL:-}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-}
       OPENAI_URL: ${OPENAI_URL:-}
@@ -37,17 +38,52 @@ services:
       SNAPSHOT_KEEP_VERSIONS: ${SNAPSHOT_KEEP_VERSIONS:-}
     restart: unless-stopped
 
-  # --- Optional: local AI for summaries / goal extraction / semantic matching ---
-  # Uncomment to run Ollama next to ProjectPulse, then set
-  # OLLAMA_URL: "http://ollama:11434" in the projectpulse environment above
-  # and run: docker compose exec ollama ollama pull qwen2.5:1.5b
+  # --- Local AI: Ollama (bundled by default) ---
+  # The app points at it out of the box (OLLAMA_URL defaults to
+  # http://ollama:11434). Downloaded models live in the ollama_data volume,
+  # so they survive container upgrades. Remove both ollama services below if
+  # you'd rather use a remote provider (OpenAI-compatible / Anthropic / MCP).
   #
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: ollama
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   restart: unless-stopped
+  # GPU (NVIDIA): install the NVIDIA Container Toolkit on the host, then add
+  # under `ollama`:
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"        # host access (ollama CLI, manual pulls); safe to remove
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434   # listen beyond loopback (needed for host access)
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # One-shot: pre-downloads OLLAMA_MODEL (default qwen2.5:7b) once the
+  # server is healthy; exits instantly if the model is already present.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    entrypoint: ["ollama"]
+    command: ["pull", "${OLLAMA_MODEL:-qwen2.5:7b}"]
+    environment:
+      - OLLAMA_HOST=${OLLAMA_URL:-http://ollama:11434}
+    volumes:
+      - ollama_data:/root/.ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   ollama_data:

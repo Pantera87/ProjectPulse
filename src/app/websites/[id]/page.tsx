@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
+import { isMuted } from "@/lib/check";
 import SourceActions from "@/components/source-actions";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
@@ -48,7 +49,7 @@ export default async function WebsiteDetailPage({
         id={source.id}
         type={source.type}
         watchEnabled={source.watch_enabled === 1}
-        mutedUntil={source.muted_until}
+        muted={isMuted(source)}
         intervalHours={source.check_interval_hours}
         lastCheckedAt={source.last_checked_at}
         lastError={source.last_error}
@@ -64,6 +65,7 @@ export default async function WebsiteDetailPage({
             name: source.name,
             goal: source.goal,
             category: source.category,
+            subcategory: source.subcategory,
             notes: source.notes,
           }}
         />
@@ -72,8 +74,8 @@ export default async function WebsiteDetailPage({
       <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Update rules (keywords)</h2>
         <p className="text-xs text-slate-500">
-          When any keyword appears in newly added page content, the update gets the
-          rule&apos;s priority. Example: keywords “rocm, amd” with priority critical.
+          When any keyword appears in newly added page content, the update gets
+          the rule&apos;s priority.
         </p>
         <RuleEditor sourceId={source.id} type={source.type} rules={rulesOf(source)} />
       </section>

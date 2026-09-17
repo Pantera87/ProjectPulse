@@ -11,6 +11,10 @@ export default function RestoreForm() {
   async function onFile(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
+    const ok = window.confirm(
+      `Restore "${file.name}"?\n\nThis REPLACES all current data (sources, snapshots, updates and settings) with the contents of the backup.`
+    );
+    if (!ok) return;
     setStatus("Restoring…");
     const res = await fetch("/api/backup", { method: "POST", body: file });
     const j = (await res.json().catch(() => ({}))) as {

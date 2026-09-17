@@ -79,6 +79,30 @@ export const github = {
     if (!res.ok) return null;
     return res.text();
   },
+  /**
+   * README text AND its rendered blob URL (e.g.
+   * https://github.com/{owner}/{repo}/blob/main/README.md) in one JSON call —
+   * used by the keyword scan so a README match can link straight to the file
+   * instead of the repo root.
+   */
+  readmeInfo: async (
+    owner: string,
+    repo: string
+  ): Promise<{ text: string; htmlUrl: string | null } | null> => {
+    try {
+      const json = await gh<{
+        content?: string;
+        html_url?: string;
+      }>(`/repos/${owner}/${repo}/readme`);
+      if (!json.content) return null;
+      return {
+        text: Buffer.from(json.content, "base64").toString("utf8"),
+        htmlUrl: json.html_url ?? null,
+      };
+    } catch {
+      return null;
+    }
+  },
   milestones: (owner: string, repo: string) =>
     gh<GhMilestone[]>(`/repos/${owner}/${repo}/milestones?state=all&per_page=20`),
   issues: (owner: string, repo: string, labels: string) =>
@@ -95,7 +119,7 @@ export const github = {
 export function parseGithubRef(
   input: string
 ): [string, string] | null {
-  let s = input.trim();
+  const s = input.trim();
   const urlMatch = s.match(/github\.com[/:]([^/]+)\/([^/#?]+)/i);
   if (urlMatch) return [urlMatch[1], urlMatch[2].replace(/\.git$/, "")];
   const pair = s.match(/^[\w.-]+\/[\w.-]+$/);

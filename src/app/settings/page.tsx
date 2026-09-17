@@ -2,8 +2,10 @@ import { getDb } from "@/lib/db";
 import { schedulerStatus } from "@/lib/scheduler";
 import { aiState, readAIConfig } from "@/lib/ai";
 import { CATALOG, hardwareHint } from "@/lib/ollama";
+import { readChannels, recentLog } from "@/lib/notifiers";
 import RestoreForm from "@/components/restore-form";
 import AISettings from "@/components/ai-settings";
+import NotifySettings from "@/components/notify-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,8 @@ export default async function SettingsPage() {
   const ai = await aiState();
   const cfg = readAIConfig();
   const catalog = CATALOG.map((m) => ({ ...m, hint: hardwareHint(m) }));
+  const channels = readChannels(d);
+  const notifyLog = recentLog(d, 20);
 
   return (
     <div className="space-y-6">
@@ -55,7 +59,7 @@ export default async function SettingsPage() {
           initialConfig={{
             provider: cfg.provider,
             model: cfg.model,
-            ollamaUrl: cfg.ollamaUrl || (cfg.provider === "ollama" ? "http://localhost:11434" : ""),
+            ollamaUrl: cfg.ollamaUrl || (cfg.provider === "ollama" ? "http://127.0.0.1:11434" : ""),
             openaiUrl: cfg.openaiUrl,
             openaiKey: cfg.openaiKey,
             anthropicKey: cfg.anthropicKey,
@@ -69,15 +73,18 @@ export default async function SettingsPage() {
         />
       </section>
 
-      <section className="glass space-y-2 p-4">
+      <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Alerts</h2>
-        <p className="text-sm text-slate-400">
-          {process.env.WEBHOOK_URL
-            ? `Webhook enabled: POSTs each new update (with priority) to ${process.env.WEBHOOK_URL}.`
-            : "No webhook configured. Set WEBHOOK_URL to forward every new update as JSON ({title, url, priority, kind, …}) to any endpoint."}
-        </p>
-        {process.env.AUTH_PASSWORD && (
-          <p className="text-sm text-emerald-400">Password auth is enabled (AUTH_PASSWORD set).</p>
+        <NotifySettings
+          initialChannels={channels}
+          initialLog={notifyLog}
+          authEnabled={Boolean(process.env.AUTH_PASSWORD)}
+        />
+        {process.env.WEBHOOK_URL && (
+          <p className="text-xs text-slate-500">
+            Note: WEBHOOK_URL is also set in the environment — it is used as an extra webhook
+            channel until you save a webhook channel here.
+          </p>
         )}
       </section>
     </div>

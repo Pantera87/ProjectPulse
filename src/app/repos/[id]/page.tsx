@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDb, dataDir, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
+import { isMuted } from "@/lib/check";
+import { formatDateTime } from "@/lib/format";
 import SourceActions from "@/components/source-actions";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
@@ -74,7 +76,7 @@ export default async function RepoDetailPage({
         id={source.id}
         type="github"
         watchEnabled={source.watch_enabled === 1}
-        mutedUntil={source.muted_until}
+        muted={isMuted(source)}
         intervalHours={source.check_interval_hours}
         lastCheckedAt={source.last_checked_at}
         lastError={source.last_error}
@@ -108,10 +110,10 @@ export default async function RepoDetailPage({
       <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Watch rules</h2>
         <p className="text-xs text-slate-500">
-          Critical rules (e.g. keywords “amd, rocm, hip”) flag matching releases,
-          README or commit text at that priority. GitHub milestones and major semver
-          bumps are always flagged as <em>high</em>. Add issue labels to watch new
-          labeled issues/PRs.
+          Rules flag matching releases, README or commit text at the rule&apos;s
+          priority — critical rules are the strongest signal. GitHub milestones
+          and major semver bumps are always flagged as <em>high</em>. Add issue
+          labels to watch new labeled issues/PRs.
         </p>
         <RuleEditor sourceId={source.id} type="github" rules={rulesOf(source)} />
       </section>
@@ -124,6 +126,7 @@ export default async function RepoDetailPage({
             name: source.name,
             goal: source.goal,
             category: source.category,
+            subcategory: source.subcategory,
             notes: source.notes,
           }}
         />
@@ -157,7 +160,7 @@ export default async function RepoDetailPage({
                   </a>
                 )}
                 <span className="ml-auto text-xs text-slate-500">
-                  {new Date(u.created_at).toLocaleString()}
+                  {formatDateTime(u.created_at)}
                 </span>
                 <MarkReadButton id={u.id} isRead={!!u.read_at} />
               </li>

@@ -2,7 +2,7 @@
  * AI provider seam.
  *
  * Providers (selected in Settings or via env):
- *   - Ollama: local tiny models (qwen2.5:1.5b default); the model is loaded
+ *   - Ollama: local models (qwen2.5:7b default); the model is loaded
  *     on first use and auto-downloaded when AI is requested without it.
  *   - OpenAI-compatible: any /v1/chat/completions endpoint (OpenAI, LM
  *     Studio, vLLM, Ollama's /v1, gateways…).
@@ -14,9 +14,38 @@
  * kill-switch that overrides the Settings toggle.
  */
 import { getDb, getSetting, setSetting } from "./db";
-import { ollamaInstalled, startPull } from "./ollama";
+import type { Priority } from "./db";
+import { DEFAULT_OLLAMA_MODEL, ollamaInstalled, ollamaVersion, startPull } from "./ollama";
 
 export type ProviderKind = "ollama" | "openai" | "anthropic" | "mcp";
+
+/**
+ * A document handed to the provider alongside the prompt. Ollama (≥ 0.6.2)
+ * uses its built-in RAG: the server chunks, embeds and retrieves from the
+ * files so the model only sees the most relevant parts. Providers without
+ * RAG support ignore the docs (callers keep a truncated in-prompt copy).
+ */
+export interface AIDoc {
+  /** File name shown to the server, e.g. "readme.md". */
+  name: string;
+  content: string;
+}
+
+/**
+ * Structured result of the AI semantic topic-match pass.
+ */
+export interface SemanticMatch {
+  match: boolean;
+  /** The topic/keyword the text most relates to. */
+  topic: string;
+  /** One-sentence explanation of what in the text matches and why. */
+  summary: string;
+  /**
+   * AI-assessed relevance of the match: critical = direct & significant
+   * development about the topic, high = clearly related, normal = tangential.
+   */
+  priority: Priority;
+}
 
 export interface AIProvider {
   readonly enabled: boolean;
@@ -24,11 +53,33 @@ export interface AIProvider {
   /** Summarize a diff/changes for a project. */
   summarize(diff: string, context: string): Promise<string | null>;
   /** One-line goal/purpose of software described by text. */
-  extractGoal(htmlText: string): Promise<string | null>;
-  /** Does this text semantically relate to any of the keywords? */
-  semanticallyMatches(text: string, keywords: string[]): Promise<boolean | null>;
+  extractGoal(htmlText: string, docs?: AIDoc[]): Promise<string | null>;
+  /**
+   * Does this text semantically relate to any of the keywords — and if so,
+   * classify the match: which topic it relates to, a one-sentence summary of
+   * what in the text matches, and how important/relevant it is.
+   * null = AI unavailable / unparseable reply (callers treat as no match).
+   */
+  semanticMatch(text: string, keywords: string[], docs?: AIDoc[]): Promise<SemanticMatch | null>;
+  /**
+   * Two-level classification of the project's intended use: a GENERIC
+   * category (broad domain/family, e.g. "cnc") plus a specific subcategory
+   * (e.g. "cnc-controller-firmware"). null = AI unavailable / unparseable
+   * reply (callers fall back to heuristics).
+   */
+  suggestCategory(
+    text: string,
+    existing: string[],
+    docs?: AIDoc[]
+  ): Promise<{ category: string; subcategory: string | null } | null>;
+  /**
+   * Specific subcategory (a few hyphenated words) for a project that is
+   * already in a known category (e.g. "cnc" → "cnc-controller-firmware").
+   * null = AI unavailable / unparseable reply.
+   */
+  suggestSubcategory(text: string, category: string, docs?: AIDoc[]): Promise<string | null>;
   /** Summarize what a whole project/software is. */
-  summarizeProject(text: string, context: string): Promise<string | null>;
+  summarizeProject(text: string, context: string, docs?: AIDoc[]): Promise<string | null>;
   /** Connectivity probe — returns the model's reply to a trivial prompt. */
   ping(): Promise<string | null>;
 }
@@ -39,8 +90,27 @@ abstract class BaseAI implements AIProvider {
   abstract readonly enabled: boolean;
   protected abstract complete(
     prompt: string,
-    opts?: { maxTokens?: number }
+    opts?: { maxTokens?: number; docs?: AIDoc[] }
   ): Promise<string | null>;
+  /** Whether the provider can receive RAG documents (Ollama ≥ 0.6.2 only). */
+  protected get supportsDocs(): boolean {
+    return false;
+  }
+
+  /**
+   * In-prompt text budget: when the provider gets the full content as a RAG
+   * document, only a short anchor stays in the prompt; otherwise the usual
+   * (larger) truncation applies.
+   */
+  private clip(text: string, withDoc: number, plain: number, hasDoc: boolean): string {
+    const n = this.supportsDocs && hasDoc ? withDoc : plain;
+    return text.length > n ? text.slice(0, n) : text;
+  }
+
+  /** Prompt note added when the full content travels as an attached doc. */
+  private docNote(hasDoc: boolean): string {
+    return this.supportsDocs && hasDoc ? " The full document text is attached." : "";
+  }
 
   async summarize(diff: string, context: string): Promise<string | null> {
     const d = diff.length > 4000 ? diff.slice(0, 4000) : diff;
@@ -50,33 +120,77 @@ abstract class BaseAI implements AIProvider {
     );
   }
 
-  async extractGoal(htmlText: string): Promise<string | null> {
-    const t = htmlText.length > 3000 ? htmlText.slice(0, 3000) : htmlText;
+  async extractGoal(htmlText: string, docs?: AIDoc[]): Promise<string | null> {
+    const t = this.clip(htmlText, 500, 3000, !!docs?.length);
     return this.complete(
-      `In one sentence (max 25 words), what is the main goal/purpose of the software described below?\n\n${t}`,
-      { maxTokens: 120 }
+      `In one sentence (max 25 words), what is the main goal/purpose of the software described below?${this.docNote(
+        !!docs?.length
+      )}\n\n${t}`,
+      { maxTokens: 120, docs }
     );
   }
 
-  async semanticallyMatches(text: string, keywords: string[]): Promise<boolean | null> {
-    const t = text.length > 3000 ? text.slice(0, 3000) : text;
+  async semanticMatch(text: string, keywords: string[], docs?: AIDoc[]): Promise<SemanticMatch | null> {
+    const t = this.clip(text, 500, 3000, !!docs?.length);
     const out = await this.complete(
       `Does the following text relate to any of these topics: ${keywords.join(
         ", "
-      )}? Answer with a single word: yes or no.\n\n${t}`,
-      { maxTokens: 8 }
+      )}?${this.docNote(!!docs?.length)}\n` +
+        `Reply with ONLY a JSON object (no other text) with these keys:\n` +
+        `- "match": true or false — does the text genuinely relate to at least one of the topics?\n` +
+        `- "topic": which topic it relates to (copy it from the list, "" if none)\n` +
+        `- "priority": how important this match is — "critical" only if the text is a direct and significant development about the topic, "high" if clearly related, "normal" if only tangential\n` +
+        `- "summary": one plain sentence (max 25 words) explaining what in the text matches the topic and why it matters\n\n` +
+        `${t}`,
+      { maxTokens: 200, docs }
     );
-    if (!out) return null;
-    if (/^yes\b/i.test(out)) return true;
-    if (/^no\b/i.test(out)) return false;
-    return null;
+    return parseSemanticMatch(out, keywords);
   }
 
-  async summarizeProject(text: string, context: string): Promise<string | null> {
-    const t = text.length > 5000 ? text.slice(0, 5000) : text;
+  async suggestCategory(
+    text: string,
+    existing: string[],
+    docs?: AIDoc[]
+  ): Promise<{ category: string; subcategory: string | null } | null> {
+    const t = this.clip(text, 500, 2000, !!docs?.length);
+    const existingList = existing.length
+      ? `Reuse one of these existing categories for the category part if it fits: ${existing.join(", ")}.\n`
+      : "";
+    const out = await this.complete(
+      `Classify the project described below in TWO levels, as short lowercase slugs (hyphenated words).${this.docNote(
+        !!docs?.length
+      )}\n` +
+        `Level 1 "category": the GENERIC domain or family the project belongs to — never the specific product, component or feature (firmware for a CNC controller is "cnc", not "cnc-controller-firmware"). 1-2 words, e.g. ai, engineering, gpu, devops, security.\n` +
+        `Level 2 "subcategory": the specific thing it is, a few hyphenated words (e.g. cnc-controller-firmware).\n` +
+        `Base your answer on what the project actually DOES (its features, the problem it solves). The project or repository name is just a label — NEVER repeat the name (or any part of it) as the category or subcategory.\n` +
+        `If the text is too thin to classify confidently, reply "unknown" — do not guess.\n` +
+        `${existingList}` +
+        `Reply with ONLY: category/subcategory (or just the category if the subcategory is unclear), or "unknown" if it cannot be determined.\n\n${t}`,
+      { maxTokens: 24, docs }
+    );
+    return parseCategoryPair(out);
+  }
+
+  async suggestSubcategory(text: string, category: string, docs?: AIDoc[]): Promise<string | null> {
+    const t = this.clip(text, 500, 2000, !!docs?.length);
+    const out = await this.complete(
+      `The project described below belongs to the category "${category}".${this.docNote(
+        !!docs?.length
+      )}\n` +
+        `Give the specific SUBCATEGORY: a short lowercase slug of a few hyphenated words describing the specific thing it is (e.g. cnc-controller-firmware — not the generic category itself, and not the project name).\n` +
+        `Reply with only the subcategory, or "unknown" if it cannot be determined.\n\n${t}`,
+      { maxTokens: 16, docs }
+    );
+    return normalizeCategory(out);
+  }
+
+  async summarizeProject(text: string, context: string, docs?: AIDoc[]): Promise<string | null> {
+    const t = this.clip(text, 500, 5000, !!docs?.length);
     return this.complete(
-      `In 2-3 plain sentences, summarize what the project "${context}" is and what it does. No preamble, no lists.\n\n${t}`,
-      { maxTokens: 300 }
+      `In 2-3 plain sentences, summarize what the project "${context}" is and what it does.${this.docNote(
+        !!docs?.length
+      )} No preamble, no lists.\n\n${t}`,
+      { maxTokens: 300, docs }
     );
   }
 
@@ -94,7 +208,13 @@ class NullProvider implements AIProvider {
   async extractGoal(): Promise<string | null> {
     return null;
   }
-  async semanticallyMatches(): Promise<boolean | null> {
+  async semanticMatch(): Promise<SemanticMatch | null> {
+    return null;
+  }
+  async suggestCategory(): Promise<{ category: string; subcategory: string | null } | null> {
+    return null;
+  }
+  async suggestSubcategory(): Promise<string | null> {
     return null;
   }
   async summarizeProject(): Promise<string | null> {
@@ -103,6 +223,83 @@ class NullProvider implements AIProvider {
   async ping(): Promise<string | null> {
     return null;
   }
+}
+
+/**
+ * Tolerantly parse a semantic-match reply into a SemanticMatch.
+ * Small local models often wrap JSON in code fences or add stray text —
+ * extract the first {...} block and degrade gracefully (missing priority →
+ * "normal", missing summary/topic → fallbacks). Unusable reply → null,
+ * i.e. treated as no match by callers.
+ */
+function parseSemanticMatch(out: string | null, keywords: string[]): SemanticMatch | null {
+  if (!out) return null;
+  const m = out.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(m[0]);
+  } catch {
+    return null;
+  }
+  if (typeof obj !== "object" || obj === null) return null;
+  const o = obj as Record<string, unknown>;
+  if (o.match !== true) return null;
+
+  let priority: Priority = "normal";
+  if (typeof o.priority === "string") {
+    const p = o.priority.trim().toLowerCase();
+    if (p === "critical" || p === "high" || p === "normal") priority = p;
+  }
+  const summary =
+    typeof o.summary === "string"
+      ? o.summary.trim().replace(/^["']+|["']+$/g, "").trim()
+      : "";
+  const topic =
+    typeof o.topic === "string" && o.topic.trim()
+      ? o.topic.trim()
+      : keywords.slice(0, 3).join(", ");
+  return {
+    match: true,
+    topic,
+    summary: summary || `The text relates to: ${topic}`,
+    priority,
+  };
+}
+
+/** Normalize a model reply into a valid category slug (null when unusable). */
+export function normalizeCategory(out: string | null): string | null {
+  if (!out) return null;
+  const s = out
+    .trim()
+    .toLowerCase()
+    .replace(/["'.]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (!s) return null;
+  if (["unknown", "none", "n-a", "unclear", "general", "other"].includes(s)) return null;
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s)) return null;
+  return s.length > 30 ? s.slice(0, 30) : s;
+}
+
+/**
+ * Parse a "category/subcategory" model reply. Missing or unusable
+ * subcategory → null; unusable category → null.
+ */
+function parseCategoryPair(
+  out: string | null
+): { category: string; subcategory: string | null } | null {
+  if (!out) return null;
+  const clean = out.trim().toLowerCase().replace(/^["'\s]+|["'\s]+$/g, "");
+  const i = clean.indexOf("/");
+  const catPart = i === -1 ? clean : clean.slice(0, i);
+  const subPart = i === -1 ? "" : clean.slice(i + 1);
+  const category = normalizeCategory(catPart);
+  if (!category) return null;
+  const subcategory = subPart.trim() ? normalizeCategory(subPart) : null;
+  return { category, subcategory };
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,9 +344,14 @@ class OllamaProvider extends BaseAI {
     return /^\d+$/.test(this.keepAlive) ? `${this.keepAlive}m` : "5m";
   }
 
+  /** Ollama ≥ 0.6.2 supports the `files` RAG parameter (checked per server). */
+  protected get supportsDocs(): boolean {
+    return true;
+  }
+
   protected async complete(
     prompt: string,
-    opts: { maxTokens?: number } = {}
+    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
   ): Promise<string | null> {
     try {
       const state = await ollamaModelState(this.url, this.model);
@@ -160,6 +362,20 @@ class OllamaProvider extends BaseAI {
         // message via the pull registry.
         startPull(this.url, this.model);
         return null;
+      }
+      const docs = (opts.docs ?? []).filter((d) => d.content.trim().length > 0).slice(0, 8);
+      // Built-in RAG (Ollama ≥ 0.6.2): the server chunks, embeds and
+      // retrieves from the files, so the model only sees the most relevant
+      // parts of a long document instead of a truncated prefix.
+      if (docs.length > 0 && (await this.ragSupported())) {
+        const out = await this.ragChat(prompt, docs, opts.maxTokens ?? 300);
+        if (out) return out;
+      }
+      if (docs.length > 0) {
+        // Older Ollama (no `files` support) or the chat call failed: inline
+        // the document content (truncated) so the model still sees context.
+        const docText = docs.map((d) => d.content).join("\n\n").slice(0, 4000);
+        prompt = `${prompt}\n\n--- Document content ---\n${docText}`;
       }
       const res = await fetch(`${this.url}/api/generate`, {
         method: "POST",
@@ -181,6 +397,82 @@ class OllamaProvider extends BaseAI {
       return null;
     }
   }
+
+  /**
+   * Is the server new enough for built-in RAG (`files` on /api/chat, added
+   * in 0.6.2)? Probed via /api/version once per server, cached 10 minutes.
+   * Older servers silently ignore unknown request fields, so a version
+   * check is the only reliable way to tell.
+   */
+  private async ragSupported(): Promise<boolean> {
+    const hit = ragProbe.get(this.url);
+    if (hit && Date.now() - hit.at < RAG_PROBE_TTL_MS) return hit.ok;
+    let ok = false;
+    try {
+      const v = await ollamaVersion(this.url);
+      if (v) {
+        ok = versionGte(v, "0.6.2");
+        ragProbe.set(this.url, { ok, at: Date.now() });
+      }
+    } catch {
+      // Unknown (server unreachable?) — retry on the next call.
+    }
+    return ok;
+  }
+
+  /** One chat call with the Ollama built-in RAG over the given documents. */
+  private async ragChat(
+    prompt: string,
+    docs: AIDoc[],
+    maxTokens: number
+  ): Promise<string | null> {
+    try {
+      const used = new Set<string>();
+      const files: Record<string, { contents: string }> = {};
+      for (let i = 0; i < docs.length; i++) {
+        let name =
+          docs[i].name.replace(/[^\w.-]+/g, "_").slice(0, 64) || `doc${i + 1}.txt`;
+        if (used.has(name)) name = `${name}_${i + 1}`;
+        used.add(name);
+        files[name] = { contents: docs[i].content.slice(0, 40_000) };
+      }
+      const res = await fetch(`${this.url}/api/chat`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [{ role: "user", content: prompt }],
+          files,
+          stream: false,
+          keep_alive: this.keepAliveParam,
+          options: { temperature: 0.1, num_predict: maxTokens },
+        }),
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { message?: { content?: string } };
+      const out = (json.message?.content ?? "").trim();
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** RAG-support probe results per Ollama server URL (10-minute TTL). */
+const ragProbe = new Map<string, { ok: boolean; at: number }>();
+const RAG_PROBE_TTL_MS = 10 * 60_000;
+
+/** "0.6.10" >= "0.6.2" — dot-separated numeric comparison (missing part = 0). */
+function versionGte(v: string, min: string): boolean {
+  const a = v.split(".").map((n) => parseInt(n, 10) || 0);
+  const b = min.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,9 +493,11 @@ class OpenAICompatibleProvider extends BaseAI {
     this.model = model;
   }
 
+  /** No RAG support here — docs (if any) are ignored; BaseAI keeps the full
+   *  in-prompt truncation budget. */
   protected async complete(
     prompt: string,
-    opts: { maxTokens?: number } = {}
+    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
   ): Promise<string | null> {
     try {
       const headers: Record<string, string> = { "content-type": "application/json" };
@@ -248,9 +542,10 @@ class AnthropicProvider extends BaseAI {
     this.model = model;
   }
 
+  /** No RAG support here — docs (if any) are ignored. */
   protected async complete(
     prompt: string,
-    opts: { maxTokens?: number } = {}
+    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
   ): Promise<string | null> {
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -335,7 +630,7 @@ class MCPProvider extends BaseAI {
     return "prompt";
   }
 
-  protected async complete(prompt: string): Promise<string | null> {
+  protected async complete(prompt: string, _opts?: { maxTokens?: number; docs?: AIDoc[] }): Promise<string | null> {
     try {
       await this.ensure();
       const res = await this.client!.callTool(
@@ -394,7 +689,7 @@ const CONFIG_KEYS: (keyof AIConfig)[] = [
 function defaultConfig(): AIConfig {
   return {
     provider: "ollama",
-    model: process.env.OLLAMA_MODEL || "qwen2.5:1.5b",
+    model: process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL,
     ollamaUrl: process.env.OLLAMA_URL || "",
     openaiUrl: process.env.OPENAI_URL || "https://api.openai.com/v1",
     openaiKey: process.env.OPENAI_API_KEY || "",
@@ -404,6 +699,16 @@ function defaultConfig(): AIConfig {
     mcpArg: "",
     ollamaKeepAlive: process.env.OLLAMA_KEEP_ALIVE || "5",
   };
+}
+
+/**
+ * 0.0.0.0 (and [::]) are BIND addresses, not connectable targets — a client
+ * must dial 127.0.0.1. Applied on read AND on save so a pasted server-style
+ * address never silently breaks the connection check.
+ */
+function normalizeUrl(v: string): string {
+  const m = v.trim().match(/^(https?):\/\/\[?(0\.0\.0\.0|::)\]?(:\d+)?(\/.*)?$/i);
+  return m ? `${m[1]}://127.0.0.1${m[3] ?? ""}${m[4] ?? ""}` : v;
 }
 
 /** Config = env defaults overridden by values saved in Settings (DB). */
@@ -418,6 +723,9 @@ export function readAIConfig(): AIConfig {
     const p = cfg.provider;
     if (p !== "ollama" && p !== "openai" && p !== "anthropic" && p !== "mcp")
       cfg.provider = "ollama";
+    cfg.ollamaUrl = normalizeUrl(cfg.ollamaUrl);
+    cfg.openaiUrl = normalizeUrl(cfg.openaiUrl);
+    cfg.mcpUrl = normalizeUrl(cfg.mcpUrl);
   } catch {
     // DB not ready yet — env defaults only
   }
@@ -428,9 +736,12 @@ export function saveAIConfig(
   patch: Partial<AIConfig> & { enabled?: "on" | "off" | null }
 ): void {
   const d = getDb();
+  const urlKeys: (keyof AIConfig)[] = ["ollamaUrl", "openaiUrl", "mcpUrl"];
   for (const k of CONFIG_KEYS) {
     const v = patch[k];
-    if (v !== undefined) setSetting(d, `ai.${k}`, v === "" ? null : String(v));
+    if (v === undefined) continue;
+    const val = urlKeys.includes(k) ? normalizeUrl(String(v)) : String(v);
+    setSetting(d, `ai.${k}`, val === "" ? null : val);
   }
   if (patch.enabled === "on") setSetting(d, "ai.enabled", "on");
   else if (patch.enabled === "off") setSetting(d, "ai.enabled", "off");
@@ -470,7 +781,7 @@ function effectiveEnabled(cfg: AIConfig): boolean {
 function buildProvider(cfg: AIConfig): AIProvider {
   switch (cfg.provider) {
     case "ollama":
-      return new OllamaProvider(cfg.ollamaUrl, cfg.model || "qwen2.5:1.5b", cfg.ollamaKeepAlive);
+      return new OllamaProvider(cfg.ollamaUrl, cfg.model || DEFAULT_OLLAMA_MODEL, cfg.ollamaKeepAlive);
     case "openai":
       return new OpenAICompatibleProvider(cfg.openaiUrl, cfg.openaiKey, cfg.model);
     case "anthropic":
@@ -517,6 +828,8 @@ export interface AIState {
   ollama?: {
     reachable: boolean;
     version: string | null;
+    /** built-in RAG (`files` on /api/chat) is available — Ollama ≥ 0.6.2 */
+    ragSupported: boolean;
     installed: string[];
     loaded: string[];
     modelInstalled: boolean;
@@ -547,13 +860,15 @@ async function checkRemoteReachable(cfg: AIConfig): Promise<boolean> {
   try {
     if (cfg.provider === "openai") {
       // /models with the configured key: 200 = reachable AND authed.
+      // Some gateways (local / custom) don't implement /models — a 404 or
+      // 405 still proves the endpoint is up, so treat those as reachable.
       // 401/403 (bad key) or a dead host → yellow.
       const base = cfg.openaiUrl.replace(/\/+$/, "");
       const r = await fetch(`${base}/models`, {
         headers: cfg.openaiKey ? { authorization: `Bearer ${cfg.openaiKey}` } : undefined,
         signal: AbortSignal.timeout(4000),
       });
-      ok = r.status === 200;
+      ok = r.status === 200 || r.status === 404 || r.status === 405;
     } else if (cfg.provider === "anthropic") {
       const r = await fetch("https://api.anthropic.com/v1/models?limit=1", {
         headers: {
@@ -598,10 +913,11 @@ export async function aiState(): Promise<AIState> {
   if (cfg.provider === "ollama" && cfg.ollamaUrl) {
     const { ollamaSnapshot, getPullJobs } = await import("./ollama");
     const snap = await ollamaSnapshot(cfg.ollamaUrl);
-    const model = cfg.model || "qwen2.5:1.5b";
+    const model = cfg.model || DEFAULT_OLLAMA_MODEL;
     state.ollama = {
       reachable: snap.reachable,
       version: snap.version,
+      ragSupported: !!snap.version && versionGte(snap.version, "0.6.2"),
       installed: snap.installed,
       loaded: snap.loaded,
       modelInstalled: snap.installed.includes(model),

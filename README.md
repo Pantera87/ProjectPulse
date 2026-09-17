@@ -6,7 +6,7 @@ A self-hosted tracker for software projects. Two jobs:
    **watch them for changes** — new changelog entries, new mentions of keywords
    you care about.
 2. **Track GitHub repos** — releases, milestones, labeled issues — with
-   **priority keyword rules** (e.g. flag anything mentioning *rocm/amd* as
+   **priority keyword rules** (e.g. flag anything mentioning *kernel, linux* as
    *critical*) and automatic detection of big milestones (major version bumps,
    completed GitHub milestones).
 
@@ -17,8 +17,15 @@ deployable to TrueNAS SCALE as a Compose project.
 
 ```bash
 docker compose up -d --build
-# open http://localhost:3000
+# open http://localhost:4701
 ```
+
+AI runs out of the box on the bundled **Ollama** container: the app points at
+`http://ollama:11434` by default, and `ollama-init` pre-downloads the default
+model (`qwen2.5:7b`, override with `OLLAMA_MODEL`) once the server is up.
+Downloaded models persist in the `ollama_data` Docker volume. To use a remote
+provider instead, remove the two `ollama*` services from the compose file and
+pick the provider in Settings.
 
 All data (SQLite DB + snapshots) lives in `./data`. To move to TrueNAS:
 
@@ -43,11 +50,32 @@ All data (SQLite DB + snapshots) lives in `./data`. To move to TrueNAS:
 - **Track updates**: a scheduled check extracts the page's main text,
   normalizes it and hashes it. On change: a new snapshot version is stored and
   an update entry with a text diff is created.
-- **Keyword rules** per site: e.g. critical rule `rocm, amd, hip` → the moment
+- **Keyword rules** per site: e.g. critical rule `kernel, linux` → the moment
   those words appear in newly added page text, the update is *critical*.
+  With AI enabled, a semantic second pass also flags text that *relates to*
+  the rule's topics without using the exact words.
 - Goal extraction: the project's one-line purpose is auto-extracted
-  (meta description → first paragraph) and editable. Category is suggested
-  from the goal (`gpu`, `ml-inference`, …) — the dashboard groups projects by it.
+  (meta description → first paragraph) and editable. The category is
+  auto-assigned in two levels for every source type: a **generic category**
+  for the broad domain/family (e.g. `cnc`) and a specific **subcategory**
+  (e.g. `cnc-controller-firmware`). AI assigns both when available. For
+  **GitHub** sources the classification is a priority cascade over the
+  repo's own signals: its **topics** first, then topics + **about**
+  section, and only when neither gives a confident answer is the **full
+  README** ingested (the stored AI summary can substitute for the README
+  when it is already present); websites and feeds are read from their full
+  page/feed text whenever the stored goal/summary is too thin to classify
+  from (a project name alone is not content); without AI a
+  keyword-hint fallback assigns only the generic category — not very
+  accurate, so those are marked with a "guessed" hint in the UI. Missing
+  levels are backfilled automatically on every check (a subcategory left
+  empty is completed by AI on a later check) — and keyword guesses are
+  re-classified by AI on a later check once it becomes available. A
+  category that simply repeats the project name (a known weak-model failure
+  when it was given too little content) is treated as invalid and
+  re-classified from content on the next check. Values
+  set by AI or by the user are otherwise never overwritten, and both levels
+  are always editable. The dashboard groups projects by category.
 
 ### GitHub
 - Add as `owner/repo` or a GitHub URL.
@@ -56,11 +84,13 @@ All data (SQLite DB + snapshots) lives in `./data`. To move to TrueNAS:
   - semver **major bump** or "stable/1.0" in the title → *high*
   - otherwise → *normal*
 - **Milestones**: newly opened or completed GitHub milestones → *high*.
-- **Label watching**: add issue labels to a rule (e.g. `rocm`) — new open
+- **Label watching**: add issue labels to a rule (e.g. `linux`) — new open
   issues/PRs with that label are flagged at the rule's priority.
 - **State-change scans**: README and the last 30 commits are scanned for
   keywords; you get one alert when a keyword *newly* appears
-  (e.g. "ROCm" shows up in the README → instant critical alert).
+  (e.g. a watched keyword shows up in the README → instant critical alert).
+  The alert links directly to the match: the commit whose message contains
+  the keyword, or the README section it appears in.
 - Unauthenticated GitHub API: 60 requests/h per IP. Set `GITHUB_TOKEN` for 5000/h.
 
 ### Feeds
@@ -92,26 +122,45 @@ apply.
 | `SNAPSHOT_KEEP_VERSIONS` | snapshot history depth (default 10) |
 
 ### AI (optional)
-AI powers four features: one-line **summaries of changes**, **goal
+AI powers five features: one-line **summaries of changes**, **goal
 extraction** from pages without descriptions, **semantic keyword matching**
-("added AMD GPU support" matches a `rocm` rule), and a short **project
-summary** generated when a project is added (shown on project cards and
-detail pages). All AI calls are background/non-blocking with heuristic
-fallbacks — the app is fully functional without it.
+(the keyword matcher always runs first, AI only adds matches it never
+vetoes), **two-level category assignment** of projects by intended use
+(generic category + specific subcategory, reusing existing categories for
+dashboard grouping), and a short **project summary** generated when a
+project is added (shown on project cards and detail pages). All AI calls
+are background/non-blocking with heuristic fallbacks — the app is fully
+functional without it.
 
 **Providers** (Settings → AI, or env as defaults):
 
 | Provider | What it needs | Notes |
 |---|---|---|
-| **Ollama** (default) | `OLLAMA_URL` (separate Ollama container ships commented out in `docker-compose.yml`) | Tiny local models (`qwen2.5:1.5b` default). Models load on first use. |
+| **Ollama** (default) | bundled `ollama` service in `docker-compose.yml` — `OLLAMA_URL` defaults to `http://ollama:11434` | Local models (`qwen2.5:7b` default — very accurate; smaller models in the Settings catalog are moderately accurate or basic; override with `OLLAMA_MODEL`, pre-pulled on container startup by `ollama-init`). Models load on first use. |
 | **OpenAI-compatible** | base URL (+ key for hosted APIs) | OpenAI, LM Studio, vLLM, Ollama's `/v1`, any gateway. |
 | **Anthropic** | API key | Claude via the Messages API. |
 | **MCP** | MCP server URL (Streamable HTTP) | Run the AI on another machine (e.g. a desktop with a GPU) and point ProjectPulse at an MCP server there; tool + argument are auto-detected (or set explicitly). |
 
 **Model manager** (Ollama): Settings → AI lists a curated catalog of small
-models with their size, context and a hardware-fit hint for *this* server
-(based on system RAM — Node cannot read VRAM). Status per model:
-*installed / loaded / downloading %*, with one-click **Download** (manual).
+models (the standard Q4_K_M builds) with their size, context, an accuracy hint
+(*very accurate* 7B+ / *moderately accurate* 3B / *basic* ≤ 2B) and a
+hardware-fit hint for *this* server (based on system RAM — Node cannot read
+VRAM). Status per model:
+*installed / loaded / downloading %*, with one-click **Download** and
+**Delete** per model, plus **Delete all models & reset AI** to wipe every
+installed model and start over from the default. Before README text is
+handed to a model, badges, images, inline HTML and license headers are
+stripped so prompt contexts stay minimal (CPU prompt ingestion scales
+linearly with length).
+
+**RAG (Ollama ≥ 0.6.2 only):** instead of truncating long documents into
+the prompt, ProjectPulse hands the full project content (README / page
+text / feed) to Ollama's built-in RAG — the server chunks, embeds and
+retrieves from it, so the model only sees the most relevant parts. Used by
+category classification, project summaries, goal extraction and the
+semantic keyword pass. On older Ollama versions (or non-Ollama providers)
+the calls degrade to the in-prompt truncated prefix. Settings shows
+*RAG ready / RAG off* for the Ollama server.
 
 **Auto-download (the only automatic download):** if AI is enabled and the
 selected Ollama model is not on the machine, ProjectPulse starts the pull
@@ -134,7 +183,7 @@ loaded).
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000, data in ./data
+npm run dev        # http://localhost:4701, data in ./data
 npm run build      # production build
 ```
 
@@ -142,13 +191,23 @@ npm run build      # production build
 
 - `src/lib/db.ts` — SQLite schema (sources, snapshots, updates, FTS index)
 - `src/lib/checkers/{website,github,rss}.ts` — per-type checkers
-- `src/lib/rules.ts` — keyword rule engine (word-boundary, negation, priorities)
+- `src/lib/rules.ts` — keyword rule engine (word-boundary, negation,
+  priorities) + `findRuleHitSmart` (keyword pass first, optional AI
+  semantic second pass)
 - `src/lib/scheduler.ts` + `src/instrumentation.ts` — in-process scheduler
 - `src/lib/ai.ts` — AI provider seam (Ollama, OpenAI-compatible, Anthropic,
   MCP) with per-feature fallbacks; `src/lib/ollama.ts` — Ollama client,
   model catalog + hardware hints, download registry
-- `src/lib/project-summary.ts` — gathers project context and stores the AI
-  summary (triggered on add + backfilled on first check)
+- `src/lib/project-context.ts` — gathers the full project content (README +
+  meta for GitHub, page text for websites, feed text for RSS) for the AI
+  summary + content-based category classification;
+  `src/lib/project-summary.ts` — stores the AI summary (triggered on add +
+  backfilled on first check); `src/lib/category.ts` — AI two-level category
+  auto-assignment (generic category + subcategory) from project content
+  (GitHub: tiered topics → about → full README, README only ingested when
+  the light tiers are unsure; RAG document for the full tier) with
+  keyword-hint fallback (backfilled on add + first check; name-echoing
+  values are re-classified)
 - `src/lib/notifiers.ts` — notifier seam (webhook implementation)
 - `src/middleware.ts` — optional password auth gate
 - API routes under `src/app/api/` mirror the pages; UI is Next.js App Router

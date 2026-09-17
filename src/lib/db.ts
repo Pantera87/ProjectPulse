@@ -29,7 +29,12 @@ export interface SourceRow {
   url: string;
   name: string | null;
   goal: string | null;
+  /** Generic category level — broad domain/family (e.g. "cnc") */
   category: string | null;
+  /** Specific subcategory under it (e.g. "cnc-controller-firmware") */
+  subcategory: string | null;
+  /** How the category was assigned: "ai" | "heuristic" | "user" (null = legacy/unknown) */
+  category_source: string | null;
   notes: string | null;
   watch_enabled: number;
   check_interval_hours: number;
@@ -155,11 +160,26 @@ function migrate(d: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS notification_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel TEXT NOT NULL,
+      channel_type TEXT NOT NULL,
+      update_id INTEGER,
+      priority TEXT,
+      status TEXT NOT NULL,
+      error TEXT,
+      attempts INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_notification_log_created ON notification_log(created_at);
   `);
   // Columns added after initial release — guard for existing databases.
   addColumnIfMissing(d, "snapshots", "screenshot", "TEXT");
   addColumnIfMissing(d, "sources", "logo", "TEXT");
   addColumnIfMissing(d, "sources", "project_summary", "TEXT");
+  addColumnIfMissing(d, "sources", "subcategory", "TEXT");
+  addColumnIfMissing(d, "sources", "category_source", "TEXT");
 }
 
 export function getSetting(d: Database.Database, key: string): string | null {

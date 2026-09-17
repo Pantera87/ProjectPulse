@@ -24,7 +24,7 @@ FROM node:24 AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000 \
+    PORT=4701 \
     HOSTNAME=0.0.0.0 \
     DATA_DIR=/data \
     PUPPETEER_CACHE_DIR=/opt/puppeteer
@@ -56,10 +56,10 @@ COPY --from=builder /app/.next/static ./.next/static
 RUN mkdir -p /data && chown -R node:node /data /app /opt/puppeteer
 USER node
 VOLUME ["/data"]
-EXPOSE 3000
+EXPOSE 4701
 
 # Healthcheck using node's built-in fetch (slim image has no curl).
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:4701/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]

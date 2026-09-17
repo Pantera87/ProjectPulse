@@ -57,7 +57,7 @@ function derive(s: AIState | null): Display {
   // Enabled
   if (s.provider === "ollama") {
     const o = s.ollama;
-    const model = s.model ?? "qwen2.5:1.5b";
+    const model = s.model ?? "qwen2.5:7b";
     const pull = o?.pulls?.[model];
     if (pull && pull.status === "downloading")
       return {
@@ -65,19 +65,23 @@ function derive(s: AIState | null): Display {
         label: `AI · ${model} · ${Math.round(pull.progress * 100)}%`,
         title: `Model ${model} is being downloaded — AI summaries will appear once it finishes.`,
       };
-    if (o && !o.reachable)
+    // Green only with a VERIFIED live connection: the Ollama snapshot must
+    // have answered (o.reachable) AND the model must be installed.
+    // No snapshot data or an unreachable server → yellow, never green.
+    if (!o || !o.reachable)
       return {
         dot: "bg-amber-400",
         label: `AI · ${model} (offline)`,
-        title: `Ollama server unreachable. Check that it is running (OLLAMA_URL).`,
+        title:
+          "Ollama server unreachable. Check that it is running — and on WSL/Docker hosts use http://127.0.0.1:11434 (not localhost) in Settings → AI.",
       };
-    if (o && !o.modelInstalled)
+    if (!o.modelInstalled)
       return {
         dot: "bg-amber-400",
         label: `AI · ${model} (download)`,
         title: `Model ${model} must be downloaded. It will be fetched automatically on first AI use — or download it now in Settings → AI.`,
       };
-    if (o?.modelLoaded)
+    if (o.modelLoaded)
       return {
         dot: "bg-emerald-400",
         label: `AI · ${model} loaded`,
@@ -86,11 +90,12 @@ function derive(s: AIState | null): Display {
     return {
       dot: "bg-emerald-400",
       label: `AI · ${model}`,
-      title: `AI active — ${model} is installed (loaded into memory on first use).`,
+      title: `AI active — Ollama is reachable and ${model} is installed (loaded into memory on first use).`,
     };
   }
-  // Remote providers (OpenAI-compatible, Anthropic, MCP): green dot when
-  // the endpoint answered the last check, yellow when it didn't.
+  // Remote providers (OpenAI-compatible, Anthropic, MCP): green only when the
+  // last live check PASSED (reachable === true), yellow when it failed,
+  // pulsing yellow while the first check is still pending (null).
   const label = s.provider === "mcp" ? "AI · MCP" : `AI · ${s.provider}`;
   const sub = s.model ? ` · ${s.model}` : "";
   if (s.reachable === false)
@@ -98,6 +103,12 @@ function derive(s: AIState | null): Display {
       dot: "bg-amber-400",
       label: `${label}${sub} (offline)`,
       title: `${s.provider} endpoint not reachable — check the URL/key in Settings → AI.`,
+    };
+  if (s.reachable !== true)
+    return {
+      dot: "animate-pulse bg-amber-400",
+      label: `${label}${sub} (checking…)`,
+      title: "Checking the provider endpoint — the badge turns green once it answers.",
     };
   return {
     dot: "bg-emerald-400",

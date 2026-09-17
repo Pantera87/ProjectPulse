@@ -35,6 +35,7 @@ export async function PATCH(
     "name",
     "goal",
     "category",
+    "subcategory",
     "notes",
     "watch_enabled",
     "check_interval_hours",
@@ -48,8 +49,17 @@ export async function PATCH(
   if (patch.watch_enabled !== undefined)
     patch.watch_enabled = patch.watch_enabled ? 1 : 0;
   if (patch.muted_until === "clear") patch.muted_until = null;
+  // Manual category/subcategory edits count as user-set (no "guessed" badge).
+  if (patch.category !== undefined || patch.subcategory !== undefined) {
+    patch.category_source = "user";
+  }
   touchSource(d, Number(id), patch);
-  if (patch.name !== undefined || patch.goal !== undefined || patch.category !== undefined) {
+  if (
+    patch.name !== undefined ||
+    patch.goal !== undefined ||
+    patch.category !== undefined ||
+    patch.subcategory !== undefined
+  ) {
     indexForSearch(
       d,
       "source",
@@ -57,7 +67,7 @@ export async function PATCH(
       String(patch.name ?? (row as { name: string | null }).name ?? ""),
       `${patch.goal ?? (row as { goal: string | null }).goal ?? ""} ${
         patch.category ?? (row as { category: string | null }).category ?? ""
-      }`
+      } ${patch.subcategory ?? (row as { subcategory: string | null }).subcategory ?? ""}`
     );
   }
   const updated = d

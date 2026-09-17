@@ -23,6 +23,7 @@ export interface CatalogRow {
   q4GB: number;
   ctx: string;
   blurb: string;
+  accuracy: "high" | "mid" | "low";
   hint: { label: string; tone: "good" | "ok" | "bad" };
 }
 
@@ -39,10 +40,18 @@ const TONE: Record<string, string> = {
   bad: "text-amber-300",
 };
 
+/** Model list sections — highest accuracy on top. */
+const ACCURACY_GROUPS: { key: "high" | "mid" | "low"; label: string }[] = [
+  { key: "high", label: "High accuracy" },
+  { key: "mid", label: "Mid accuracy" },
+  { key: "low", label: "Low accuracy" },
+];
+
 export default function AISettings({ initial, initialConfig, catalog, authEnabled }: Props) {
   const [s, setS] = useState<AIState>(initial);
   const [form, setForm] = useState<AIFormConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [test, setTest] = useState<{ ok: boolean; reply: string | null; error: string | null } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -74,11 +83,34 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
     await post("/api/ai", { enabled: intentOn ? "off" : "on" });
     refresh();
   };
-  // Remote providers (openai/anthropic/mcp): dot + text reflect whether the
-  // endpoint answered the last reachability check (green) or not (yellow).
-  const remoteOnline =
-    s.enabled && s.provider !== "ollama" && s.reachable !== false;
+  // The dot + text reflect a VERIFIED connection, not "enabled + saved":
+  // green only after a live check passed (reachable === true, or — for
+  // Ollama — the server snapshot answered AND the model is installed).
+  // Yellow = unreachable, or the first check hasn't come back yet (null).
+  const remoteOnline = s.enabled && s.provider !== "ollama" && s.reachable === true;
   const remoteOffline = s.enabled && s.provider !== "ollama" && s.reachable === false;
+  const remoteChecking = s.enabled && s.provider !== "ollama" && s.reachable == null;
+  const ollamaOnline =
+    s.enabled &&
+    s.provider === "ollama" &&
+    s.ollama?.reachable === true &&
+    s.ollama.modelInstalled;
+
+  // Per-connection annotation for the status line ("" when nothing to say).
+  const connNote = (() => {
+    if (s.provider === "ollama") {
+      if (!s.ollama) return "";
+      if (!s.ollama.reachable) return " · not connected (Ollama unreachable)";
+      if (!s.ollama.modelInstalled) return " · connected (model not downloaded)";
+      return s.ollama.modelLoaded
+        ? " · connected (model loaded)"
+        : " · connected (model installed)";
+    }
+    if (remoteOffline) return " · not connected (check URL / key)";
+    if (remoteChecking) return " · checking connection…";
+    if (remoteOnline) return " · connected";
+    return "";
+  })();
 
   const save = async () => {
     setSaving(true);
@@ -109,6 +141,68 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
     }
   };
 
+  const deleteModel = async (name: string) => {
+    const isCurrent = s.model === name;
+    const ok = window.confirm(
+      isCurrent
+        ? `Delete ${name}?\n\nIt is the currently selected model — AI will fall back to heuristics until it is downloaded again (the download starts automatically on the next AI use).`
+        : `Delete ${name} from Ollama?\n\nThe downloaded weights will be removed from disk.`
+    );
+    if (!ok) return;
+    setMsg(null);
+    setDeleting(name);
+    try {
+      const r = await post("/api/ai/ollama/delete", { name });
+      const j = await r.json().catch(() => ({} as { error?: string }));
+      if (!r.ok) setMsg(j.error ?? `Failed to delete ${name}`);
+      else setMsg(`${name} deleted.`);
+      refresh();
+    } catch {
+      setMsg("Delete failed (could not reach the app server).");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const deleteAllAndReset = async () => {
+    const names = s.ollama?.installed ?? [];
+    if (names.length === 0) {
+      setMsg("No installed models to delete.");
+      return;
+    }
+    const ok = window.confirm(
+      `Delete ALL ${names.length} installed Ollama model(s) and reset AI?\n\n${names.join(
+        "\n"
+      )}\n\nThis frees the disk space and the model selection goes back to the default (qwen2.5:7b), which is downloaded automatically on the next AI use.`
+    );
+    if (!ok) return;
+    setMsg(null);
+    setDeleting("all");
+    const failed: string[] = [];
+    for (const name of names) {
+      try {
+        const r = await post("/api/ai/ollama/delete", { name });
+        const j = await r.json().catch(() => ({} as { error?: string }));
+        if (!r.ok) failed.push(`${name}: ${j.error ?? "failed"}`);
+      } catch {
+        failed.push(name);
+      }
+    }
+    // Start AI over: model selection back to the default (Ollama provider only).
+    if (form.provider === "ollama" && form.model !== "qwen2.5:7b") {
+      const next = { ...form, model: "qwen2.5:7b" };
+      setForm(next);
+      await post("/api/ai", next);
+    }
+    setMsg(
+      failed.length
+        ? `Deleted ${names.length - failed.length} of ${names.length} model(s). Failed: ${failed.join("; ")}`
+        : `All models deleted and AI reset — the default model (qwen2.5:7b) downloads automatically on the next AI use.`
+    );
+    refresh();
+    setDeleting(null);
+  };
+
   const field = (label: string, key: keyof AIFormConfig, placeholder: string, type = "text") => (
     <label className="block text-xs text-slate-400">
       {label}
@@ -128,9 +222,9 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
       <div className="flex flex-wrap items-center gap-3">
         <span
           className={`h-2.5 w-2.5 rounded-full ${
-            remoteOnline
+            remoteOnline || ollamaOnline
               ? "bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]"
-              : intentOn || remoteOffline
+              : intentOn
                 ? "bg-amber-400"
                 : "bg-slate-500"
           }`}
@@ -142,13 +236,7 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
             : !intentOn
               ? "AI is disabled (Settings toggle)."
               : s.enabled
-                ? `AI is on — ${s.provider}${s.model ? ` · ${s.model}` : ""}${
-                    s.provider !== "ollama"
-                      ? remoteOffline
-                        ? " · not connected (check URL / key)"
-                        : " · connected"
-                      : ""
-                  }`
+                ? `AI is on — ${s.provider}${s.model ? ` · ${s.model}` : ""}${connNote}`
                 : "AI is enabled — no provider configured yet."}
         </p>
         <button
@@ -194,7 +282,7 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
           field(
             "Model",
             "model",
-            form.provider === "ollama" ? "qwen2.5:1.5b" : "gpt-4o-mini / claude-haiku-4-5",
+            form.provider === "ollama" ? "qwen2.5:7b" : "gpt-4o-mini / claude-haiku-4-5",
           )}
         {form.provider === "ollama" &&
           field("Ollama base URL", "ollamaUrl", "http://localhost:11434")}
@@ -244,7 +332,21 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
       {/* Ollama model manager */}
       {form.provider === "ollama" && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-slate-200">Ollama models</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-medium text-slate-200">Ollama models</h3>
+            {s.ollama && s.ollama.installed.length > 0 && (
+              <button
+                onClick={deleteAllAndReset}
+                disabled={deleting !== null}
+                className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-[11px] text-rose-300 transition hover:bg-rose-400/20 disabled:opacity-50"
+                title="Delete every installed Ollama model and reset the model selection to the default (qwen2.5:7b)"
+              >
+                {deleting === "all"
+                  ? "Deleting all…"
+                  : `Delete all models & reset AI (${s.ollama.installed.length})`}
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="block text-xs text-slate-400">
               Auto-unload model after
@@ -294,9 +396,15 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
                 </li>
                 <li>
                   Press Save (with the URL), then Download again. Manual alternative:{" "}
-                  <code>ollama pull qwen2.5:1.5b</code>
+                  <code>ollama pull qwen2.5:7b</code>
                 </li>
               </ol>
+              <p className="mt-1">
+                Tip: use <code>http://127.0.0.1:11434</code> instead of <code>localhost</code> —
+                on WSL2/Docker hosts <code>localhost</code> can resolve to <code>::1</code>, where a
+                WSL port relay may answer without an Ollama behind it. From a Docker container, use{" "}
+                <code>http://host.docker.internal:11434</code>.
+              </p>
             </div>
           )}
           {s.ollama && s.ollama.reachable && (
@@ -312,68 +420,102 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
                   </span>
                 </>
               )}
+              {" · "}
+              {s.ollama.ragSupported ? (
+                <span className="text-emerald-300" title="The server chunks, embeds and retrieves from project pages/READMEs, so the model sees the most relevant parts of long documents">
+                  RAG ready
+                </span>
+              ) : (
+                <span
+                  className="text-amber-300"
+                  title="Built-in RAG (full README/page analysis) needs Ollama ≥ 0.6.2 — long documents are truncated into the prompt instead. Upgrade with: ollama update"
+                >
+                  RAG off (Ollama &lt; 0.6.2)
+                </span>
+              )}
               . Models load into memory on first use.
             </p>
           )}
-          <ul className="space-y-1.5">
-            {catalog.map((m) => {
-              const pull = s.ollama?.pulls?.[m.name];
-              const installing = s.ollama?.installed.includes(m.name);
-              const loaded = s.ollama?.loaded.includes(m.name);
-              const isCurrent = form.model === m.name;
-              return (
-                <li
-                  key={m.name}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs"
-                >
-                  <button
-                    onClick={() => setForm((f) => ({ ...f, model: m.name }))}
-                    className={`min-w-[140px] text-left font-medium ${
-                      isCurrent ? "text-violet-300" : "text-slate-200 hover:text-white"
-                    }`}
-                    title="Use this model"
-                  >
-                    {m.name}
-                    {isCurrent && <span className="ml-1 text-violet-300">●</span>}
-                  </button>
-                  <span className="text-slate-500">
-                    {m.family} · {m.params} · {m.ctx} ctx · ~{m.q4GB} GB
-                  </span>
-                  {loaded ? (
-                    <span className="badge border-emerald-400/40 bg-emerald-400/10 text-emerald-300">
-                      loaded
-                    </span>
-                  ) : installing ? (
-                    <span className="badge border-sky-400/40 bg-sky-400/10 text-sky-300">
-                      installed
-                    </span>
-                  ) : null}
-                  {pull && pull.status === "downloading" && (
-                    <span className="badge animate-pulse border-sky-400/40 bg-sky-400/10 text-sky-300">
-                      downloading {Math.round(pull.progress * 100)}%
-                    </span>
-                  )}
-                  {pull && pull.status === "error" && (
-                    <span className="badge border-rose-400/40 bg-rose-400/10 text-rose-300" title={pull.error ?? ""}>
-                      download failed
-                    </span>
-                  )}
-                  <span className={`ml-auto max-w-[45%] text-[11px] ${TONE[m.hint.tone]}`}>
-                    {m.hint.label}
-                  </span>
-                  {!installing && !loaded && (
-                    <button
-                      onClick={() => download(m.name)}
-                      disabled={pull?.status === "downloading"}
-                      className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
-                    >
-                      {pull?.status === "downloading" ? "Downloading…" : "Download"}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          {ACCURACY_GROUPS.map((g) => {
+            const models = catalog.filter((m) => m.accuracy === g.key);
+            if (models.length === 0) return null;
+            return (
+              <div key={g.key} className="space-y-1.5 pt-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                  {g.label}
+                </p>
+                <ul className="space-y-1.5">
+                  {models.map((m) => {
+                    const pull = s.ollama?.pulls?.[m.name];
+                    const installing = s.ollama?.installed.includes(m.name);
+                    const loaded = s.ollama?.loaded.includes(m.name);
+                    const isCurrent = form.model === m.name;
+                    return (
+                      <li
+                        key={m.name}
+                        className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs"
+                      >
+                        <button
+                          onClick={() => setForm((f) => ({ ...f, model: m.name }))}
+                          className={`min-w-[140px] text-left font-medium ${
+                            isCurrent ? "text-violet-300" : "text-slate-200 hover:text-white"
+                          }`}
+                          title="Use this model"
+                        >
+                          {m.name}
+                          {isCurrent && <span className="ml-1 text-violet-300">●</span>}
+                        </button>
+                        <span className="text-slate-500">
+                          {m.family} · {m.params} · {m.ctx} ctx · ~{m.q4GB} GB
+                        </span>
+                        {loaded ? (
+                          <span className="badge border-emerald-400/40 bg-emerald-400/10 text-emerald-300">
+                            loaded
+                          </span>
+                        ) : installing ? (
+                          <span className="badge border-sky-400/40 bg-sky-400/10 text-sky-300">
+                            installed
+                          </span>
+                        ) : null}
+                        {pull && pull.status === "downloading" && (
+                          <span className="badge animate-pulse border-sky-400/40 bg-sky-400/10 text-sky-300">
+                            downloading {Math.round(pull.progress * 100)}%
+                          </span>
+                        )}
+                        {pull && pull.status === "error" && (
+                          <span className="badge border-rose-400/40 bg-rose-400/10 text-rose-300" title={pull.error ?? ""}>
+                            download failed
+                          </span>
+                        )}
+                        <span className={`ml-auto max-w-[45%] text-[11px] ${TONE[m.hint.tone]}`}>
+                          {m.hint.label}
+                        </span>
+                        {!installing && !loaded && (
+                          <button
+                            onClick={() => download(m.name)}
+                            disabled={pull?.status === "downloading"}
+                            className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                          >
+                            {pull?.status === "downloading" ? "Downloading…" : "Download"}
+                          </button>
+                        )}
+                        {(installing || loaded) && (
+                          <button
+                            onClick={() => deleteModel(m.name)}
+                            disabled={deleting === m.name}
+                            className="rounded-full border border-rose-400/30 bg-rose-400/10 px-2.5 py-1 text-[11px] text-rose-300 transition hover:bg-rose-400/20 disabled:opacity-50"
+                            title="Delete this model from Ollama (frees disk space)"
+                          >
+                            {deleting === m.name ? "Deleting…" : "Delete"}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
           <p className="text-[11px] leading-relaxed text-slate-500">
             Click a model name to select it (then press Save). Hardware hints are based on this
             server&rsquo;s system RAM — GPU/VRAM usage is up to Ollama to manage. If AI is

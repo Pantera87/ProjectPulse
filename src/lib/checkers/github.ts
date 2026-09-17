@@ -1,11 +1,12 @@
 import type Database from "better-sqlite3";
 import type { SourceRow } from "../db";
-import { github, parseGithubRef, type GhRelease } from "../github";
+import { github, parseGithubRef, type GhCommit, type GhRelease } from "../github";
 import {
-  findRuleHit,
+  findRuleHitSmart,
   isMajorBump,
   looksLikeMilestoneRelease,
 } from "../rules";
+import { getAI } from "../ai";
 import {
   insertUpdate,
   indexForSearch,
@@ -13,7 +14,7 @@ import {
   stateOf,
   touchSource,
 } from "../models";
-import { truncate } from "../text";
+import { markdownSectionAnchor, truncate } from "../text";
 import { notify } from "../notifiers";
 import { captureScreenshot, downloadFile, fileIsStale } from "../screenshots";
 import type { CheckResult } from "./website";
@@ -111,9 +112,12 @@ export async function checkGithub(
         a.published_at.localeCompare(b.published_at)
       );
       for (const r of newReleases) {
-        const hit = findRuleHit(rules, "releases", [
-          { kind: "releases", text: `${r.name ?? ""} ${r.body ?? ""}` },
-        ]);
+        const hit = await findRuleHitSmart(
+          rules,
+          "releases",
+          [{ kind: "releases", text: `${r.name ?? ""} ${r.body ?? ""}` }],
+          getAI()
+        );
         let priority: "critical" | "high" | "normal" = "normal";
         if (hit) priority = hit.priority;
         else if (
@@ -125,11 +129,21 @@ export async function checkGithub(
           priority,
           hit ? "keyword" : "release",
           hit
-            ? `Keyword "${hit.matched.join(", ")}" in release ${r.tag_name}`
+            ? hit.semantic
+              ? hit.semanticTopic
+                ? `Topic match in release ${r.tag_name}: ${hit.semanticTopic}`
+                : `AI topic match in release ${r.tag_name}`
+              : `Keyword "${hit.matched.join(", ")}" in release ${r.tag_name}`
             : `Release ${r.tag_name}${r.prerelease ? " (pre-release)" : ""}`,
-          r.body ?? r.name ?? null,
+          hit?.semantic && hit.semanticSummary ? hit.semanticSummary : r.body ?? r.name ?? null,
           r.html_url,
-          { tag: r.tag_name, prerelease: r.prerelease }
+          {
+            tag: r.tag_name,
+            prerelease: r.prerelease,
+            semantic: !!hit?.semantic,
+            semanticTopic: hit?.semanticTopic ?? null,
+            semanticSummary: hit?.semanticSummary ?? null,
+          }
         );
         seenTags.push(r.tag_name);
         state.prev_tag = r.tag_name;
@@ -206,31 +220,90 @@ export async function checkGithub(
     // --- Keyword scans: README + recent commits (state-change detection) ---
     for (const scan of (["readme", "commits"] as const)) {
       let text = "";
+      // Where a match links to (instead of the repo root): the README blob
+      // URL for README hits, the individual commits for commit hits.
+      let readmeUrl: string | null = null;
+      let commits: GhCommit[] = [];
       if (scan === "readme") {
-        text = (await github.readme(owner, repo)) ?? "";
+        const info = await github.readmeInfo(owner, repo);
+        text = info?.text ?? "";
+        readmeUrl = info?.htmlUrl ?? null;
       } else {
-        const commits = await github.commits(owner, repo, 30);
+        commits = await github.commits(owner, repo, 30);
         text = commits.map((c) => c.commit.message).join("\n");
       }
       for (const rule of rules) {
         if (!rule.sources.includes(scan)) continue;
-        const matched =
-          findRuleHit([rule], scan, [{ kind: scan, text }])?.matched ?? [];
+        // Keyword pass first; the AI semantic second pass only runs when the
+        // keyword pass found nothing. The state-change bookkeeping below
+        // dedupes repeated matches across checks for both kinds of hits.
+        const hit = await findRuleHitSmart(
+          [rule],
+          scan,
+          [{ kind: scan, text }],
+          getAI(),
+          // The README can be much longer than a prompt slice — hand the
+          // full text to RAG-capable providers; commit messages stay in-prompt.
+          scan === "readme" && text ? [{ name: "readme.md", content: text }] : undefined
+        );
         const key = `${scan}:${rule.id}`;
         const previouslyMatched = state.readme_matched?.[key] === true;
-        if (matched.length > 0 && !previouslyMatched) {
+        if (hit && !previouslyMatched) {
+          // Link the update directly to where the match lives:
+          //  - README: the README file itself, with a best-effort anchor
+          //    to the section containing the matched keyword;
+          //  - commits: the (newest) commit whose message contains one of
+          //    the matched keywords — semantic hits have no literal keyword,
+          //    so they link to the repo's commit list instead.
+          let url = `https://github.com/${owner}/${repo}`;
+          let commitSha: string | null = null;
+          if (scan === "readme") {
+            if (readmeUrl) {
+              url = readmeUrl;
+              if (!hit.semantic && hit.matched.length > 0) {
+                const anchor = markdownSectionAnchor(text, hit.matched[0]);
+                if (anchor) url = `${readmeUrl}#${anchor}`;
+              }
+            }
+          } else {
+            url = `https://github.com/${owner}/${repo}/commits`;
+            if (!hit.semantic && hit.matched.length > 0) {
+              const found = commits.find((c) =>
+                hit.matched.some((kw) =>
+                  /^[a-z0-9]+$/i.test(kw)
+                    ? new RegExp(`\\b${kw}\\b`, "i").test(c.commit.message)
+                    : c.commit.message.toLowerCase().includes(kw.toLowerCase())
+                )
+              );
+              if (found) {
+                url = found.html_url;
+                commitSha = found.sha;
+              }
+            }
+          }
           emit(
-            rule.priority,
+            hit.priority,
             "keyword",
-            `Keyword "${matched.join(", ")}" now present in ${scan}`,
-            null,
-            `https://github.com/${owner}/${repo}`,
-            { scan, keywords: matched }
+            hit.semantic
+              ? hit.semanticTopic
+                ? `Topic match in ${scan}: ${hit.semanticTopic}`
+                : `AI topic match now present in ${scan}`
+              : `Keyword "${hit.matched.join(", ")}" now present in ${scan}`,
+            hit.semanticSummary ?? null,
+            url,
+            {
+              scan,
+              keywords: hit.matched,
+              semantic: !!hit.semantic,
+              semanticTopic: hit.semanticTopic ?? null,
+              semanticSummary: hit.semanticSummary ?? null,
+              commitSha,
+            }
           );
         }
         if (state.readme_matched)
-          state.readme_matched[key] = matched.length > 0;
-        else state.readme_matched = { [key]: matched.length > 0 };
+          state.readme_matched[key] = hit !== null;
+        else state.readme_matched = { [key]: hit !== null };
       }
     }
 

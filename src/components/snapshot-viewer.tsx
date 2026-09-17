@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { createTwoFilesPatch } from "diff";
+import { formatDateTime } from "@/lib/format";
 /**
  * Server component: renders the selected snapshot version in a sandboxed
  * iframe, or a unified diff between two versions.
@@ -78,7 +79,7 @@ export default function SnapshotViewer({
                 key={s.version}
                 href={s.version === version ? baseHref : `${baseHref}?v=${s.version}`}
                 className={`chip ${s.version === version ? "chip-active" : ""}`}
-                title={new Date(s.fetched_at).toLocaleString()}
+                title={formatDateTime(s.fetched_at)}
               >
                 v{s.version}
               </Link>
@@ -104,7 +105,7 @@ export default function SnapshotViewer({
             />
             <p className="text-xs text-slate-500">
               Visual screenshot · captured{" "}
-              {row.fetched_at ? new Date(row.fetched_at).toLocaleString() : "—"} ·{" "}
+              {formatDateTime(row.fetched_at)} ·{" "}
               <a
                 href={`/api/sources/${sourceId}/snapshots?version=${version}`}
                 target="_blank"

@@ -27,6 +27,12 @@ async function jget(url: string, path: string, timeoutMs = 10_000) {
   }
 }
 
+/** Server version string (e.g. "0.6.2"), or null when unreachable. */
+export async function ollamaVersion(url: string): Promise<string | null> {
+  const json = await jget(url, "/api/version");
+  return json?.version ?? null;
+}
+
 /** Locally installed model names, or null when the server is unreachable. */
 export async function ollamaInstalled(url: string): Promise<string[] | null> {
   const json = await jget(url, "/api/tags");
@@ -90,6 +96,32 @@ export function getPullJobs(): Record<string, PullJob> {
   return Object.fromEntries(pulls);
 }
 
+/** Delete an installed model from the Ollama server (frees the weights on
+ *  disk). Ollama's endpoint: DELETE /api/delete with a JSON body. */
+export async function ollamaDeleteModel(
+  url: string,
+  name: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${base(url)}/api/delete`, {
+      method: "DELETE",
+      headers: { "user-agent": UA, "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) return { ok: false, error: `Ollama returned ${res.status} when deleting ${name}` };
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: /fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)
+        ? `Ollama server not reachable at ${base(url)} — is Ollama running?`
+        : msg,
+    };
+  }
+}
+
 /**
  * Start (or return an in-flight) background download of `name`. The pull
  * survives the HTTP request that started it; progress is exposed via
@@ -144,9 +176,13 @@ export function startPull(url: string, name: string): PullJob {
     } catch (e) {
       job.status = "error";
       const msg = e instanceof Error ? e.message : String(e);
-      job.error = /fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)
-        ? `Ollama server not reachable at ${base(url)} — is Ollama installed and running? (https://ollama.com/download)`
-        : msg;
+      if (/fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)) {
+        job.error = `Ollama server not reachable at ${base(url)} — is Ollama installed and running? (https://ollama.com/download)`;
+      } else if (/does not exist|manifest/i.test(msg)) {
+        job.error = `Ollama could not fetch ${name} ("${msg}"). This tag does not exist in the official registry — check the available tags at https://ollama.com/library, and upgrade Ollama if it is old (it may predate this model).`;
+      } else {
+        job.error = msg;
+      }
     }
   })();
   return job;
@@ -164,18 +200,25 @@ export interface CatalogModel {
   q4GB: number;
   ctx: string;
   blurb: string;
+  /** accuracy tier — the settings model list is grouped by this (high on top) */
+  accuracy: "high" | "mid" | "low";
 }
 
+/** The model used everywhere (defaults, pre-pull, UI hints) unless the user
+ *  chose another one in Settings. Plain tags are Ollama's standard Q4_K_M
+ *  builds — e.g. qwen2.5:7b already IS the Q4_K_M quantization. */
+export const DEFAULT_OLLAMA_MODEL = "qwen2.5:7b";
+
 export const CATALOG: CatalogModel[] = [
-  { name: "qwen2.5:1.5b", family: "Qwen 2.5", params: "1.5B", q4GB: 1.0, ctx: "32k", blurb: "Default. Excellent short-text summarization; fast on almost any hardware." },
-  { name: "llama3.2:1b", family: "Llama 3.2", params: "1B", q4GB: 0.8, ctx: "128k", blurb: "Lightest general-purpose model, very long context." },
-  { name: "gemma2:2b", family: "Gemma 2", params: "2B", q4GB: 1.6, ctx: "8k", blurb: "Small and multilingual; fine for summaries, short context." },
-  { name: "qwen2.5:3b", family: "Qwen 2.5", params: "3B", q4GB: 2.0, ctx: "32k", blurb: "Noticeably better quality than 1.5B at low cost." },
-  { name: "llama3.2:3b", family: "Llama 3.2", params: "3B", q4GB: 2.0, ctx: "128k", blurb: "Solid mid-size model with a very long context window." },
-  { name: "phi-4-mini", family: "Phi-4-mini", params: "3.8B", q4GB: 2.5, ctx: "128k", blurb: "Punches above its weight on reasoning and summarization." },
-  { name: "qwen2.5:7b", family: "Qwen 2.5", params: "7B", q4GB: 4.7, ctx: "32k", blurb: "Best local quality for most use; needs ~6 GB free RAM." },
-  { name: "llama3.1:8b", family: "Llama 3.1", params: "8B", q4GB: 4.9, ctx: "128k", blurb: "Strong all-rounder with a long context window." },
-  { name: "gemma2:9b", family: "Gemma 2", params: "9B", q4GB: 5.4, ctx: "8k", blurb: "High quality, but short context and the heaviest download here." },
+  { name: "qwen2.5:1.5b", family: "Qwen 2.5", params: "1.5B", q4GB: 1.0, ctx: "32k", accuracy: "low", blurb: "Basic accuracy; fast on almost any hardware, excellent for quick short-text summarization." },
+  { name: "llama3.2:1b", family: "Llama 3.2", params: "1B", q4GB: 0.8, ctx: "128k", accuracy: "low", blurb: "Basic accuracy; lightest general-purpose model, very long context." },
+  { name: "gemma2:2b", family: "Gemma 2", params: "2B", q4GB: 1.6, ctx: "8k", accuracy: "low", blurb: "Basic accuracy; small and multilingual; fine for summaries, short context." },
+  { name: "qwen2.5:3b", family: "Qwen 2.5", params: "3B", q4GB: 2.0, ctx: "32k", accuracy: "mid", blurb: "Moderately accurate; noticeably better quality at low cost." },
+  { name: "llama3.2:3b", family: "Llama 3.2", params: "3B", q4GB: 2.0, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; solid mid-size model with a very long context window." },
+  { name: "phi-4-mini", family: "Phi-4-mini", params: "3.8B", q4GB: 2.5, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; punches above its weight on reasoning and summarization." },
+  { name: "qwen2.5:7b", family: "Qwen 2.5", params: "7B", q4GB: 4.7, ctx: "32k", accuracy: "high", blurb: "Default. Very accurate — best local quality for most use; needs ~6 GB free RAM." },
+  { name: "llama3.1:8b", family: "Llama 3.1", params: "8B", q4GB: 4.9, ctx: "128k", accuracy: "high", blurb: "Very accurate; strong all-rounder with a long context window." },
+  { name: "gemma2:9b", family: "Gemma 2", params: "9B", q4GB: 5.4, ctx: "8k", accuracy: "high", blurb: "Very accurate; highest quality here, but short context and the heaviest download." },
 ];
 
 /** Total system RAM in GB. */

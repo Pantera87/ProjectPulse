@@ -1,7 +1,8 @@
 import type Database from "better-sqlite3";
 import Parser from "rss-parser";
 import type { SourceRow } from "../db";
-import { findRuleHit } from "../rules";
+import { findRuleHitSmart } from "../rules";
+import { getAI } from "../ai";
 import {
   insertUpdate,
   indexForSearch,
@@ -66,18 +67,37 @@ export async function checkRss(
     for (const it of entries) {
       if (seen.includes(it.guid)) continue;
       const text = `${it.title} ${it.contentSnippet ?? it.content ?? ""}`;
-      const hit = findRuleHit(rules, "feed", [{ kind: "feed", text }]);
+      // Keyword pass first; an AI semantic second pass runs when no keyword hits.
+      const hit = await findRuleHitSmart(
+        rules,
+        "feed",
+        [{ kind: "feed", text }],
+        getAI()
+      );
       const priority = hit ? hit.priority : "normal";
       const id = insertUpdate(d, {
         source_id: source.id,
         priority,
         kind: hit ? "keyword" : "feed_entry",
         title: hit
-          ? `Keyword "${hit.matched.join(", ")}" in feed: ${it.title}`
+          ? hit.semantic
+            ? hit.semanticTopic
+              ? `Topic match in feed: ${it.title}`
+              : `AI topic match in feed: ${it.title}`
+            : `Keyword "${hit.matched.join(", ")}" in feed: ${it.title}`
           : it.title,
-        summary: truncate(it.contentSnippet ?? "", 1000),
+        summary:
+          hit?.semantic && hit.semanticSummary
+            ? hit.semanticSummary
+            : truncate(it.contentSnippet ?? "", 1000),
         url: it.link || source.url,
-        payload: { guid: it.guid, date: it.isoDate ?? null },
+        payload: {
+          guid: it.guid,
+          date: it.isoDate ?? null,
+          semantic: !!hit?.semantic,
+          semanticTopic: hit?.semanticTopic ?? null,
+          semanticSummary: hit?.semanticSummary ?? null,
+        },
       });
       updatesCreated++;
       void notify({

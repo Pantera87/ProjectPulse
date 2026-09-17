@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 
 interface Props {
   sourceId: number;
-  initial: { name: string | null; goal: string | null; category: string | null; notes: string | null };
+  initial: {
+    name: string | null;
+    goal: string | null;
+    category: string | null;
+    subcategory: string | null;
+    notes: string | null;
+  };
 }
 
 const cls = "input-glass w-full";
@@ -14,6 +20,7 @@ export default function EditMeta({ sourceId, initial }: Props) {
   const [name, setName] = useState(initial.name ?? "");
   const [goal, setGoal] = useState(initial.goal ?? "");
   const [category, setCategory] = useState(initial.category ?? "");
+  const [subcategory, setSubcategory] = useState(initial.subcategory ?? "");
   const [notes, setNotes] = useState(initial.notes ?? "");
   const [saved, setSaved] = useState(false);
   const router = useRouter();
@@ -23,7 +30,7 @@ export default function EditMeta({ sourceId, initial }: Props) {
     await fetch(`/api/sources/${sourceId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, goal, category, notes }),
+      body: JSON.stringify({ name, goal, category, subcategory, notes }),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -37,8 +44,16 @@ export default function EditMeta({ sourceId, initial }: Props) {
         <input value={name} onChange={(e) => setName(e.target.value)} className={cls} />
       </label>
       <label className="text-xs text-slate-400">
-        Category (free text, e.g. gpu, ml-inference)
+        Category (generic domain, e.g. gpu, cnc)
         <input value={category} onChange={(e) => setCategory(e.target.value)} className={cls} />
+      </label>
+      <label className="text-xs text-slate-400">
+        Subcategory (specific, e.g. cnc-controller-firmware)
+        <input
+          value={subcategory}
+          onChange={(e) => setSubcategory(e.target.value)}
+          className={cls}
+        />
       </label>
       <label className="text-xs text-slate-400 sm:col-span-2">
         Goal (one line — auto-extracted, editable)

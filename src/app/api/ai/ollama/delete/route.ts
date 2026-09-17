@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readAIConfig } from "@/lib/ai";
-import { startPull, getPullJobs } from "@/lib/ollama";
+import { ollamaDeleteModel } from "@/lib/ollama";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +9,7 @@ interface Body {
 }
 
 /**
- * POST /api/ai/ollama/pull — start (or join) a background download of an
- * Ollama model. Progress is reported via GET /api/ai (ollama.pulls).
+ * POST /api/ai/ollama/delete — delete an installed Ollama model from disk.
  */
 export async function POST(req: Request) {
   let body: Body;
@@ -25,12 +24,9 @@ export async function POST(req: Request) {
 
   const cfg = readAIConfig();
   // Ollama's default local endpoint when the user hasn't set one.
-  // 127.0.0.1 (not localhost): on WSL/Docker hosts "localhost" can resolve
-  // to ::1, where a WSL relay may hold the port without an Ollama behind it.
   const root = (cfg.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
 
-  // Quick reachability check so the UI gets immediate, actionable feedback
-  // instead of a job that errors a moment later.
+  // Quick reachability check so the UI gets immediate, actionable feedback.
   let up = false;
   try {
     const r = await fetch(`${root}/api/version`, { signal: AbortSignal.timeout(3000) });
@@ -41,12 +37,13 @@ export async function POST(req: Request) {
   if (!up)
     return NextResponse.json(
       {
-        error: `Ollama is not reachable at ${root}. Install it from https://ollama.com/download (Windows: "winget install Ollama.Ollama"), make sure it is running (system tray or "ollama serve"), then press Download again. Models are fetched by Ollama itself from the official registry (registry.ollama.ai).`,
+        error: `Ollama is not reachable at ${root}. Make sure it is running, then try again.`,
       },
       { status: 503 },
     );
 
-  startPull(root, name);
-  const job = getPullJobs()[name];
-  return NextResponse.json({ ok: true, name, status: job.status, progress: job.progress });
+  const result = await ollamaDeleteModel(root, name);
+  return result.ok
+    ? NextResponse.json({ ok: true, name })
+    : NextResponse.json({ error: result.error ?? "Delete failed" }, { status: 502 });
 }

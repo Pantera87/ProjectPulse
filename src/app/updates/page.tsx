@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import UpdateItem, { type UpdateView } from "@/components/update-item";
 import MarkAllRead from "@/components/mark-all";
+import ClearUpdates from "@/components/clear-updates";
 import SourceFilter from "@/components/source-filter";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,7 @@ export default async function UpdatesPage({
           {p.window ? `Digest — last ${p.window} days` : "Updates"}
         </h1>
         <MarkAllRead />
+        <ClearUpdates />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">

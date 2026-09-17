@@ -6,6 +6,7 @@ import { checkRss } from "./checkers/rss";
 import { getDb } from "./db";
 import type { CheckResult } from "./checkers/website";
 import { summarizeProjectForSource } from "./project-summary";
+import { categoryMirrorsName, ensureCategoryForSource } from "./category";
 
 /** Run the appropriate checker for a source row. */
 export async function checkSource(
@@ -31,6 +32,36 @@ export async function checkSource(
   if (result.ok && !source.project_summary) {
     try {
       await summarizeProjectForSource(d, source);
+    } catch {
+      // best-effort — retried on the next check
+    }
+  }
+  // Category/subcategory backfill for all source types — fills only the
+  // missing levels (category: AI first, keyword-hint heuristic as fallback;
+  // subcategory: AI only) and upgrades keyword-guessed values once AI is
+  // available. Also re-classifies values that simply echo the project name
+  // (an invalid classification by a weak model). AI/user values are never
+  // otherwise touched. Re-read the row so freshly written goal/summary are
+  // seen.
+  if (
+    result.ok &&
+    (!source.category ||
+      !source.subcategory ||
+      source.category_source === "heuristic" ||
+      categoryMirrorsName(source))
+  ) {
+    try {
+      const fresh = d
+        .prepare("SELECT * FROM sources WHERE id = ?")
+        .get(source.id) as SourceRow | undefined;
+      if (
+        fresh &&
+        (!fresh.category ||
+          !fresh.subcategory ||
+          fresh.category_source === "heuristic" ||
+          categoryMirrorsName(fresh))
+      )
+        await ensureCategoryForSource(d, fresh);
     } catch {
       // best-effort — retried on the next check
     }

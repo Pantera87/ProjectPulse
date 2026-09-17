@@ -1,4 +1,5 @@
 import MarkReadButton from "./mark-read";
+import { formatDateTime } from "@/lib/format";
 
 export interface UpdateView {
   id: number;
@@ -11,6 +12,7 @@ export interface UpdateView {
   read_at: string | null;
   source_name: string | null;
   source_type: string;
+  payload_json?: string | null;
 }
 
 const STYLES: Record<string, string> = {
@@ -26,6 +28,14 @@ const PRIORITY_BADGE: Record<string, string> = {
 };
 
 export default function UpdateItem({ u }: { u: UpdateView }) {
+  // Semantic (AI) hits: the AI judged both the match and the severity, so
+  // mark them with an "AI" chip next to the kind badge.
+  let aiJudged = false;
+  try {
+    aiJudged = !!(u.payload_json && JSON.parse(u.payload_json).semantic === true);
+  } catch {
+    aiJudged = false;
+  }
   return (
     <li
       className={`rounded-xl border px-3 py-2 backdrop-blur-md ${STYLES[u.priority] ?? STYLES.normal} ${
@@ -41,6 +51,14 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
           {u.priority}
         </span>
         <span className="badge">{u.kind}</span>
+        {aiJudged && (
+          <span
+            className="badge text-indigo-300"
+            title="Matched and prioritized by AI"
+          >
+            AI
+          </span>
+        )}
         <span className="font-medium">{u.title}</span>
         <span className="text-xs text-slate-500">
           {u.source_type} · {u.source_name}
@@ -51,7 +69,7 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
           </a>
         )}
         <span className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          {new Date(u.created_at).toLocaleString()}
+          {formatDateTime(u.created_at)}
           <MarkReadButton id={u.id} isRead={!!u.read_at} />
         </span>
       </div>

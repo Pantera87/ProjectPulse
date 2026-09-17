@@ -8,58 +8,13 @@
  * downloading) leaves project_summary null and the next check retries.
  */
 import type Database from "better-sqlite3";
-import Parser from "rss-parser";
 import type { SourceRow } from "./db";
 import { getDb } from "./db";
 import { getAI } from "./ai";
-import { fetchText } from "./http";
-import { parseHtml, truncate } from "./text";
-import { github, parseGithubRef } from "./github";
+import { ensureCategoryForSource } from "./category";
+import { contextDocName, gatherProjectContext } from "./project-context";
+import { truncate } from "./text";
 import { touchSource } from "./models";
-
-const rssParser = new Parser({ headers: { "user-agent": "ProjectPulse/1.0" } });
-
-/** Build the text the model sees, per source type. null when unavailable. */
-async function gatherProjectContext(s: SourceRow): Promise<string | null> {
-  try {
-    if (s.type === "github") {
-      const ref = parseGithubRef(s.url);
-      if (!ref) return null;
-      const [owner, repo] = ref;
-      const [meta, readme] = await Promise.all([
-        github.repo(owner, repo),
-        github.readme(owner, repo),
-      ]);
-      const parts = [
-        meta.description ?? "",
-        meta.topics?.length ? `Topics: ${meta.topics.join(", ")}` : "",
-        readme ?? "",
-      ];
-      return parts.filter(Boolean).join("\n\n") || null;
-    }
-    if (s.type === "website") {
-      const html = await fetchText(s.url);
-      const page = parseHtml(html);
-      return [page.title, page.metaDescription ?? "", page.text]
-        .filter(Boolean)
-        .join("\n\n") || null;
-    }
-    // rss
-    const xml = await fetchText(s.url, {
-      headers: { accept: "application/rss+xml, application/atom+xml, application/xml, */*" },
-    });
-    const feed = await rssParser.parseString(xml);
-    const latest = feed.items
-      .slice(0, 3)
-      .map((it) => `${it.title ?? ""}: ${it.contentSnippet ?? ""}`)
-      .join("\n");
-    return [feed.title ?? "", (feed as { description?: string }).description ?? "", latest]
-      .filter(Boolean)
-      .join("\n\n") || null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Summarize a source's project if the summary is missing. Returns the
@@ -74,9 +29,24 @@ export async function summarizeProjectForSource(
   if (source.project_summary) return source.project_summary;
   const text = await gatherProjectContext(source);
   if (!text) return null;
-  const summary = await ai.summarizeProject(text, source.name || source.url);
+  // The full content is also handed to the provider as a RAG document
+  // (Ollama ≥ 0.6.2) so the model sees the most relevant parts, not just
+  // a truncated prefix.
+  const summary = await ai.summarizeProject(text, source.name || source.url, [
+    { name: contextDocName(source.type), content: text },
+  ]);
   if (!summary) return null;
   touchSource(d, source.id, { project_summary: truncate(summary, 1000) });
+  // Fresh summary text is the best input for the category classifier —
+  // complete any missing level (or upgrade a keyword guess) while we already
+  // have the context (best-effort; AI/user values are never touched).
+  if (!source.category || !source.subcategory || source.category_source === "heuristic") {
+    try {
+      await ensureCategoryForSource(d, { ...source, project_summary: truncate(summary, 1000) });
+    } catch {
+      // best-effort — retried on the next check
+    }
+  }
   return summary;
 }
 

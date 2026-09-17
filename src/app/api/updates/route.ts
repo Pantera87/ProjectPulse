@@ -70,3 +70,31 @@ export async function POST(req: Request) {
   d.prepare(`UPDATE updates SET read_at = ? WHERE id IN (${ph})`).run(now, ...ids);
   return NextResponse.json({ ok: true, affected: ids.length });
 }
+
+/**
+ * DELETE /api/updates — bulk delete. Optional filters: ?source_id=3,
+ * ?read=1|0, ?olderThanDays=N. No params → deletes ALL updates.
+ */
+export function DELETE(req: Request) {
+  const d = getDb();
+  const url = new URL(req.url);
+  const where: string[] = [];
+  const vals: unknown[] = [];
+  const sourceId = url.searchParams.get("source_id");
+  if (sourceId) {
+    where.push("source_id = ?");
+    vals.push(Number(sourceId));
+  }
+  const read = url.searchParams.get("read");
+  if (read === "1") where.push("read_at IS NOT NULL");
+  else if (read === "0") where.push("read_at IS NULL");
+  const olderThanDays = url.searchParams.get("olderThanDays");
+  if (olderThanDays) {
+    where.push("created_at < datetime('now', ?)");
+    vals.push(`-${Number(olderThanDays) || 7} days`);
+  }
+  const info = d
+    .prepare(`DELETE FROM updates ${where.length ? "WHERE " + where.join(" AND ") : ""}`)
+    .run(...vals);
+  return NextResponse.json({ ok: true, affected: info.changes });
+}

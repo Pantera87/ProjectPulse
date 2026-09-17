@@ -71,6 +71,101 @@ body {
   transform: translateY(-1px);
 }
 
+/* Deeper glass for section panels that hold interactive content. */
+.glass-strong {
+  background:
+    linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.015) 55%,
+      rgba(139, 92, 246, 0.05) 100%
+    ),
+    rgba(8, 12, 32, 0.35);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow:
+    var(--glass-highlight),
+    0 16px 40px -16px rgba(2, 4, 20, 0.9);
+}
+
+/* Stat tiles: glass with a priority-tinted inner glow slot. */
+.glass-tile {
+  position: relative;
+  overflow: hidden;
+}
+.glass-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% -20%,
+    rgba(139, 92, 246, 0.14),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+.glass-tile:hover::before {
+  background: radial-gradient(
+    120% 90% at 50% -20%,
+    rgba(139, 92, 246, 0.28),
+    transparent 65%
+  );
+}
+
+/* Specular "liquid" shine that sweeps across on hover (opt-in). */
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+.glass-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 60%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+}
+.glass-shine:hover::after {
+  transform: translateX(130%);
+}
+
+/* Entrance: fade + rise, staggered via inline --delay. */
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Unread-total tick: quick glow pulse when the count changes. */
+.count-flash {
+  animation: count-flash 0.9s ease;
+}
+@keyframes count-flash {
+  0% {
+    filter: brightness(1.9) drop-shadow(0 0 10px rgba(139, 92, 246, 0.8));
+  }
+  100% {
+    filter: none;
+  }
+}
+
 /* ---------- buttons ---------- */
 
 .btn-primary {
@@ -295,8 +390,13 @@ body {
   }
   .glass-hover,
   .btn-primary,
-  .btn-ghost {
+  .btn-ghost,
+  .glass-shine::after {
     transition: none;
+  }
+  .rise,
+  .count-flash {
+    animation: none;
   }
 }
 

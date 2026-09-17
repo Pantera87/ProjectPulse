@@ -3,6 +3,7 @@ import { getDb, type SourceType, type WatchRule } from "@/lib/db";
 import { indexForSearch } from "@/lib/models";
 import { parseGithubRef } from "@/lib/github";
 import { ensureProjectSummaryById } from "@/lib/project-summary";
+import { ensureCategoryById } from "@/lib/category";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ interface CreateBody {
   notes?: string;
   goal?: string;
   category?: string;
+  subcategory?: string;
   watch_enabled?: number;
   check_interval_hours?: number;
   rules?: WatchRule[];
@@ -64,18 +66,22 @@ export async function POST(req: Request) {
   }
 
   const name = (body.name ?? "").trim() || null;
+  const category = (body.category ?? "").trim() || null;
+  const subcategory = (body.subcategory ?? "").trim() || null;
   const info = d
     .prepare(
-      `INSERT INTO sources (type, url, name, goal, category, notes, watch_enabled,
+      `INSERT INTO sources (type, url, name, goal, category, subcategory, category_source, notes, watch_enabled,
         check_interval_hours, rules_json, state_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
     )
     .run(
       type,
       url,
       name,
       (body.goal ?? "").trim() || null,
-      (body.category ?? "").trim() || null,
+      category,
+      category ? subcategory : null,
+      category ? "user" : null,
       (body.notes ?? "").trim() || null,
       body.watch_enabled ?? 1,
       body.check_interval_hours ?? 6,
@@ -83,9 +89,12 @@ export async function POST(req: Request) {
       new Date().toISOString()
     );
   const id = Number(info.lastInsertRowid);
-  indexForSearch(d, "source", id, name ?? url, body.goal ?? "");
+  indexForSearch(d, "source", id, name ?? url, `${body.goal ?? ""} ${category ?? ""} ${subcategory ?? ""}`);
   // AI project summary (background — also auto-downloads the Ollama model
   // if AI is enabled but the model is not on the machine yet).
   ensureProjectSummaryById(id);
+  // AI category auto-assignment (background; summary-driven re-classification
+  // with richer context completes later and wins; heuristic covers AI-off).
+  ensureCategoryById(id);
   return NextResponse.json({ id }, { status: 201 });
 }

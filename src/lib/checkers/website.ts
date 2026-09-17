@@ -6,10 +6,9 @@ import {
   parseHtml,
   normalizeForHash,
   extractGoalFromPage,
-  suggestCategory,
   truncate,
 } from "../text";
-import { findRuleHit } from "../rules";
+import { findRuleHitSmart } from "../rules";
 import { getAI } from "../ai";
 import { fetchText } from "../http";
 import { captureScreenshot } from "../screenshots";
@@ -139,29 +138,42 @@ export async function checkWebsite(
     const diffText = truncate(diff, 8000);
 
     // Rule matching on newly added lines first, then full new text
+    // (keyword pass; an AI semantic second pass runs when no keyword hits,
+    // over the full page text via RAG when the provider supports it).
     const rules = rulesOf(source);
-    const hit =
-      findRuleHit(rules, "content", [
+    const hit = await findRuleHitSmart(
+      rules,
+      "content",
+      [
         { kind: "content", text: addedLines.join("\n") },
-      ]) ??
-      findRuleHit(rules, "content", [{ kind: "content", text: normalized }]);
+        { kind: "content", text: normalized },
+      ],
+      getAI(),
+      [{ name: "page.txt", content: normalized }]
+    );
 
     const priority = hit ? hit.priority : "normal";
     const name = source.name || page.title || source.url;
 
-    // Optional AI summary of the change
+    // Optional AI summary of the change. For semantic topic matches the
+    // match explanation takes precedence over the generic change summary.
     const ai = getAI();
     let summary: string | null =
       addedLines.slice(0, 8).join(" | ") || "Page content changed";
     const aiSummary = await ai.summarize(diffText, name);
     if (aiSummary) summary = aiSummary;
+    if (hit?.semantic && hit.semanticSummary) summary = hit.semanticSummary;
 
     const id = insertUpdate(d, {
       source_id: source.id,
       priority,
       kind: hit ? "keyword" : "content_change",
       title: hit
-        ? `Keyword "${hit.matched.join(", ")}" detected: ${name}`
+        ? hit.semantic
+          ? hit.semanticTopic
+            ? `Topic match: ${name} — ${hit.semanticTopic}`
+            : `AI topic match: ${name}`
+          : `Keyword "${hit.matched.join(", ")}" detected: ${name}`
         : `Page updated: ${name}`,
       summary: truncate(summary, 1000),
       url: source.url,
@@ -170,6 +182,9 @@ export async function checkWebsite(
         added: addedLines.slice(0, 30),
         removed: removedLines.slice(0, 30),
         snapshotVersion: version,
+        semantic: !!hit?.semantic,
+        semanticTopic: hit?.semanticTopic ?? null,
+        semanticSummary: hit?.semanticSummary ?? null,
       },
     });
     updatesCreated++;
@@ -189,19 +204,20 @@ export async function checkWebsite(
     });
   }
 
-  // Goal / category backfill on first check
+  // Goal backfill on first check. (Category/subcategory backfill happens in
+  // check.ts after the check — missing levels only, never overwritten.)
   if (!source.goal) {
     let goal = extractGoalFromPage(page);
     const ai = getAI();
     if (!page.metaDescription) {
-      const aiGoal = await ai.extractGoal(page.text.slice(0, 3000));
+      // Full page text as a RAG document where supported (short in-prompt
+      // anchor otherwise).
+      const aiGoal = await ai.extractGoal(page.text, [
+        { name: "page.txt", content: page.text },
+      ]);
       if (aiGoal) goal = aiGoal;
     }
     touchSource(d, source.id, { goal: truncate(goal, 500) });
-    if (!source.category) {
-      const cat = suggestCategory(goal);
-      if (cat) touchSource(d, source.id, { category: cat });
-    }
   }
 
   touchSource(d, source.id, {
