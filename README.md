@@ -10,9 +10,6 @@
   priority keyword rules and optional local AI.
 </p>
 
-<p align="center">
-  Next.js (standalone) &middot; SQLite &middot; single Docker container &middot; TrueNAS SCALE Compose project
-</p>
 
 ## Table of contents
 
