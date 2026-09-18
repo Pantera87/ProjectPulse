@@ -24,6 +24,7 @@ import {
   snapshotMode,
   stateOf,
   touchSource,
+  higherPriority,
 } from "../models";
 import { notify } from "../notifiers";
 import { checkFeedUrl } from "./rss";
@@ -214,16 +215,20 @@ export async function checkWebsite(
       [{ name: "page.txt", content: normalized }]
     );
 
-    const priority = hit ? hit.priority : "normal";
+    let priority = hit ? hit.priority : "normal";
     const name = source.name || page.title || source.url;
 
-    // Optional AI summary of the change. For semantic topic matches the
-    // match explanation takes precedence over the generic change summary.
+    // Optional AI summary + importance classification of the change. For
+    // semantic topic matches the match explanation takes precedence over the
+    // generic change summary.
     const ai = getAI();
     let summary: string | null =
       addedLines.slice(0, 8).join(" | ") || "Page content changed";
-    const aiSummary = await ai.summarize(diffText, name);
-    if (aiSummary) summary = aiSummary;
+    const aiSummary = await ai.summarizeUpdate(diffText, name);
+    if (aiSummary) {
+      summary = aiSummary.summary;
+      priority = higherPriority(priority, aiSummary.priority);
+    }
     if (hit?.semantic && hit.semanticSummary) summary = hit.semanticSummary;
 
     const id = insertUpdate(d, {

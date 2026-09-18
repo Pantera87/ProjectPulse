@@ -53,11 +53,33 @@ export interface SemanticMatch {
   priority: Priority;
 }
 
+/**
+ * Result of summarizing an update: a short plain-language summary plus the
+ * AI's classification of how important the change is.
+ */
+export interface UpdateSummary {
+  /** One or two plain sentences describing what changed. */
+  summary: string;
+  /**
+   * AI-assessed importance of the change: critical = major version / breaking
+   * change / security issue, high = significant new feature or fix,
+   * normal = routine or minor change.
+   */
+  priority: Priority;
+}
+
 export interface AIProvider {
   readonly enabled: boolean;
   readonly kind: ProviderKind | "none";
   /** Summarize a diff/changes for a project. */
   summarize(diff: string, context: string): Promise<string | null>;
+  /**
+   * Summarize an update (release notes, diff, feed entry, commit message…)
+   * in one or two plain sentences AND classify its importance
+   * (critical / high / normal). null = AI unavailable / unparseable reply
+   * (callers keep their heuristic summary and priority).
+   */
+  summarizeUpdate(text: string, context: string): Promise<UpdateSummary | null>;
   /** One-line goal/purpose of software described by text. */
   extractGoal(htmlText: string, docs?: AIDoc[]): Promise<string | null>;
   /**
@@ -133,6 +155,21 @@ abstract class BaseAI implements AIProvider {
       `Summarize these changes to the project "${context}" in one or two plain sentences. No preamble.\n\n${d}`,
       { maxTokens: 300 }
     );
+  }
+
+  async summarizeUpdate(text: string, context: string): Promise<UpdateSummary | null> {
+    const t = text.length > 4000 ? text.slice(0, 4000) : text;
+    const out = await this.complete(
+      `Below is a change to the project "${context}".\n` +
+        `1) Summarize the change in one or two plain sentences.\n` +
+        `2) Classify how important the change is.\n` +
+        `Reply with ONLY a JSON object (no other text) with these keys:\n` +
+        `- "summary": one or two plain sentences (max 40 words) describing what changed, in plain language a human can act on\n` +
+        `- "priority": "critical" only for a major version, a breaking change, or a security issue; "high" for a significant new feature or fix; "normal" for routine or minor changes\n\n` +
+        `${t}`,
+      { maxTokens: 200 }
+    );
+    return parseUpdateSummary(out);
   }
 
   async extractGoal(htmlText: string, docs?: AIDoc[]): Promise<string | null> {
@@ -230,6 +267,9 @@ class NullProvider implements AIProvider {
   async summarize(): Promise<string | null> {
     return null;
   }
+  async summarizeUpdate(): Promise<UpdateSummary | null> {
+    return null;
+  }
   async extractGoal(): Promise<string | null> {
     return null;
   }
@@ -248,6 +288,38 @@ class NullProvider implements AIProvider {
   async ping(): Promise<string | null> {
     return null;
   }
+}
+
+/**
+ * Tolerantly parse an update-summary reply into an UpdateSummary. Small
+ * local models often wrap JSON in code fences or add stray text — extract
+ * the first {...} block and degrade gracefully (missing/invalid priority →
+ * "normal"). Unusable reply (no parseable summary) → null, so callers keep
+ * their heuristic summary and priority.
+ */
+function parseUpdateSummary(out: string | null): UpdateSummary | null {
+  if (!out) return null;
+  const m = out.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(m[0]);
+  } catch {
+    return null;
+  }
+  if (typeof obj !== "object" || obj === null) return null;
+  const o = obj as Record<string, unknown>;
+  const summary =
+    typeof o.summary === "string"
+      ? o.summary.trim().replace(/^["']+|["']+$/g, "").trim()
+      : "";
+  if (!summary) return null;
+  let priority: Priority = "normal";
+  if (typeof o.priority === "string") {
+    const p = o.priority.trim().toLowerCase();
+    if (p === "critical" || p === "high" || p === "normal") priority = p;
+  }
+  return { summary, priority };
 }
 
 /**

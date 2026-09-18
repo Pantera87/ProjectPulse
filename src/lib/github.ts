@@ -58,6 +58,8 @@ export interface GhIssue {
   labels: { name: string }[];
   html_url: string;
   created_at: string;
+  /** Issue/PR body text (may be empty). */
+  body?: string | null;
 }
 
 export interface GhCommit {

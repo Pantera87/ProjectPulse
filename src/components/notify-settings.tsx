@@ -41,11 +41,15 @@ export default function NotifySettings({ initialChannels, initialLog, authEnable
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testState, setTestState] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [dirty, setDirty] = useState(false);
 
-  const update = (id: string, patch: Partial<NotifyChannel>) =>
+  const update = (id: string, patch: Partial<NotifyChannel>) => {
+    setDirty(true);
     setChannels((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  };
 
   const add = (type: ChannelType) => {
+    setDirty(true);
     setChannels((cs) => [
       ...cs,
       {
@@ -60,7 +64,10 @@ export default function NotifySettings({ initialChannels, initialLog, authEnable
     ]);
   };
 
-  const remove = (id: string) => setChannels((cs) => cs.filter((c) => c.id !== id));
+  const remove = (id: string) => {
+    setDirty(true);
+    setChannels((cs) => cs.filter((c) => c.id !== id));
+  };
 
   const doTest = async (ch: NotifyChannel) => {
     setTestState((t) => ({ ...t, [ch.id]: { ok: false, msg: "Sending…" } }));
@@ -99,9 +106,11 @@ export default function NotifySettings({ initialChannels, initialLog, authEnable
     }
     if (j.channels) setChannels(j.channels);
     if (j.log) setLog(j.log);
+    setDirty(false);
   };
 
   const toggleKind = (ch: NotifyChannel, k: (typeof KINDS)[number]) => {
+    setDirty(true);
     const has = (ch.kinds as readonly string[]).includes(k);
     update(ch.id, {
       kinds: (has
@@ -340,6 +349,13 @@ export default function NotifySettings({ initialChannels, initialLog, authEnable
           )}
         </div>
       ))}
+
+      {dirty && (
+        <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
+          Unsaved changes — “Send test” works in this state, but real updates will NOT be
+          delivered until you click “Save channels”.
+        </p>
+      )}
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="btn-primary px-4 py-2 text-sm">

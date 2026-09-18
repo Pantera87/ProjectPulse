@@ -10,6 +10,7 @@ import {
   rulesOf,
   stateOf,
   touchSource,
+  higherPriority,
 } from "../models";
 import { truncate, hashText, compressHtml } from "../text";
 import { notify } from "../notifiers";
@@ -81,9 +82,27 @@ export async function checkFeedUrl(
         getAI()
       );
       const priority = hit ? hit.priority : "normal";
+      // Optional AI summary + importance classification of the entry. For
+      // semantic topic matches the match explanation takes precedence (and
+      // the extra AI call is skipped — the semantic pass already summarized).
+      let summary =
+        hit?.semantic && hit.semanticSummary
+          ? hit.semanticSummary
+          : truncate(it.contentSnippet ?? "", 1000);
+      let finalPriority = priority;
+      if (!hit?.semantic) {
+        const aiRes = await getAI().summarizeUpdate(
+          `${it.title} ${it.contentSnippet ?? ""}`.trim(),
+          source.name || source.url
+        );
+        if (aiRes) {
+          summary = aiRes.summary;
+          finalPriority = higherPriority(finalPriority, aiRes.priority);
+        }
+      }
       const id = insertUpdate(d, {
         source_id: source.id,
-        priority,
+        priority: finalPriority,
         kind: hit ? "keyword" : "feed_entry",
         title: hit
           ? hit.semantic
@@ -92,10 +111,7 @@ export async function checkFeedUrl(
               : `AI topic match in feed: ${it.title}`
             : `Keyword "${hit.matched.join(", ")}" in feed: ${it.title}`
           : it.title,
-        summary:
-          hit?.semantic && hit.semanticSummary
-            ? hit.semanticSummary
-            : truncate(it.contentSnippet ?? "", 1000),
+        summary: truncate(summary, 1000),
         url: it.link || source.url,
         payload: {
           guid: it.guid,
@@ -109,9 +125,9 @@ export async function checkFeedUrl(
       void notify({
         id,
         title: it.title,
-        summary: truncate(it.contentSnippet ?? "", 300),
+        summary: truncate(summary, 300),
         url: it.link || source.url,
-        priority,
+        priority: finalPriority,
         kind: hit ? "keyword" : "feed_entry",
         sourceName: source.name || source.url,
         sourceUrl: source.url,

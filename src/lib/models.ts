@@ -13,6 +13,17 @@ import { getDb, getSetting, dataDir } from "./db";
 
 const nowIso = () => new Date().toISOString();
 
+const PRIORITY_RANK: Record<Priority, number> = { normal: 0, high: 1, critical: 2 };
+
+/**
+ * The more important of two priorities. Used so an AI importance
+ * classification can only ever UPGRADE a priority — rule-assigned
+ * (user-defined) and heuristic priorities are never downgraded.
+ */
+export function higherPriority(a: Priority, b: Priority): Priority {
+  return PRIORITY_RANK[a] >= PRIORITY_RANK[b] ? a : b;
+}
+
 export function rulesOf(s: SourceRow): WatchRule[] {
   try {
     const r = JSON.parse(s.rules_json);

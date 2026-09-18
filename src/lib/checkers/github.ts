@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { createPatch } from "diff";
-import type { SourceRow } from "../db";
+import type { SourceRow, Priority } from "../db";
 import {
   github,
   parseGithubRef,
@@ -23,6 +23,7 @@ import {
   snapshotMode,
   stateOf,
   touchSource,
+  higherPriority,
 } from "../models";
 import { markdownSectionAnchor, truncate, hashText, parseHtml, normalizeForHash, compressHtml } from "../text";
 import { fetchText } from "../http";
@@ -281,13 +282,32 @@ export async function checkGithub(
         // "Track changes: new releases" off AND no keyword hit → the tag is
         // recorded as seen but produces no update.
         if (!trackReleases && !hit) continue;
-        let priority: "critical" | "high" | "normal" = "normal";
+        let priority: Priority = "normal";
         if (hit) priority = hit.priority;
         else if (
           isMajorBump(state.prev_tag, r.tag_name) ||
           looksLikeMilestoneRelease(r.name ?? r.tag_name)
         )
           priority = "high";
+        // Optional AI summary + importance classification of the release
+        // notes (skipped when a semantic rule match already summarized it).
+        let releaseSummary: string | null =
+          hit?.semantic && hit.semanticSummary
+            ? hit.semanticSummary
+            : r.body ?? r.name ?? null;
+        if (!hit?.semantic) {
+          const notes = [r.name ?? "", r.body ?? ""].filter(Boolean).join("\n");
+          if (notes) {
+            const aiRes = await getAI().summarizeUpdate(
+              notes,
+              `${owner}/${repo} release ${r.tag_name}`
+            );
+            if (aiRes) {
+              releaseSummary = aiRes.summary;
+              priority = higherPriority(priority, aiRes.priority);
+            }
+          }
+        }
         emit(
           priority,
           hit ? "keyword" : "release",
@@ -298,7 +318,7 @@ export async function checkGithub(
                 : `AI topic match in release ${r.tag_name}`
               : `Keyword "${hit.matched.join(", ")}" in release ${r.tag_name}`
             : `Release ${r.tag_name}${r.prerelease ? " (pre-release)" : ""}`,
-          hit?.semantic && hit.semanticSummary ? hit.semanticSummary : r.body ?? r.name ?? null,
+          releaseSummary,
           r.html_url,
           {
             tag: r.tag_name,
@@ -332,11 +352,24 @@ export async function checkGithub(
           const rule = labelRules.find((r) =>
             r.labels?.some((l) => l.toLowerCase() === lbl.toLowerCase())
           );
+          // Optional AI summary + importance classification of the issue
+          // (title + body). Previously the "summary" was just the issue URL.
+          let issuePriority: Priority = rule ? rule.priority : "normal";
+          let issueSummary: string | null = null;
+          const issueText = [i.title, i.body ?? ""].filter(Boolean).join("\n");
+          const aiRes = await getAI().summarizeUpdate(
+            issueText,
+            `${owner}/${repo} issue #${i.number}`
+          );
+          if (aiRes) {
+            issueSummary = aiRes.summary;
+            issuePriority = higherPriority(issuePriority, aiRes.priority);
+          }
           emit(
-            rule ? rule.priority : "normal",
+            issuePriority,
             "issue",
             `Labeled "${lbl}": ${i.title}`,
-            i.html_url,
+            issueSummary,
             i.html_url,
             { label: lbl, number: i.number }
           );
@@ -380,11 +413,26 @@ export async function checkGithub(
               .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
               .map((l) => l.slice(1).trim())
               .filter(Boolean);
+            // Optional AI summary + importance classification of the README
+            // change (diff as the input; heuristic added-lines as fallback).
+            let readmePriority: Priority = "normal";
+            let readmeSummary = truncate(
+              added.slice(0, 10).join("\n") || "README changed",
+              1000
+            );
+            const aiRes = await getAI().summarizeUpdate(
+              patch,
+              `${owner}/${repo} README`
+            );
+            if (aiRes) {
+              readmeSummary = aiRes.summary;
+              readmePriority = higherPriority(readmePriority, aiRes.priority);
+            }
             emit(
-              "normal",
+              readmePriority,
               "readme",
               "README updated",
-              truncate(added.slice(0, 10).join("\n") || "README changed", 1000),
+              truncate(readmeSummary, 1000),
               readmeUrl ?? `https://github.com/${owner}/${repo}`,
               { added: added.slice(0, 30) }
             );
@@ -405,12 +453,32 @@ export async function checkGithub(
             const fresh = commits
               .filter((c) => !seenShas.includes(c.sha))
               .reverse(); // oldest first
+            // Optional AI summary + importance classification per commit.
+            // Capped: summarizing more than 10 commits at once would be a
+            // burst of LLM calls for little extra value.
+            const ai = getAI();
+            const useAI = fresh.length <= 10;
             for (const c of fresh) {
+              let commitPriority: Priority = "normal";
+              let commitSummary: string | null = null;
+              if (useAI) {
+                const aiRes = await ai.summarizeUpdate(
+                  c.commit.message,
+                  `${owner}/${repo} commit`
+                );
+                if (aiRes) {
+                  commitSummary = aiRes.summary;
+                  commitPriority = higherPriority(
+                    commitPriority,
+                    aiRes.priority
+                  );
+                }
+              }
               emit(
-                "normal",
+                commitPriority,
                 "commit",
                 `Commit: ${c.commit.message.split("\n")[0].slice(0, 120)}`,
-                null,
+                commitSummary,
                 c.html_url,
                 { sha: c.sha }
               );
