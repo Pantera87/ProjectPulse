@@ -212,9 +212,13 @@ export async function checkGithub(
       const pageHtml = await fetchText(pageUrl, { timeoutMs: 60_000 });
       const pageHash = hashText(normalizeForHash(parseHtml(pageHtml).text));
       const mode = snapshotMode(d);
+      // Also re-store when no snapshot row is left (e.g. the user deleted
+      // them all), even if the page hash is unchanged.
       if (
         mode !== "screenshot" &&
-        (state.page_hash === undefined || state.page_hash !== pageHash)
+        (state.page_hash === undefined ||
+          state.page_hash !== pageHash ||
+          maxSnapshotVersion(d, source.id) === 0)
       ) {
         const version = maxSnapshotVersion(d, source.id) + 1;
         let htmlLocal: string | null = null;

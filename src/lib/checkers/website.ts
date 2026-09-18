@@ -60,6 +60,10 @@ export async function checkWebsite(
   const newHash = hashText(normalized);
   const firstCheck = !source.last_content_hash;
   const state = stateOf(source);
+  // Whether a snapshot is still actually stored — the user may have deleted
+  // them all, in which case the next check silently re-stores a fresh
+  // baseline copy (no change update is raised for it).
+  const rebaseline = !firstCheck && maxSnapshotVersion(d, source.id) === 0;
 
   // --- Fast path: auto-discovered RSS/Atom feed. Once the baseline exists,
   // the feed is checked instead of re-scraping the page every cycle; the
@@ -99,7 +103,7 @@ export async function checkWebsite(
     }
   }
 
-  if (!firstCheck && newHash === source.last_content_hash) {
+  if (!firstCheck && !rebaseline && newHash === source.last_content_hash) {
     // Backfill a visual screenshot for the latest snapshot if missing
     // (e.g. first check after upgrading to the screenshot feature).
     const last = d
@@ -170,7 +174,7 @@ export async function checkWebsite(
 
   let updatesCreated = 0;
 
-  if (!firstCheck) {
+  if (!firstCheck && !rebaseline) {
     const prevPage = prev ? parseHtml(readHtml(prev.html)) : null;
     const prevNorm = prevPage ? normalizeForHash(prevPage.text) : "";
 
@@ -286,5 +290,5 @@ export async function checkWebsite(
   });
   indexForSearch(d, "source", source.id, source.name || source.url, source.goal || page.title || "");
 
-  return { ok: true, changed: !firstCheck, updatesCreated };
+  return { ok: true, changed: !firstCheck && !rebaseline, updatesCreated };
 }
