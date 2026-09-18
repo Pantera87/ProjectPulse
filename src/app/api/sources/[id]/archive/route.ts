@@ -67,6 +67,12 @@ export async function GET(
     headers: {
       "content-type": TYPES[ext] ?? "application/octet-stream",
       "cache-control": "no-store",
+      // The snapshot viewer renders archived HTML in a sandboxed iframe,
+      // which gives the document an opaque origin. Pages that load their
+      // CSS/JS with crossorigin="anonymous" (e.g. GitHub) then issue CORS
+      // requests for these assets — without a wildcard origin the browser
+      // blocks them and the snapshot renders unstyled.
+      "access-control-allow-origin": "*",
     },
   });
 }

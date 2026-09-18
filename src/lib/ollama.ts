@@ -105,6 +105,40 @@ export async function ollamaSnapshot(url: string): Promise<OllamaSnapshot> {
   };
 }
 
+/**
+ * Normalize an Ollama model name for comparison: trim, lowercase, drop a
+ * trailing ":latest" — so "qwen2.5", "qwen2.5:latest" and "Qwen2.5:Latest"
+ * all refer to the same model.
+ */
+export function normalizeOllamaModel(name: string): string {
+  const n = name.trim().toLowerCase();
+  return n.endsWith(":latest") ? n.slice(0, -":latest".length) : n;
+}
+
+/**
+ * Model-integrity probe: does Ollama resolve the model's files? Uses
+ * GET /api/show, which reads model metadata from disk WITHOUT loading the
+ * model into memory — so keep_alive / auto-unload behavior is completely
+ * unaffected.
+ * Returns null when the probe cannot answer (server unreachable, or an old
+ * Ollama without /api/show → the check is simply skipped), or false when the
+ * server answered but the model is missing/corrupted.
+ */
+export async function ollamaModelInfo(url: string, name: string): Promise<boolean | null> {
+  try {
+    const res = await fetch(`${base(url)}/api/show?name=${encodeURIComponent(name)}`, {
+      headers: { "user-agent": UA },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 404) return null; // endpoint not implemented (old Ollama)
+    if (!res.ok) return false;
+    res.body?.cancel().catch(() => {});
+    return true;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Downloads                                                           */
 /* ------------------------------------------------------------------ */
@@ -120,7 +154,17 @@ export interface PullJob {
 
 const pulls = new Map<string, PullJob>();
 
+/** Finished/errored jobs linger this long before leaving the registry. */
+const PULL_JOB_TTL_MS = 15 * 60_000;
+
 export function getPullJobs(): Record<string, PullJob> {
+  // Prune stale finished jobs so the UI / aiState() don't accumulate
+  // yesterday's "done" / "error" entries until process restart.
+  const now = Date.now();
+  for (const [name, job] of pulls) {
+    if (job.status !== "downloading" && now - Date.parse(job.startedAt) > PULL_JOB_TTL_MS)
+      pulls.delete(name);
+  }
   return Object.fromEntries(pulls);
 }
 
@@ -204,7 +248,12 @@ export function startPull(url: string, name: string): PullJob {
     } catch (e) {
       job.status = "error";
       const msg = e instanceof Error ? e.message : String(e);
-      if (/fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)) {
+      // The 30-minute AbortSignal.timeout fires as TimeoutError("signal
+      // timed out") — a SLOW download, not a dead server (the generic
+      // /timeout/ check below used to mislabel it "not reachable").
+      if ((e instanceof Error && e.name === "TimeoutError") || /signal timed out/i.test(msg)) {
+        job.error = `The download of ${name} timed out after 30 minutes (large model or slow connection) — start the pull again to resume.`;
+      } else if (/fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)) {
         job.error = `Ollama server not reachable at ${base(url)} — is Ollama installed and running? (https://ollama.com/download)`;
       } else if (/does not exist|manifest/i.test(msg)) {
         job.error = `Ollama could not fetch ${name} ("${msg}"). This tag does not exist in the official registry — check the available tags at https://ollama.com/library, and upgrade Ollama if it is old (it may predate this model).`;

@@ -99,18 +99,9 @@ export default function DashboardClient({
   const [density, setDensityState] = useState<"comfortable" | "compact">("compact");
   const [flashKey, setFlashKey] = useState(0);
   const prevTotal = useRef(initialCounts.total);
-  // Set when the user explicitly picks a density; auto-switching then stops.
-  const densityChosen = useRef(false);
 
-  // Resolution-based default density: comfortable (expanded) on large / 4K
-  // displays, compact on smaller ones.
-  const resolutionDensity = () =>
-    window.innerWidth >= 1920 ? "comfortable" : "compact";
-
-  // Density preference: restored from localStorage after mount to avoid
-  // hydration mismatch; persisted on change. When nothing is saved, the
-  // default follows the screen resolution and keeps following it on resize
-  // until the user picks a mode manually.
+  // Density default is compact; a previously picked mode is restored from
+  // localStorage after mount to avoid a hydration mismatch.
   useEffect(() => {
     let saved: string | null = null;
     try {
@@ -119,24 +110,11 @@ export default function DashboardClient({
       // ignore
     }
     if (saved === "comfortable" || saved === "compact") {
-      setDensityState(saved);
-    } else {
-      setDensityState(resolutionDensity());
+      const chosen = saved;
+      queueMicrotask(() => setDensityState(chosen));
     }
-    let t: number | undefined;
-    const onResize = () => {
-      if (densityChosen.current) return;
-      window.clearTimeout(t);
-      t = window.setTimeout(() => setDensityState(resolutionDensity()), 200);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("resize", onResize);
-    };
   }, []);
   const setDensity = (d: "comfortable" | "compact") => {
-    densityChosen.current = true;
     setDensityState(d);
     try {
       window.localStorage.setItem("pp-dashboard-density", d);

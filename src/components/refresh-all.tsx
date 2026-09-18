@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SourceType } from "@/lib/db";
 import { Glyph } from "./icons";
+import { useAiBusy } from "./ai-activity-provider";
 
 interface Props {
   /** Called once when a run that this button started finishes. */
@@ -41,6 +42,10 @@ export default function RefreshAll({ onDone, compact = false, type }: Props) {
   const [progress, setProgress] = useState({ checked: 0, total: 0 });
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
+  // Disabled while the AI engine is busy (summarizing updates, requeues, …) —
+  // running the full checker at the same time would fight the model for
+  // Ollama's memory. The navbar ring shows what is running.
+  const aiBusy = useAiBusy();
 
   const stopPolling = () => {
     if (poller.current) {
@@ -82,7 +87,7 @@ export default function RefreshAll({ onDone, compact = false, type }: Props) {
   }, [type]);
 
   const start = async () => {
-    if (running) return;
+    if (running || aiBusy) return;
     setRunning(true);
     try {
       const j = (await fetch("/api/sources/check-all", {
@@ -109,11 +114,15 @@ export default function RefreshAll({ onDone, compact = false, type }: Props) {
   return (
     <button
       onClick={start}
-      disabled={running}
+      disabled={running || aiBusy}
       className={`btn-ghost ${compact ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm"} ${
         running ? "border-violet-400/50 text-violet-300" : ""
       }`}
-      title="Run the checker for every tracked project now"
+      title={
+        aiBusy && !running
+          ? "AI is processing — Check all unlocks when it finishes"
+          : "Run the checker for every tracked project now"
+      }
     >
       <Glyph
         name="bolt"
@@ -123,7 +132,9 @@ export default function RefreshAll({ onDone, compact = false, type }: Props) {
         ? progress.total > 0
           ? `Checking ${progress.checked}/${progress.total}…`
           : "Checking…"
-        : "Check all"}
+        : aiBusy
+          ? "AI working…"
+          : "Check all"}
     </button>
   );
 }

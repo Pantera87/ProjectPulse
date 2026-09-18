@@ -18,10 +18,14 @@ import type { Priority } from "./db";
 import {
   DEFAULT_OLLAMA_MODEL,
   defaultOllamaUrl,
+  getPullJobs,
   ollamaInstalled,
   ollamaVersion,
   startPull,
+  normalizeOllamaModel,
+  type PullJob,
 } from "./ollama";
+import { aiActivity, recordAIResult, trackAIWork } from "./ai-activity";
 
 export type ProviderKind = "ollama" | "openai" | "anthropic" | "mcp";
 
@@ -149,9 +153,25 @@ abstract class BaseAI implements AIProvider {
     return this.supportsDocs && hasDoc ? " The full document text is attached." : "";
   }
 
+  /**
+   * complete() with engine-health recording: a null reply means the
+   * PROVIDER failed (network / HTTP / model missing / empty response) and
+   * is reported to the activity registry. A non-null reply is a success
+   * even when a caller's parser later finds nothing in it — "no match"
+   * and "unknown" are answers, not errors.
+   */
+  protected async trackedComplete(
+    prompt: string,
+    opts?: { maxTokens?: number; docs?: AIDoc[] }
+  ): Promise<string | null> {
+    const out = await this.complete(prompt, opts);
+    recordAIResult(out !== null, out === null ? `${this.kind} provider returned no response` : undefined);
+    return out;
+  }
+
   async summarize(diff: string, context: string): Promise<string | null> {
     const d = diff.length > 4000 ? diff.slice(0, 4000) : diff;
-    return this.complete(
+    return this.trackedComplete(
       `Summarize these changes to the project "${context}" in one or two plain sentences. No preamble.\n\n${d}`,
       { maxTokens: 300 }
     );
@@ -159,7 +179,7 @@ abstract class BaseAI implements AIProvider {
 
   async summarizeUpdate(text: string, context: string): Promise<UpdateSummary | null> {
     const t = text.length > 4000 ? text.slice(0, 4000) : text;
-    const out = await this.complete(
+    const out = await this.trackedComplete(
       `Below is a change to the project "${context}".\n` +
         `1) Summarize the change in one or two plain sentences.\n` +
         `2) Classify how important the change is.\n` +
@@ -174,7 +194,7 @@ abstract class BaseAI implements AIProvider {
 
   async extractGoal(htmlText: string, docs?: AIDoc[]): Promise<string | null> {
     const t = this.clip(htmlText, 500, 3000, !!docs?.length);
-    return this.complete(
+    return this.trackedComplete(
       `In one sentence (max 25 words), what is the main goal/purpose of the software described below?${this.docNote(
         !!docs?.length
       )}\n\n${t}`,
@@ -184,7 +204,7 @@ abstract class BaseAI implements AIProvider {
 
   async semanticMatch(text: string, keywords: string[], docs?: AIDoc[]): Promise<SemanticMatch | null> {
     const t = this.clip(text, 500, 3000, !!docs?.length);
-    const out = await this.complete(
+    const out = await this.trackedComplete(
       `Does the following text relate to any of these topics: ${keywords.join(
         ", "
       )}?${this.docNote(!!docs?.length)}\n` +
@@ -208,7 +228,7 @@ abstract class BaseAI implements AIProvider {
     const existingList = existing.length
       ? `Reuse one of these existing categories for the category part if it fits: ${existing.join(", ")}.\n`
       : "";
-    const out = await this.complete(
+    const out = await this.trackedComplete(
       `Classify the project described below in TWO levels, as short lowercase slugs (hyphenated words).${this.docNote(
         !!docs?.length
       )}\n` +
@@ -225,7 +245,7 @@ abstract class BaseAI implements AIProvider {
 
   async suggestSubcategory(text: string, category: string, docs?: AIDoc[]): Promise<string | null> {
     const t = this.clip(text, 500, 2000, !!docs?.length);
-    const out = await this.complete(
+    const out = await this.trackedComplete(
       `The project described below belongs to the category "${category}".${this.docNote(
         !!docs?.length
       )}\n` +
@@ -247,7 +267,7 @@ abstract class BaseAI implements AIProvider {
     const clipLen = size === "short" ? 8000 : size === "long" ? 40000 : 20000;
     const count = size === "short" ? 3 : size === "long" ? 10 : 6;
     const t = this.clip(text, 1000, clipLen, !!docs?.length);
-    return this.complete(
+    return this.trackedComplete(
       `Summarize the ENTIRE content below about the project "${context}": what it is, the problem it solves, and its main features — base this on the whole content, not just the beginning.${this.docNote(
         !!docs?.length
       )}\n` +
@@ -257,7 +277,7 @@ abstract class BaseAI implements AIProvider {
   }
 
   async ping(): Promise<string | null> {
-    return this.complete("Reply with exactly one word: OK", { maxTokens: 8 });
+    return this.trackedComplete("Reply with exactly one word: OK", { maxTokens: 8 });
   }
 }
 
@@ -341,7 +361,8 @@ function parseSemanticMatch(out: string | null, keywords: string[]): SemanticMat
   }
   if (typeof obj !== "object" || obj === null) return null;
   const o = obj as Record<string, unknown>;
-  if (o.match !== true) return null;
+  // Small models sometimes answer "match": "true" (a string) — accept it.
+  if (o.match !== true && o.match !== "true") return null;
 
   let priority: Priority = "normal";
   if (typeof o.priority === "string") {
@@ -376,7 +397,9 @@ export function normalizeCategory(out: string | null): string | null {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
   if (!s) return null;
-  if (["unknown", "none", "n-a", "unclear", "general", "other"].includes(s)) return null;
+  // "n/a" and "n.a" normalize to "na" (dots/slashes are stripped) — reject
+  // it alongside the dashed spelling the model sometimes emits.
+  if (["unknown", "none", "n-a", "na", "unclear", "general", "other"].includes(s)) return null;
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s)) return null;
   return s.length > 30 ? s.slice(0, 30) : s;
 }
@@ -416,9 +439,25 @@ async function ollamaModelState(
   if (hit && Date.now() - hit.at < PRESENCE_TTL) return hit.state;
   const installed = await ollamaInstalled(url);
   if (installed === null) return "unknown"; // server unreachable — fail softly
-  const state = installed.includes(model) ? "installed" : "missing";
+  // Normalized compare: "qwen2.5", "qwen2.5:latest" and "Qwen2.5" all match
+  // the same install (exact-string compare broke on missing ":tag").
+  const want = normalizeOllamaModel(model);
+  const state =
+    installed.some((m) => normalizeOllamaModel(m) === want) ||
+    // The auto-download may have finished while a "missing" state was still
+    // cached: a completed pull job means the model is present even though
+    // /api/tags has not been re-fetched yet.
+    pullJobFor(model)?.status === "done"
+      ? "installed"
+      : "missing";
   modelPresence.set(key, { state, at: Date.now() });
   return state;
+}
+
+/** Pull job for a model (registry keys are raw names — match normalized). */
+function pullJobFor(model: string): PullJob | undefined {
+  const want = normalizeOllamaModel(model);
+  return Object.values(getPullJobs()).find((j) => normalizeOllamaModel(j.name) === want);
 }
 
 class OllamaProvider extends BaseAI {
@@ -441,9 +480,17 @@ class OllamaProvider extends BaseAI {
     return /^\d+$/.test(this.keepAlive) ? `${this.keepAlive}m` : "5m";
   }
 
-  /** Ollama ≥ 0.6.2 supports the `files` RAG parameter (checked per server). */
+  /**
+   * Ollama ≥ 0.6.2 supports the `files` RAG parameter. Synchronous mirror
+   * of the async probe in ragSupported() (false until the probe has run),
+   * so BaseAI's clip/docNote budgets match what complete() actually sends:
+   * on older servers the docs are INLINED into the prompt, not attached —
+   * the in-prompt anchor must keep the full (larger) budget, not the tiny
+   * with-doc one, and the "document attached" note would be a lie.
+   */
+  private ragOk = false;
   protected get supportsDocs(): boolean {
-    return true;
+    return this.ragOk;
   }
 
   protected async complete(
@@ -503,7 +550,10 @@ class OllamaProvider extends BaseAI {
    */
   private async ragSupported(): Promise<boolean> {
     const hit = ragProbe.get(this.url);
-    if (hit && Date.now() - hit.at < RAG_PROBE_TTL_MS) return hit.ok;
+    if (hit && Date.now() - hit.at < RAG_PROBE_TTL_MS) {
+      this.ragOk = hit.ok;
+      return hit.ok;
+    }
     let ok = false;
     try {
       const v = await ollamaVersion(this.url);
@@ -514,6 +564,7 @@ class OllamaProvider extends BaseAI {
     } catch {
       // Unknown (server unreachable?) — retry on the next call.
     }
+    this.ragOk = ok;
     return ok;
   }
 
@@ -891,6 +942,58 @@ function buildProvider(cfg: AIConfig): AIProvider {
   }
 }
 
+/**
+ * Provider methods tracked as "AI work" (each can take seconds to minutes).
+ * Friendly labels show up in the nav ring while work is in flight.
+ */
+const TRACKED_LABELS: Partial<Record<keyof AIProvider, string>> = {
+  summarize: "summarizing changes",
+  summarizeUpdate: "summarizing updates",
+  extractGoal: "extracting project goal",
+  semanticMatch: "semantic keyword matching",
+  suggestCategory: "classifying category",
+  suggestSubcategory: "classifying subcategory",
+  summarizeProject: "summarizing project",
+  ping: "testing AI",
+};
+
+/**
+ * Wrap a provider so every tracked call is recorded in the AI activity
+ * registry (src/lib/ai-activity.ts): the nav shows a "processing" ring while
+ * ANY work is in flight — manual checks, check-all, the scheduler,
+ * fire-and-forget background requeues — and the badge can surface real
+ * engine failures. Disabled providers (NullProvider) pass through
+ * untracked: "AI off" is a state, not an error.
+ */
+function wrapProvider(p: AIProvider): AIProvider {
+  if (!p.enabled) return p;
+  const out: Record<string, unknown> = {};
+  // Walk the WHOLE prototype chain, not just own properties: class fields
+  // (kind/enabled) are own, but every method (summarize, ping, …) is defined
+  // on BaseAI's prototype — copying only own props produced a wrapper with
+  // no methods at all ("e.ping is not a function").
+  for (
+    let proto: object | null = p;
+    proto && proto !== Object.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const k of Object.getOwnPropertyNames(proto)) {
+      if (k !== "constructor" && !(k in out))
+        out[k] = (p as unknown as Record<string, unknown>)[k];
+    }
+  }
+  for (const k of Object.keys(out)) {
+    if (typeof out[k] === "function") out[k] = (out[k] as (...a: unknown[]) => unknown).bind(p);
+  }
+  for (const [k, label] of Object.entries(TRACKED_LABELS)) {
+    const orig = out[k];
+    if (typeof orig === "function") {
+      out[k] = (...args: unknown[]) => trackAIWork(label!, () => (orig as (...a: unknown[]) => Promise<unknown>)(...args));
+    }
+  }
+  return out as unknown as AIProvider;
+}
+
 const nullProvider = new NullProvider();
 let cache: { sig: string; provider: AIProvider } | null = null;
 
@@ -898,7 +1001,7 @@ export function getAI(): AIProvider {
   const cfg = readAIConfig();
   const sig = JSON.stringify(cfg) + "|" + (userOverride() ?? "env");
   if (cache && cache.sig === sig) return cache.provider;
-  const provider = effectiveEnabled(cfg) ? buildProvider(cfg) : nullProvider;
+  const provider = effectiveEnabled(cfg) ? wrapProvider(buildProvider(cfg)) : nullProvider;
   cache = { sig, provider };
   return provider;
 }
@@ -934,7 +1037,24 @@ export interface AIState {
     loaded: string[];
     modelInstalled: boolean;
     modelLoaded: boolean;
+    /**
+     * /api/show probe of the configured model (model files resolvable,
+     * checked WITHOUT loading the model). null = probe unavailable (old
+     * Ollama or server unreachable).
+     */
+    modelIntact: boolean | null;
     pulls: Record<string, import("./ollama").PullJob>;
+  };
+  /**
+   * Engine health from REAL AI calls (no artificial probes): failures in
+   * the last hour + the last success/error, recorded by the activity
+   * registry (src/lib/ai-activity.ts). Present when AI is enabled.
+   */
+  health?: {
+    failures: number;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+    lastErrorAt: string | null;
   };
 }
 
@@ -990,6 +1110,26 @@ async function checkRemoteReachable(cfg: AIConfig): Promise<boolean> {
   return ok;
 }
 
+/**
+ * Ollama model-integrity probe (GET /api/show): validates the configured
+ * model's files WITHOUT loading the model into memory, so keep_alive /
+ * auto-unload behavior is untouched. Cached 60 s per url|model so the 5 s
+ * badge poll costs one probe per minute.
+ */
+const SHOW_TTL_MS = 60_000;
+let showCache: { key: string; at: number; ok: boolean | null } | null = null;
+
+async function probeOllamaModel(cfg: AIConfig): Promise<boolean | null> {
+  const model = cfg.model || DEFAULT_OLLAMA_MODEL;
+  const key = `${cfg.ollamaUrl}|${model}`;
+  if (showCache && showCache.key === key && Date.now() - showCache.at < SHOW_TTL_MS)
+    return showCache.ok;
+  const { ollamaModelInfo } = await import("./ollama");
+  const ok = await ollamaModelInfo(cfg.ollamaUrl, model);
+  showCache = { key, at: Date.now(), ok };
+  return ok;
+}
+
 /** Full AI state for the UI (navbar badge + settings page). */
 export async function aiState(): Promise<AIState> {
   const cfg = readAIConfig();
@@ -1011,18 +1151,36 @@ export async function aiState(): Promise<AIState> {
     state.reachable = await checkRemoteReachable(cfg);
   }
   if (cfg.provider === "ollama" && cfg.ollamaUrl) {
-    const { ollamaSnapshot, getPullJobs } = await import("./ollama");
+    const { ollamaSnapshot, getPullJobs, normalizeOllamaModel } = await import("./ollama");
     const snap = await ollamaSnapshot(cfg.ollamaUrl);
     const model = cfg.model || DEFAULT_OLLAMA_MODEL;
+    // Normalized compare: "qwen2.5", "qwen2.5:latest" and "Qwen2.5" all
+    // match the same install (exact-string compare broke on the missing tag).
+    const modelKey = normalizeOllamaModel(model);
     state.ollama = {
       reachable: snap.reachable,
       version: snap.version,
       ragSupported: !!snap.version && versionGte(snap.version, "0.6.2"),
       installed: snap.installed,
       loaded: snap.loaded,
-      modelInstalled: snap.installed.includes(model),
-      modelLoaded: snap.loaded.includes(model),
+      modelInstalled: snap.installed.some((m) => normalizeOllamaModel(m) === modelKey),
+      modelLoaded: snap.loaded.some((m) => normalizeOllamaModel(m) === modelKey),
+      // /api/show: model files resolvable WITHOUT loading the model into
+      // memory (keep_alive / auto-unload behavior untouched). null = probe
+      // unavailable (old Ollama or server unreachable) → check skipped.
+      modelIntact: snap.reachable ? await probeOllamaModel(cfg) : null,
       pulls: getPullJobs(),
+    };
+  }
+  if (enabled) {
+    // Engine health from REAL calls (null result / error → failure). The
+    // badge turns amber after repeated failures even when the endpoint is up.
+    const a = aiActivity();
+    state.health = {
+      failures: a.failures,
+      lastSuccessAt: a.lastSuccessAt,
+      lastError: a.lastError,
+      lastErrorAt: a.lastErrorAt,
     };
   }
   return state;

@@ -53,6 +53,7 @@ export async function checkGithub(
   const firstRun = state.seen_tags === undefined;
   const seenTags: string[] = state.seen_tags ?? [];
   let updatesCreated = 0;
+  let readmeChanged = false;
 
   const emit = (
     priority: "critical" | "high" | "normal",
@@ -194,16 +195,12 @@ export async function checkGithub(
         name: `${source.name || meta.full_name} [archived]`,
       });
 
-    // --- Project logo (repo avatar) + visual screenshot of the repo page ---
+    // --- Project logo (repo avatar) ---
+    // (The repo-page screenshot is captured at the end of the check, after
+    // README change detection, so a changed README triggers a fresh capture.)
     const logoRel = `logos/${source.id}.png`;
     if (await downloadFile(meta.owner.avatar_url, logoRel)) {
       touchSource(d, source.id, { logo: logoRel });
-    }
-    const shotRel = `screenshots/github-${source.id}.png`;
-    if (fileIsStale(shotRel, 30)) {
-      await captureScreenshot(`https://github.com/${owner}/${repo}`, shotRel, {
-        github: true,
-      });
     }
 
     // --- Offline snapshot of the repo page (versioned, hash-gated) ---
@@ -255,9 +252,12 @@ export async function checkGithub(
     // --- Releases ---
     const releases = await github.releases(owner, repo);
     if (firstRun) {
-      // First check: silently record existing tags as the baseline
+      // First check: silently record existing tags as the baseline.
+      // GitHub returns releases newest-first — baseline the bump
+      // comparison against the NEWEST existing release (steady state keeps
+      // prev_tag = newest processed release after each check).
       for (const r of releases) seenTags.push(r.tag_name);
-      state.prev_tag = releases[releases.length - 1]?.tag_name;
+      state.prev_tag = releases[0]?.tag_name;
     } else {
       const newReleases: GhRelease[] = [];
       for (const r of releases) {
@@ -277,6 +277,11 @@ export async function checkGithub(
               getAI()
             )
           : null;
+        // Capture the previous tag BEFORE overwriting state.prev_tag — the
+        // major-bump comparison must be against the release that came
+        // before, not the tag itself (comparing the tag with itself made
+        // the "high" priority below unreachable).
+        const prevTag = state.prev_tag;
         seenTags.push(r.tag_name);
         state.prev_tag = r.tag_name;
         // "Track changes: new releases" off AND no keyword hit → the tag is
@@ -284,10 +289,7 @@ export async function checkGithub(
         if (!trackReleases && !hit) continue;
         let priority: Priority = "normal";
         if (hit) priority = hit.priority;
-        else if (
-          isMajorBump(state.prev_tag, r.tag_name) ||
-          looksLikeMilestoneRelease(r.name ?? r.tag_name)
-        )
+        else if (isMajorBump(prevTag, r.tag_name) || looksLikeMilestoneRelease(r.name ?? r.tag_name))
           priority = "high";
         // Optional AI summary + importance classification of the release
         // notes (skipped when a semantic rule match already summarized it).
@@ -399,6 +401,7 @@ export async function checkGithub(
           if (state.readme_hash === undefined) {
             state.readme_hash = h; // baseline — no update
           } else if (h !== state.readme_hash) {
+            readmeChanged = true; // refresh the repo-page screenshot too
             const prevText = state.readme_text ?? "";
             const patch = createPatch(
               "README.md",
@@ -563,6 +566,16 @@ export async function checkGithub(
           state.readme_matched[key] = hit !== null;
         else state.readme_matched = { [key]: hit !== null };
       }
+    }
+
+    // --- Visual screenshot of the repo page (README framed at the top) ---
+    // Captured when the file is missing or older than 30 days (backfill —
+    // e.g. after a manual delete) or when the README changed this check.
+    const shotRel = `screenshots/github-${source.id}.png`;
+    if (fileIsStale(shotRel, 30) || readmeChanged) {
+      await captureScreenshot(`https://github.com/${owner}/${repo}`, shotRel, {
+        github: true,
+      });
     }
 
     touchSource(d, source.id, {

@@ -12,6 +12,7 @@ import RuleEditor from "@/components/rule-editor";
 import TrackingToggles from "@/components/tracking-toggles";
 import MarkReadButton from "@/components/mark-read";
 import SnapshotViewer from "@/components/snapshot-viewer";
+import ScreenshotDeleteButton from "@/components/screenshot-delete-button";
 import SummaryText from "@/components/summary-text";
 import SummarySizeSelect from "@/components/summary-size-select";
 
@@ -94,14 +95,17 @@ export default async function RepoDetailPage({
       <section className="glass space-y-3 p-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Repository screenshot</h2>
-          <a
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-indigo-300 hover:underline"
-          >
-            Open on GitHub →
-          </a>
+          <div className="flex items-center gap-3">
+            {hasRepoShot && <ScreenshotDeleteButton sourceId={source.id} />}
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-indigo-300 hover:underline"
+            >
+              Open on GitHub →
+            </a>
+          </div>
         </div>
         {hasRepoShot ? (
           <img
@@ -111,7 +115,9 @@ export default async function RepoDetailPage({
           />
         ) : (
           <p className="text-sm text-slate-500">
-            No screenshot yet — run “Check now” to capture the repository page.
+            No screenshot yet — run “Check now” to capture the repository page
+            (it is also captured automatically on the next scheduled check,
+            and re-captured whenever the README changes).
           </p>
         )}
       </section>

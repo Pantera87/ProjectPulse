@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import KebabMenu from "./kebab-menu";
 import Time from "./time";
+import { useAiBusy } from "./ai-activity-provider";
 
 interface Props {
   id: number;
@@ -30,6 +31,11 @@ export default function SourceActions({
   compact = false,
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
+  // While the AI engine is busy (summarizing updates, requeues, …) the check
+  // button stays disabled — otherwise the checker would fight the model for
+  // Ollama's memory. The navbar ring shows what is running.
+  const aiBusy = useAiBusy();
+  const checkDisabled = busy !== null || aiBusy;
   const router = useRouter();
   const detail =
     type === "github"
@@ -80,10 +86,15 @@ export default function SourceActions({
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <button
           onClick={runCheck}
-          disabled={busy !== null}
+          disabled={checkDisabled}
           className="btn-primary px-3 py-1 text-sm"
+          title={
+            aiBusy && busy === null
+              ? "AI is processing — the check button unlocks when it finishes"
+              : undefined
+          }
         >
-          {busy === "check" ? "Checking…" : "Check now"}
+          {busy === "check" ? "Checking…" : aiBusy ? "AI working…" : "Check now"}
         </button>
         <KebabMenu
           title="More actions"
@@ -128,10 +139,15 @@ export default function SourceActions({
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <button
         onClick={runCheck}
-        disabled={busy !== null}
+        disabled={checkDisabled}
         className="btn-primary px-3 py-1 text-sm"
+        title={
+          aiBusy && busy === null
+            ? "AI is processing — the check button unlocks when it finishes"
+            : undefined
+        }
       >
-        {busy === "check" ? "Checking…" : "Check now"}
+        {busy === "check" ? "Checking…" : aiBusy ? "AI working…" : "Check now"}
       </button>
       <button
         onClick={runWatch}

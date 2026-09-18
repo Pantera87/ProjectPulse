@@ -6,6 +6,8 @@ import { ensureStartup } from "@/lib/startup";
 import { getDb } from "@/lib/db";
 import SearchBox from "@/components/search-box";
 import AiStatus from "@/components/ai-status";
+import AiActivityProvider from "@/components/ai-activity-provider";
+import AiBusyRing from "@/components/ai-busy-ring";
 import Aurora from "@/components/aurora";
 import NavLinks from "@/components/nav-links";
 
@@ -61,6 +63,7 @@ function Nav() {
         </Link>
         <NavLinks unread={unread} critical={critical} />
         <div className="ml-auto flex items-center gap-2">
+          <AiBusyRing />
           <AiStatus />
           <SearchBox />
         </div>
@@ -78,8 +81,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <Aurora />
-        <Nav />
-        <main className="app-shell mx-auto flex-1 px-4 py-6">{children}</main>
+        {/* Shared AI-activity context: the nav ring, the check buttons and
+            the status badge all see live "AI is processing" state. */}
+        <AiActivityProvider>
+          <Nav />
+          <main className="app-shell mx-auto flex-1 px-4 py-6">{children}</main>
+        </AiActivityProvider>
         <footer className="app-shell mx-auto px-4 pb-4 text-xs text-slate-500">
           ProjectPulse — local project tracker.
         </footer>

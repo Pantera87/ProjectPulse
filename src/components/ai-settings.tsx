@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AIState } from "@/lib/ai";
+import { deriveAiStatus } from "@/lib/ai-status";
 
 export interface AIFormConfig {
   provider: string;
@@ -66,7 +67,16 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
     !!s.ollama && Object.values(s.ollama.pulls).some((p) => p.status === "downloading");
   useEffect(() => {
     const iv = setInterval(refresh, hasActivePull ? 2000 : 20000);
-    return () => clearInterval(iv);
+    // Re-check immediately when the tab becomes visible again (e.g. the
+    // user came back from another tab — a download may have finished).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [s, hasActivePull, refresh]);
 
   const post = (path: string, body: unknown) =>
@@ -127,18 +137,14 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
     await post("/api/ai", { enabled: intentOn ? "off" : "on" });
     refresh();
   };
-  // The dot + text reflect a VERIFIED connection, not "enabled + saved":
-  // green only after a live check passed (reachable === true, or — for
-  // Ollama — the server snapshot answered AND the model is installed).
-  // Yellow = unreachable, or the first check hasn't come back yet (null).
+  // The status light uses the EXACT same logic as the topbar badge
+  // (deriveAiStatus, src/lib/ai-status.ts): green only after a live check
+  // passed, pulsing sky while a model downloads, amber when offline / model
+  // missing or broken / engine errors, slate when off.
+  const d = deriveAiStatus(s);
   const remoteOnline = s.enabled && s.provider !== "ollama" && s.reachable === true;
   const remoteOffline = s.enabled && s.provider !== "ollama" && s.reachable === false;
   const remoteChecking = s.enabled && s.provider !== "ollama" && s.reachable == null;
-  const ollamaOnline =
-    s.enabled &&
-    s.provider === "ollama" &&
-    s.ollama?.reachable === true &&
-    s.ollama.modelInstalled;
 
   // Per-connection annotation for the status line ("" when nothing to say).
   const connNote = (() => {
@@ -265,23 +271,15 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
       {/* status + toggle */}
       <div className="flex flex-wrap items-center gap-3">
         <span
-          className={`h-2.5 w-2.5 rounded-full ${
-            remoteOnline || ollamaOnline
-              ? "bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]"
-              : intentOn
-                ? "bg-amber-400"
-                : "bg-slate-500"
+          className={`h-2.5 w-2.5 rounded-full ${d.dot}${
+            d.dot.includes("bg-emerald") ? " shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]" : ""
           }`}
+          title={d.title}
           aria-hidden="true"
         />
-        <p className="text-sm text-slate-300">
-          {s.envOff
-            ? "AI is disabled by the AI_ENABLED=false environment variable."
-            : !intentOn
-              ? "AI is disabled (Settings toggle)."
-              : s.enabled
-                ? `AI is on — ${s.provider}${s.model ? ` · ${s.model}` : ""}${connNote}`
-                : "AI is enabled — no provider configured yet."}
+        <p className="text-sm text-slate-300" title={d.title}>
+          {d.label}
+          {s.enabled ? ` — ${s.provider}${s.model ? ` · ${s.model}` : ""}${connNote}` : ""}
         </p>
         <button
           role="switch"

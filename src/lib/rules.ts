@@ -147,7 +147,13 @@ export function isMajorBump(prev: string | undefined, next: string): boolean {
   return b.major > a.major;
 }
 
-const STABLE_HINTS = /\b(stable|ga|1\.0|general availability|major)\b/i;
+/**
+ * Milestone releases get "high" priority even without notes. "1.0" is
+ * bounded with (?<![.\d]) / (?![.\d]) on both sides — a plain \b would
+ * ALSO match the "1.0" inside a version like "2.1.0" (the dot creates a
+ * word boundary), false-flagging every x.1.0 release as a milestone.
+ */
+const STABLE_HINTS = /\b(stable|ga|general availability|major)\b|(?<![.\d])1\.0(?![.\d])/i;
 
 export function looksLikeMilestoneRelease(title: string): boolean {
   return STABLE_HINTS.test(title);
