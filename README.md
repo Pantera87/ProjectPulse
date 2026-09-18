@@ -1,9 +1,5 @@
 <p align="center">
-<<<<<<< HEAD
-  <img src="public/logowithbg.png" alt="ProjectPulse logo" width="200" />
-=======
   <img src="public/logowithbg.png" alt="ProjectPulse logo" width="120" />
->>>>>>> d592fc41781dd35a5c9767b735e9bc13a3041a1b
 </p>
 
 <h1 align="center">ProjectPulse</h1>
