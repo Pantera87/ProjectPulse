@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logowithbg.png" alt="ProjectPulse logo" width="240" />
+  <img src="public/logowithbg.png" alt="ProjectPulse logo" width="120" />
 </p>
 
 <h1 align="center">ProjectPulse</h1>
