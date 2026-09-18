@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readAIConfig } from "@/lib/ai";
-import { startPull, getPullJobs } from "@/lib/ollama";
+import { startPull, getPullJobs, defaultOllamaUrl } from "@/lib/ollama";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +24,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid model name" }, { status: 400 });
 
   const cfg = readAIConfig();
-  // Ollama's default local endpoint when the user hasn't set one.
-  // 127.0.0.1 (not localhost): on WSL/Docker hosts "localhost" can resolve
-  // to ::1, where a WSL relay may hold the port without an Ollama behind it.
-  const root = (cfg.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
+  // Endpoint: the saved URL, or the resolved default (bundled compose
+  // service inside Docker, host loopback elsewhere).
+  const root = (cfg.ollamaUrl || defaultOllamaUrl()).replace(/\/+$/, "");
 
   // Quick reachability check so the UI gets immediate, actionable feedback
   // instead of a job that errors a moment later.
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
   if (!up)
     return NextResponse.json(
       {
-        error: `Ollama is not reachable at ${root}. Install it from https://ollama.com/download (Windows: "winget install Ollama.Ollama"), make sure it is running (system tray or "ollama serve"), then press Download again. Models are fetched by Ollama itself from the official registry (registry.ollama.ai).`,
+        error: `Ollama is not reachable at ${root}. If the app runs in Docker, make sure the bundled ollama service (docker-compose.yml) is up; otherwise install Ollama on the machine that address points to (https://ollama.com/download) or let Settings → AI detect the address. Models are fetched by Ollama itself from the official registry (registry.ollama.ai).`,
       },
       { status: 503 },
     );

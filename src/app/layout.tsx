@@ -43,7 +43,7 @@ function Nav() {
   }
   return (
     <nav className="sticky top-0 z-40 border-b border-white/10 bg-[#060814]/70 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
+      <div className="app-shell mx-auto flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
         <Link
           href="/"
           className="mr-4 flex items-center gap-2"
@@ -79,9 +79,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <Aurora />
         <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-        <footer className="mx-auto w-full max-w-6xl px-4 pb-4 text-xs text-slate-500">
-          ProjectPulse — local project tracker. Data lives in the <code>/data</code> volume.
+        <main className="app-shell mx-auto flex-1 px-4 py-6">{children}</main>
+        <footer className="app-shell mx-auto px-4 pb-4 text-xs text-slate-500">
+          ProjectPulse — local project tracker.
         </footer>
       </body>
     </html>

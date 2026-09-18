@@ -7,6 +7,8 @@ export type Priority = "critical" | "high" | "normal";
 export type UpdateKind =
   | "content_change"
   | "release"
+  | "readme"
+  | "commit"
   | "milestone"
   | "issue"
   | "feed_entry"
@@ -49,6 +51,14 @@ export interface SourceRow {
   logo: string | null;
   /** AI-generated summary of what the project is (set on add / first check) */
   project_summary: string | null;
+  /** Per-project AI summary length override (short/medium/long; null = follow global) */
+  summary_size: string | null;
+  /** Track every new release without keywords (1/0, default 1, github) */
+  track_releases: number;
+  /** Track README changes without keywords (1/0, default 0, github) */
+  track_readme: number;
+  /** Track every new commit without keywords (1/0, default 0, github) */
+  track_commits: number;
 }
 
 export interface SnapshotRow {
@@ -61,6 +71,12 @@ export interface SnapshotRow {
   title: string | null;
   /** rendered PNG screenshot, relative to DATA_DIR (nullable for old rows) */
   screenshot: string | null;
+  /**
+   * Self-contained copy of the page: archived HTML with asset URLs rewritten
+   * to local /api/sources/<id>/archive URLs (stored compressed, like `html`).
+   * null when no offline archive was captured.
+   */
+  html_local: string | null;
 }
 
 export interface UpdateRow {
@@ -83,6 +99,23 @@ export interface SourceState {
   seen_feed_ids?: string[];
   readme_matched?: Record<string, boolean>;
   prev_tag?: string;
+  /** Website: auto-discovered RSS/Atom feed checked instead of page scraping */
+  feed_url?: string;
+  feed_discovery_done?: boolean;
+  /** Consecutive feed-check failures (feed dropped + re-discovered at 3) */
+  feed_fails?: number;
+  /** Hash of the GitHub releases Atom feed (cheap idle-cycle pre-check) */
+  prev_release_feed_hash?: string;
+  /** "ok" | "missing" — last known state of the releases Atom feed */
+  release_feed_status?: string;
+  /** Hash of the README text (keywordless "README changed" tracking) */
+  readme_hash?: string;
+  /** Hash of the repo page main text (offline repo-page snapshots) */
+  page_hash?: string;
+  /** Last README text, capped — for diffing on README change tracking */
+  readme_text?: string;
+  /** SHAs of already-reported commits (keywordless commit tracking) */
+  seen_commit_shas?: string[];
   [k: string]: unknown;
 }
 
@@ -180,6 +213,14 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "project_summary", "TEXT");
   addColumnIfMissing(d, "sources", "subcategory", "TEXT");
   addColumnIfMissing(d, "sources", "category_source", "TEXT");
+  // Keywordless change-tracking toggles (github sources).
+  addColumnIfMissing(d, "sources", "track_releases", "INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(d, "sources", "track_readme", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing(d, "sources", "track_commits", "INTEGER NOT NULL DEFAULT 0");
+  // Per-project AI summary length override (null = follow the global setting).
+  addColumnIfMissing(d, "sources", "summary_size", "TEXT");
+  // Self-contained archived HTML of a snapshot (offline view, compressed).
+  addColumnIfMissing(d, "snapshots", "html_local", "TEXT");
   // One-time backfill: index existing updates into the FTS search table so
   // they become searchable (new updates are indexed at insert time).
   if (getSetting(d, "fts_update_backfill_v1") !== "1") {

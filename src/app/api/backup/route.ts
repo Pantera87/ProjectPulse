@@ -1,18 +1,29 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { indexForSearch } from "@/lib/models";
+import { encodeHtmlCell, decodeHtmlCell } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/backup — download full backup as JSON. */
 export function GET() {
   const d = getDb();
+  // Stored HTML columns are zlib-compressed in the DB (or legacy plain
+  // text) — encode them so the backup JSON stays text-safe.
+  const snapshots = (d.prepare("SELECT * FROM snapshots").all() as Record<
+    string,
+    unknown
+  >[]).map((s) => ({
+    ...s,
+    html: encodeHtmlCell(s.html),
+    html_local: encodeHtmlCell(s.html_local),
+  }));
   const payload = {
     app: "projectpulse",
     version: 1,
     exported_at: new Date().toISOString(),
     sources: d.prepare("SELECT * FROM sources").all(),
-    snapshots: d.prepare("SELECT * FROM snapshots").all(),
+    snapshots,
     updates: d.prepare("SELECT * FROM updates").all(),
     settings: d.prepare("SELECT * FROM settings").all(),
   };
@@ -92,8 +103,9 @@ export async function POST(req: Request) {
     const insSource = d.prepare(
       `INSERT INTO sources (id, type, url, name, goal, category, subcategory, category_source, notes, watch_enabled,
         check_interval_hours, last_checked_at, last_content_hash, last_error,
-        muted_until, rules_json, state_json, created_at, logo, project_summary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        muted_until, rules_json, state_json, created_at, logo, project_summary, summary_size,
+        track_releases, track_readme, track_commits)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const s of body.sources ?? [])
       insSource.run(
@@ -102,16 +114,19 @@ export async function POST(req: Request) {
         s.notes ?? null, s.watch_enabled ?? 1, s.check_interval_hours ?? 6,
         s.last_checked_at ?? null, s.last_content_hash ?? null, s.last_error ?? null,
         s.muted_until ?? null, s.rules_json ?? "[]", s.state_json ?? "{}",
-        s.created_at ?? new Date().toISOString(), s.logo ?? null, s.project_summary ?? null
+        s.created_at ?? new Date().toISOString(), s.logo ?? null, s.project_summary ?? null,
+        s.summary_size ?? null, s.track_releases ?? 1, s.track_readme ?? 0, s.track_commits ?? 0
       );
     const insSnap = d.prepare(
-      `INSERT INTO snapshots (id, source_id, version, fetched_at, html, content_hash, title, screenshot)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO snapshots (id, source_id, version, fetched_at, html, content_hash, title, screenshot, html_local)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const s of body.snapshots ?? [])
       insSnap.run(
-        s.id, s.source_id, s.version, s.fetched_at, s.html, s.content_hash,
-        s.title ?? null, s.screenshot ?? null
+        s.id, s.source_id, s.version, s.fetched_at,
+        decodeHtmlCell(s.html), s.content_hash,
+        s.title ?? null, s.screenshot ?? null,
+        decodeHtmlCell(s.html_local)
       );
     const insUpd = d.prepare(
       `INSERT INTO updates (id, source_id, priority, kind, title, summary, url, payload_json, created_at, read_at)

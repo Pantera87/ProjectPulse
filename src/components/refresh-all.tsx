@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { SourceType } from "@/lib/db";
 import { Glyph } from "./icons";
 
 interface Props {
@@ -9,14 +10,33 @@ interface Props {
   onDone?: () => void;
   /** Small variant for compact headers (dashboard Projects row). */
   compact?: boolean;
+  /**
+   * Scope the run to one source type (websites / GitHub / RSS pages). Omit to
+   * check every type (dashboard). When set, "Check all" only checks sources of
+   * this type, then refreshes the page when the run finishes.
+   */
+  type?: SourceType;
+}
+
+interface RunStatus {
+  running: boolean;
+  checked: number;
+  total: number;
+  type: SourceType | null;
+}
+
+/** True when an in-flight run affects this button's scope. */
+function matchesScope(thisType: SourceType | undefined, run: RunStatus) {
+  return !thisType || !run.type || run.type === thisType;
 }
 
 /**
  * Manual "check all" — POST /api/sources/check-all starts a background run
- * over every source; the button polls the run status until it finishes, then
- * refreshes server components so last-checked stamps and counts update.
+ * over every source (or one source type when `type` is set); the button polls
+ * the run status until it finishes, then refreshes server components so
+ * last-checked stamps and counts update.
  */
-export default function RefreshAll({ onDone, compact = false }: Props) {
+export default function RefreshAll({ onDone, compact = false, type }: Props) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ checked: 0, total: 0 });
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -38,17 +58,18 @@ export default function RefreshAll({ onDone, compact = false }: Props) {
   };
 
   useEffect(() => {
-    // Adopt an in-flight run (e.g. started from another tab) on mount.
+    // Adopt an in-flight run (e.g. started from another tab) on mount — but
+    // only if its scope matches this button's scope.
     fetch("/api/sources/check-all", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
-        if (j?.running) {
+        if (j?.running && matchesScope(type, j as RunStatus)) {
           setRunning(true);
           setProgress({ checked: j.checked, total: j.total });
           poller.current = setInterval(async () => {
-            const status = await fetch("/api/sources/check-all", { cache: "no-store" })
+            const status = (await fetch("/api/sources/check-all", { cache: "no-store" })
               .then((r) => r.json())
-              .catch(() => null);
+              .catch(() => null)) as RunStatus | null;
             if (!status) return;
             setProgress({ checked: status.checked, total: status.total });
             if (!status.running) finish();
@@ -58,13 +79,17 @@ export default function RefreshAll({ onDone, compact = false }: Props) {
       .catch(() => {});
     return stopPolling;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [type]);
 
   const start = async () => {
     if (running) return;
     setRunning(true);
     try {
-      const j = (await fetch("/api/sources/check-all", { method: "POST" })
+      const j = (await fetch("/api/sources/check-all", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: type ?? null }),
+      })
         .then((r) => r.json())
         .catch(() => null)) as { count?: number } | null;
       setProgress({ checked: 0, total: j?.count ?? 0 });
@@ -72,9 +97,9 @@ export default function RefreshAll({ onDone, compact = false }: Props) {
       finish();
     }
     poller.current = setInterval(async () => {
-      const status = await fetch("/api/sources/check-all", { cache: "no-store" })
+      const status = (await fetch("/api/sources/check-all", { cache: "no-store" })
         .then((r) => r.json())
-        .catch(() => null);
+        .catch(() => null)) as RunStatus | null;
       if (!status) return;
       setProgress({ checked: status.checked, total: status.total });
       if (!status.running) finish();
@@ -102,3 +127,4 @@ export default function RefreshAll({ onDone, compact = false }: Props) {
     </button>
   );
 }
+

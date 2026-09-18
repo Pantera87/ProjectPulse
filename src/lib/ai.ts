@@ -15,7 +15,13 @@
  */
 import { getDb, getSetting, setSetting } from "./db";
 import type { Priority } from "./db";
-import { DEFAULT_OLLAMA_MODEL, ollamaInstalled, ollamaVersion, startPull } from "./ollama";
+import {
+  DEFAULT_OLLAMA_MODEL,
+  defaultOllamaUrl,
+  ollamaInstalled,
+  ollamaVersion,
+  startPull,
+} from "./ollama";
 
 export type ProviderKind = "ollama" | "openai" | "anthropic" | "mcp";
 
@@ -78,8 +84,17 @@ export interface AIProvider {
    * null = AI unavailable / unparseable reply.
    */
   suggestSubcategory(text: string, category: string, docs?: AIDoc[]): Promise<string | null>;
-  /** Summarize what a whole project/software is. */
-  summarizeProject(text: string, context: string, docs?: AIDoc[]): Promise<string | null>;
+  /**
+   * Summarize what a whole project/software is — as a bullet list covering
+   * the ENTIRE content (not just its opening). `size` controls how many
+   * bullets: short = 3, medium = 6, long = 10.
+   */
+  summarizeProject(
+    text: string,
+    context: string,
+    docs?: AIDoc[],
+    size?: "short" | "medium" | "long"
+  ): Promise<string | null>;
   /** Connectivity probe — returns the model's reply to a trivial prompt. */
   ping(): Promise<string | null>;
 }
@@ -184,13 +199,23 @@ abstract class BaseAI implements AIProvider {
     return normalizeCategory(out);
   }
 
-  async summarizeProject(text: string, context: string, docs?: AIDoc[]): Promise<string | null> {
-    const t = this.clip(text, 500, 5000, !!docs?.length);
+  async summarizeProject(
+    text: string,
+    context: string,
+    docs?: AIDoc[],
+    size: "short" | "medium" | "long" = "medium"
+  ): Promise<string | null> {
+    // Cover the whole content, not just the opening: the in-prompt clip is
+    // generous, and RAG-capable providers get the full document attached.
+    const clipLen = size === "short" ? 8000 : size === "long" ? 40000 : 20000;
+    const count = size === "short" ? 3 : size === "long" ? 10 : 6;
+    const t = this.clip(text, 1000, clipLen, !!docs?.length);
     return this.complete(
-      `In 2-3 plain sentences, summarize what the project "${context}" is and what it does.${this.docNote(
+      `Summarize the ENTIRE content below about the project "${context}": what it is, the problem it solves, and its main features — base this on the whole content, not just the beginning.${this.docNote(
         !!docs?.length
-      )} No preamble, no lists.\n\n${t}`,
-      { maxTokens: 300, docs }
+      )}\n` +
+        `Reply with ONLY ${count} bullet points, one per line, each starting with "- ". No preamble, no headings, no numbering.\n\n${t}`,
+      { maxTokens: 500, docs }
     );
   }
 
@@ -690,7 +715,10 @@ function defaultConfig(): AIConfig {
   return {
     provider: "ollama",
     model: process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL,
-    ollamaUrl: process.env.OLLAMA_URL || "",
+    // Always resolved to a concrete endpoint (env var, bundled compose
+    // service inside Docker, or host loopback) — so Ollama works out of
+    // the box without the user having to figure out the address.
+    ollamaUrl: defaultOllamaUrl(),
     openaiUrl: process.env.OPENAI_URL || "https://api.openai.com/v1",
     openaiKey: process.env.OPENAI_API_KEY || "",
     anthropicKey: process.env.ANTHROPIC_API_KEY || "",

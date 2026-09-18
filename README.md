@@ -1,39 +1,59 @@
 <p align="center">
-  <img src="public/logowithbg.png" alt="ProjectPulse logo" width="240" />
+  <img src="public/logowithbg.png" alt="ProjectPulse logo" width="200" />
 </p>
 
 <h1 align="center">ProjectPulse</h1>
 
 <p align="center">
-  A self-hosted tracker for software projects: snapshot and watch project websites,
-  follow GitHub releases and milestones, and monitor RSS/Atom feeds — with
+  A self-hosted tracker for software projects: snapshot and watch project websites,<br/>
+  follow GitHub releases and milestones, and monitor RSS/Atom feeds — with<br/>
   priority keyword rules and optional local AI.
 </p>
 
+<p align="center">
+  <a href="https://nextjs.org">
+    <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16" />
+  </a>
+  <a href="https://react.dev">
+    <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
+  </a>
+  <a href="https://www.typescriptlang.org">
+    <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5" />
+  </a>
+  <a href="https://sqlite.org">
+    <img src="https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  </a>
+  <a href="https://www.docker.com">
+    <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker ready" />
+  </a>
+</p>
 
-## Table of contents
-
-- [Features](#features)
-- [How it works](#how-it-works)
-  - [Websites](#websites)
-  - [GitHub](#github)
-  - [Feeds (RSS/Atom)](#feeds-rssatom)
-  - [Keyword rules](#keyword-rules)
-  - [Category classification](#category-classification)
-  - [Updates feed &amp; dashboard](#updates-feed--dashboard)
-- [Getting started](#getting-started)
-  - [Docker](#docker)
-  - [TrueNAS SCALE](#truenas-scale)
-- [Configuration](#configuration)
-- [AI (optional)](#ai-optional)
-- [Local development](#local-development)
-- [Project structure](#project-structure)
+<div align="center">
+  <hr/>
+  <p>
+    <a href="#features">Features</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#how-it-works">How it works</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#getting-started">Getting started</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#configuration">Configuration</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#ai-optional">AI (optional)</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#local-development">Local development</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#project-structure">Project structure</a>
+  </p>
+  <hr/>
+</div>
 
 ## Features
 
 - **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, last 10 versions kept.
 - **Change tracking** — scheduled checks detect page changes; every change produces a new snapshot version plus an update entry with a text diff.
-- **GitHub tracking** — releases/tags, milestones, issue-label watching, and README/commit keyword scans.
+- **Websites via feed** — if a watched website publishes an RSS/Atom feed (declared in the page or at a common path), it is discovered automatically and checked via the feed instead of re-scraping the page — with the same keyword rules, and an automatic fallback to page snapshots if the feed breaks.
+- **GitHub tracking** — keywordless change tracking (new releases / README changes / new commits — per-repo toggles), milestones, issue-label watching, and README/commit keyword scans.
 - **Feeds** — RSS/Atom feeds as first-class sources.
 - **Priority keyword rules** — word-boundary matching with negation and priorities (e.g. flag anything mentioning *kernel, linux* as *critical*), plus an optional AI semantic second pass.
 - **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content: keyword hints first, and when no keyword matches the AI reads the full page/feed content.
@@ -49,6 +69,13 @@
 - **Track updates**: a scheduled check extracts the page's main text,
   normalizes it and hashes it. On change: a new snapshot version is stored and
   an update entry with a text diff is created.
+- **Via feed (automatic)**: if the site declares an RSS/Atom feed
+  (`<link rel="alternate">`) or serves one at a common path (`/feed`,
+  `/feed.xml`, …), it is discovered on the next check and subsequent checks
+  run through the feed instead of the page — cheaper and more reliable, same
+  keyword rules. The source gets a "via feed" badge. If the feed fails three
+  checks in a row, the feed is dropped, the site is re-discovered and normal
+  page checking resumes.
 - **Keyword rules** per site: e.g. a critical rule `kernel, linux` → the moment
   those words appear in newly added page text, the update is *critical*. With
   AI enabled, a semantic second pass also flags text that *relates to* the
@@ -59,7 +86,14 @@
 ### GitHub
 
 - Add as `owner/repo` or a GitHub URL.
-- New **releases/tags** → update entries. Priority:
+- **Track changes** (per-repo toggles, no keywords needed) — each creates an
+  update on the event itself:
+  - *New releases* (on by default) — every new release/tag.
+  - *README changes* — the README is hashed; on change an update with a text
+    diff of what was added.
+  - *New commits* — every new commit in the default branch.
+- New **releases/tags** → update entries (unless the toggle is off and no
+  keyword rule matches). Priority:
   - keyword rule match in release notes → the rule's priority (e.g. *critical*)
   - semver **major bump** or "stable/1.0" in the title → *high*
   - otherwise → *normal*
@@ -71,6 +105,10 @@
   keyword shows up in the README → instant critical alert). The alert links
   directly to the match: the commit whose message contains the keyword, or the
   README section it appears in.
+- **Rate-limit friendly**: each check first polls the repo's `releases.atom`
+  feed — a plain endpoint *outside* the API rate limit. If it is unchanged and
+  nothing else is being watched, the cycle only fetches milestones instead of
+  releases, README, commits and issues.
 - Unauthenticated GitHub API: 60 requests/h per IP. Set `GITHUB_TOKEN` for 5000/h.
 
 ### Feeds (RSS/Atom)
@@ -134,29 +172,47 @@ docker compose up -d --build
 # open http://localhost:4701
 ```
 
-AI runs out of the box on the bundled **Ollama** container: the app points at
-`http://ollama:11434` by default, and `ollama-init` pre-downloads the default
-model (`qwen2.5:7b`, override with `OLLAMA_MODEL`) once the server is up.
-Downloaded models persist in the `ollama_data` Docker volume. To use a remote
+AI runs out of the box on the bundled **Ollama** container: the compose file
+sets `OLLAMA_URL=http://ollama:11434` (the service name on the Docker network
+— no IP to look up), and `ollama-init` pre-downloads the default model
+(`qwen2.5:7b`, override with `OLLAMA_MODEL`) once the server is up.
+Downloaded models persist in the `ollama_data` named volume. To use a remote
 provider instead, remove the two `ollama*` services from the compose file and
-pick the provider in Settings.
+pick the provider in Settings. If your Ollama server lives elsewhere (e.g. on
+the Docker host), Settings → AI has a **Detect Ollama address** button that
+probes the common endpoints and fills in the one that answers.
 
-All data (SQLite DB + snapshots) lives in `./data`.
+All data (SQLite DB + snapshots) lives in the `projectpulse_data` named
+volume; Ollama's models live in the `ollama_data` named volume.
 
-### TrueNAS SCALE
+### TrueNAS SCALE (Portainer)
 
-1. Copy the project folder (or the repo) to TrueNAS.
-2. In **Apps → Compose Projects**, add the `docker-compose.yml`.
-3. Make sure the `./data` path is writable by the container user (uid 1000).
-4. `docker compose up -d --build`.
+The compose file is written for **Portainer stacks**, which cannot run
+`build:` — so build the image once on the host first:
+
+1. Copy the project folder (or the repo) to a path on TrueNAS.
+2. Enable SSH (System → Network & Services) and build the image:
+   ```bash
+   cd /path/to/ProjectPulse
+   docker build -t projectpulse:latest .
+   ```
+3. In **Portainer → Stacks → Add new stack**, paste (or upload) the
+   `docker-compose.yml`, give the stack a name, and hit **Deploy**.
+4. Open `http://<truenas-ip>:4701`.
 
 Notes:
 
-- Use a **Dataset** with `user` set to the same uid the compose file runs as.
-- The container is non-root (`node` user, uid 1000). If your existing `data`
-  folder was created by root, run `chown -R 1000:1000 data` on the host.
-- To upgrade: replace the files, `docker compose build && docker compose up -d`.
-  The `./data` volume is untouched.
+- Data uses **named Docker volumes** (`projectpulse_data`, `ollama_data`) —
+  Portainer manages them, so there is no host-path/permission (`mkdir`)
+  problem. Back them up via Portainer (Volumes → Download) or with the
+  in-app JSON backup (Settings page).
+- The `ollama-init` container shows **Exited (0)** after it runs — that's
+  its one-shot job (pre-pulling the model) done.
+- To upgrade: replace the project files, run `docker build -t
+  projectpulse:latest .` again, then **Update** the stack in Portainer.
+  The named volumes are untouched.
+- All configuration goes directly into the compose file (Portainer has no
+  `.env` file) — uncomment the variables in the `projectpulse` service.
 
 ## Configuration
 
@@ -166,7 +222,7 @@ All extras are env-driven and off by default:
 |---|---|
 | `AUTH_PASSWORD` | enables a login screen (single shared password) |
 | `WEBHOOK_URL` | POSTs every new update as JSON `{title, url, priority, kind, …}` |
-| `OLLAMA_URL` / `OLLAMA_MODEL` | AI via local Ollama (see [AI](#ai-optional)) |
+| `OLLAMA_URL` / `OLLAMA_MODEL` | AI via local Ollama (see [AI](#ai-optional)); the compose file sets `OLLAMA_URL` to the bundled service by default |
 | `OLLAMA_KEEP_ALIVE` | minutes a model stays loaded after use before Ollama frees the RAM (default 5; also settable in Settings) |
 | `OPENAI_URL` / `OPENAI_API_KEY` | AI via any OpenAI-compatible endpoint |
 | `ANTHROPIC_API_KEY` | AI via Anthropic (Claude) |
@@ -201,7 +257,7 @@ Configurable in Settings → AI, or via env as defaults:
 
 | Provider | What it needs | Notes |
 |---|---|---|
-| **Ollama** (default) | bundled `ollama` service in `docker-compose.yml` — `OLLAMA_URL` defaults to `http://ollama:11434` | Local models (`qwen2.5:7b` default — very accurate; smaller models in the Settings catalog are moderately accurate or basic; override with `OLLAMA_MODEL`, pre-pulled on container startup by `ollama-init`). Models load on first use. |
+| **Ollama** (default) | bundled `ollama` service in `docker-compose.yml` — `OLLAMA_URL` is set to `http://ollama:11434` by default (auto-detected in Settings if Ollama lives elsewhere) | Local models (`qwen2.5:7b` default — very accurate; smaller models in the Settings catalog are moderately accurate or basic; override with `OLLAMA_MODEL`, pre-pulled on container startup by `ollama-init`). Models load on first use. |
 | **OpenAI-compatible** | base URL (+ key for hosted APIs) | OpenAI, LM Studio, vLLM, Ollama's `/v1`, any gateway. |
 | **Anthropic** | API key | Claude via the Messages API. |
 | **MCP** | MCP server URL (Streamable HTTP) | Run the AI on another machine (e.g. a desktop with a GPU) and point ProjectPulse at an MCP server there; tool + argument are auto-detected (or set explicitly). |
@@ -245,6 +301,10 @@ is downloaded manually.
   when this is not set).
 - A **Test connection** button in Settings runs a trivial generation through
   the active provider.
+- If the Ollama connection is broken, Settings → AI looks for the server
+  automatically (**Detect Ollama address** probes the bundled compose service,
+  local loopback and the Docker host) and offers one click to use the address
+  that answers.
 - The navbar badge always shows the AI state: off / not configured /
   downloading / ready (model loaded).
 

@@ -1,5 +1,4 @@
 import type Database from "better-sqlite3";
-import Parser from "rss-parser";
 import type { SourceRow } from "../db";
 import { findRuleHitSmart } from "../rules";
 import { getAI } from "../ai";
@@ -12,42 +11,49 @@ import {
   stateOf,
   touchSource,
 } from "../models";
-import { truncate, hashText } from "../text";
+import { truncate, hashText, compressHtml } from "../text";
 import { notify } from "../notifiers";
-import { fetchText } from "../http";
+import { fetchFeed } from "../feed";
 import type { CheckResult } from "./website";
 
-const parser = new Parser({
-  headers: { "user-agent": "ProjectPulse/1.0" },
-});
+export interface FeedCheckOpts {
+  /**
+   * Keep the source's existing `last_content_hash` untouched. Used by the
+   * website "via feed" fast path, which must keep its *page* hash so a
+   * fallback scrape can still compare against it.
+   */
+  skipPageHash?: boolean;
+  /**
+   * Don't store a feed XML snapshot. Websites keep their HTML snapshots for
+   * the snapshot viewer; a feed XML blob there would be confusing.
+   */
+  skipSnapshot?: boolean;
+}
 
+/** Check an RSS/Atom source (the feed lives at the source's own URL). */
 export async function checkRss(
   d: Database.Database,
   source: SourceRow
 ): Promise<CheckResult> {
+  return checkFeedUrl(d, source, source.url);
+}
+
+/**
+ * Check any RSS/Atom feed URL for new entries (state tracked in
+ * `state_json.seen_feed_ids`). Shared by RSS sources and the website
+ * "via feed" fast path, which reuses the exact same entry-matching logic
+ * (keyword rules + AI semantic pass) as dedicated feeds.
+ */
+export async function checkFeedUrl(
+  d: Database.Database,
+  source: SourceRow,
+  feedUrl: string,
+  opts: FeedCheckOpts = {}
+): Promise<CheckResult> {
   let xml: string;
-  let entries: {
-    guid: string;
-    title: string;
-    link?: string;
-    isoDate?: string;
-    contentSnippet?: string;
-    content?: string;
-  }[];
+  let entries: Awaited<ReturnType<typeof fetchFeed>>["items"];
   try {
-    xml = await fetchText(source.url, {
-      timeoutMs: 30_000,
-      headers: { accept: "application/rss+xml, application/atom+xml, application/xml, */*" },
-    });
-    const feed = await parser.parseString(xml);
-    entries = feed.items.map((it, i) => ({
-      guid: it.guid || it.link || it.title || `item-${i}`,
-      title: it.title ?? "(untitled)",
-      link: it.link,
-      isoDate: it.isoDate,
-      contentSnippet: it.contentSnippet,
-      content: it.content,
-    }));
+    ({ xml, items: entries } = await fetchFeed(feedUrl));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     touchSource(d, source.id, {
@@ -119,14 +125,14 @@ export async function checkRss(
   touchSource(d, source.id, {
     last_checked_at: new Date().toISOString(),
     state_json: JSON.stringify(state),
-    last_content_hash: hashText(
-      entries.map((e) => e.guid).join("\n")
-    ),
+    ...(opts.skipPageHash
+      ? {}
+      : { last_content_hash: hashText(entries.map((e) => e.guid).join("\n")) }),
     last_error: null,
   });
 
   // Keep the latest feed snapshot for reference (best-effort)
-  if (xml.length > 2) {
+  if (!opts.skipSnapshot && xml.length > 2) {
     const version = maxSnapshotVersion(d, source.id) + 1;
     d.prepare(
       `INSERT INTO snapshots (source_id, version, fetched_at, html, content_hash, title)
@@ -135,7 +141,7 @@ export async function checkRss(
       source.id,
       version,
       new Date().toISOString(),
-      truncate(xml, 200_000),
+      compressHtml(truncate(xml, 200_000)),
       hashText(xml),
       source.name || source.url
     );

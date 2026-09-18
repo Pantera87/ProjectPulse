@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readAIConfig } from "@/lib/ai";
-import { ollamaDeleteModel } from "@/lib/ollama";
+import { ollamaDeleteModel, defaultOllamaUrl } from "@/lib/ollama";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid model name" }, { status: 400 });
 
   const cfg = readAIConfig();
-  // Ollama's default local endpoint when the user hasn't set one.
-  const root = (cfg.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
+  // Endpoint: the saved URL, or the resolved default (bundled compose
+  // service inside Docker, host loopback elsewhere).
+  const root = (cfg.ollamaUrl || defaultOllamaUrl()).replace(/\/+$/, "");
 
   // Quick reachability check so the UI gets immediate, actionable feedback.
   let up = false;

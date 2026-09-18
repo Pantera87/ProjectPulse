@@ -7,20 +7,27 @@ import {
   normalizeForHash,
   extractGoalFromPage,
   truncate,
+  compressHtml,
+  readHtml,
 } from "../text";
 import { findRuleHitSmart } from "../rules";
 import { getAI } from "../ai";
 import { fetchText } from "../http";
 import { captureScreenshot } from "../screenshots";
+import { archivePageHtml } from "../archive";
 import {
   insertUpdate,
   indexForSearch,
   maxSnapshotVersion,
   pruneSnapshots,
   rulesOf,
+  snapshotMode,
+  stateOf,
   touchSource,
 } from "../models";
 import { notify } from "../notifiers";
+import { checkFeedUrl } from "./rss";
+import { discoverWebsiteFeed } from "../feed";
 
 export interface CheckResult {
   ok: boolean;
@@ -52,6 +59,45 @@ export async function checkWebsite(
   const normalized = normalizeForHash(page.text);
   const newHash = hashText(normalized);
   const firstCheck = !source.last_content_hash;
+  const state = stateOf(source);
+
+  // --- Fast path: auto-discovered RSS/Atom feed. Once the baseline exists,
+  // the feed is checked instead of re-scraping the page every cycle; the
+  // page hash is preserved so a fallback scrape (feed died) can still
+  // compare against it.
+  if (!firstCheck && state.feed_url) {
+    // Persist state first — checkFeedUrl re-reads the row and would
+    // otherwise overwrite it with the stale state.
+    touchSource(d, source.id, { state_json: JSON.stringify(state) });
+    const result = await checkFeedUrl(d, source, state.feed_url, {
+      skipPageHash: true,
+      skipSnapshot: true,
+    });
+    if (result.ok) return result;
+    // Feed unreachable/broken: count the failure, drop it after 3 in a row
+    // (re-arming discovery), and fall through to a full page check.
+    state.feed_fails = (state.feed_fails ?? 0) + 1;
+    if (state.feed_fails >= 3) {
+      state.feed_url = undefined;
+      state.feed_fails = 0;
+      state.feed_discovery_done = false;
+    }
+  }
+
+  // --- Feed discovery (runs once per source; also backfills existing
+  // sources on their next check; re-armed when a feed dies).
+  if (!firstCheck && !state.feed_discovery_done) {
+    try {
+      const feedUrl = await discoverWebsiteFeed(source.url);
+      state.feed_discovery_done = true;
+      if (feedUrl) {
+        state.feed_url = feedUrl;
+        state.feed_fails = 0;
+      }
+    } catch {
+      // leave discovery open — retried on the next check
+    }
+  }
 
   if (!firstCheck && newHash === source.last_content_hash) {
     // Backfill a visual screenshot for the latest snapshot if missing
@@ -73,6 +119,7 @@ export async function checkWebsite(
     }
     touchSource(d, source.id, {
       last_checked_at: new Date().toISOString(),
+      state_json: JSON.stringify(state),
       last_error: null,
     });
     return { ok: true, changed: false, updatesCreated: 0 };
@@ -83,20 +130,31 @@ export async function checkWebsite(
     .prepare(
       `SELECT html FROM snapshots WHERE source_id = ? ORDER BY version DESC LIMIT 1`
     )
-    .get(source.id) as { html: string } | undefined;
+    .get(source.id) as { html: unknown } | undefined;
 
-  // Store new snapshot version
+  // Store new snapshot version (storage mode: full / html / screenshot)
   const version = maxSnapshotVersion(d, source.id) + 1;
+  const mode = snapshotMode(d);
+  let htmlLocal: string | null = null;
+  if (mode === "full") {
+    // Best-effort offline archive: page + referenced assets with local URLs.
+    try {
+      htmlLocal = await archivePageHtml(html, source.url, source.id, version);
+    } catch {
+      htmlLocal = null;
+    }
+  }
   d.prepare(
-    `INSERT INTO snapshots (source_id, version, fetched_at, html, content_hash, title)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO snapshots (source_id, version, fetched_at, html, content_hash, title, html_local)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(
     source.id,
     version,
     new Date().toISOString(),
-    html,
+    mode === "screenshot" ? null : compressHtml(html),
     newHash,
-    page.title || null
+    page.title || null,
+    htmlLocal ? compressHtml(htmlLocal) : null
   );
   pruneSnapshots(d, source.id);
 
@@ -113,7 +171,7 @@ export async function checkWebsite(
   let updatesCreated = 0;
 
   if (!firstCheck) {
-    const prevPage = prev ? parseHtml(prev.html) : null;
+    const prevPage = prev ? parseHtml(readHtml(prev.html)) : null;
     const prevNorm = prevPage ? normalizeForHash(prevPage.text) : "";
 
     const diff = createPatch(
@@ -222,6 +280,7 @@ export async function checkWebsite(
 
   touchSource(d, source.id, {
     last_checked_at: new Date().toISOString(),
+    state_json: JSON.stringify(state),
     last_content_hash: newHash,
     last_error: null,
   });

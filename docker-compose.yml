@@ -1,48 +1,48 @@
 services:
   projectpulse:
-    build: .
-    image: projectpulse:latest
-    container_name: projectpulse
+    image: pantera87/projectpulse:latest
+    # No container_name on purpose — Portainer prefixes containers with the
+    # stack name, which keeps the naming clean and conflict-free.
     ports:
       - "4701:4701"
     volumes:
-      - ./data:/data          # SQLite DB + snapshots — survives container upgrades
+      - projectpulse_data:/data          # SQLite DB + snapshots — survives container upgrades
     environment:
-      TZ: ${TZ:-UTC}
-      # --- optional (uncomment/fill in here, or put them in a .env file next to this file) ---
+      # IANA timezone (e.g. Europe/Athens). Controls the scheduler, log
+      # timestamps, and the times shown in the UI. Change it and restart
+      # the container — the UI picks it up automatically.
+      TZ: Europe/London
+      # --- optional (uncomment and fill in; Portainer has no .env file, so
+      # --- values go straight into this file) ---
       # GITHUB_TOKEN: "ghp_xxx"            # raises GitHub API limit 60 → 5000 req/h
       # AUTH_PASSWORD: "secret"            # enables a login screen
       # WEBHOOK_URL: "http://host/hook"     # forwards each new update as JSON
-      # AI_ENABLED: "true"                 # set "false" to force heuristics (hard kill-switch)
-      # OLLAMA_URL: "http://ollama:11434"  # default in Docker (bundled ollama service)
-      # OLLAMA_MODEL: "qwen2.5:7b"           # model pre-pulled by the ollama-init service
-      # OLLAMA_KEEP_ALIVE: "5"     # auto-unload the model N minutes after use ("never" = keep loaded)
+      # AI_ENABLED: "false"                # set "false" to force heuristics (hard kill-switch)
+      OLLAMA_URL: "http://ollama:11434"    # bundled ollama service (below) — the default; change to point elsewhere
+      # OLLAMA_MODEL: "qwen2.5:7b"         # model pulled by the ollama-init service
+      # OLLAMA_KEEP_ALIVE: "5"             # auto-unload the model N minutes after use ("never" = keep loaded)
       # OPENAI_URL: "https://api.openai.com/v1"   # any OpenAI-compatible endpoint
       # OPENAI_API_KEY: "sk-..."
       # ANTHROPIC_API_KEY: "sk-ant-..."
-      # MCP_URL: "http://host:port/mcp"           # remote MCP server (Streamable HTTP)
+      # MCP_URL: "http://host:port/mcp"     # remote MCP server (Streamable HTTP)
       # SCHEDULER_INTERVAL_MINUTES: "5"
       # SNAPSHOT_KEEP_VERSIONS: "10"
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
-      WEBHOOK_URL: ${WEBHOOK_URL:-}
-      AI_ENABLED: ${AI_ENABLED:-}
-      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}   # bundled ollama service (below)
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-}
-      OPENAI_URL: ${OPENAI_URL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      MCP_URL: ${MCP_URL:-}
-      SCHEDULER_INTERVAL_MINUTES: ${SCHEDULER_INTERVAL_MINUTES:-}
-      SNAPSHOT_KEEP_VERSIONS: ${SNAPSHOT_KEEP_VERSIONS:-}
     restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4701/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 60s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
   # --- Local AI: Ollama (bundled by default) ---
-  # The app points at it out of the box (OLLAMA_URL defaults to
-  # http://ollama:11434). Downloaded models live in the ollama_data volume,
-  # so they survive container upgrades. Remove both ollama services below if
-  # you'd rather use a remote provider (OpenAI-compatible / Anthropic / MCP).
+  # The app points at it out of the box (http://ollama:11434). The model
+  # library lives in the named volume `ollama_data`, so models survive
+  # container upgrades. Remove both ollama services below if you'd rather
+  # use a remote provider (OpenAI-compatible / Anthropic / MCP).
   #
   # GPU (NVIDIA): install the NVIDIA Container Toolkit on the host, then add
   # under `ollama`:
@@ -55,7 +55,6 @@ services:
   #             capabilities: [gpu]
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
     ports:
       - "11434:11434"        # host access (ollama CLI, manual pulls); safe to remove
     environment:
@@ -69,15 +68,16 @@ services:
       retries: 12
     restart: unless-stopped
 
-  # One-shot: pre-downloads OLLAMA_MODEL (default qwen2.5:7b) once the
-  # server is healthy; exits instantly if the model is already present.
+  # One-shot: pre-downloads the default model once the server is healthy;
+  # exits instantly if the model is already present. Shows up as "Exited
+  # (0)" in Portainer after it runs — that's normal. Change the model by
+  # editing the command line (and OLLAMA_MODEL in projectpulse to match).
   ollama-init:
     image: ollama/ollama:latest
-    container_name: ollama-init
     entrypoint: ["ollama"]
-    command: ["pull", "${OLLAMA_MODEL:-qwen2.5:7b}"]
+    command: ["pull", "qwen2.5:7b"]
     environment:
-      - OLLAMA_HOST=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_HOST=http://ollama:11434
     volumes:
       - ollama_data:/root/.ollama
     depends_on:
@@ -86,4 +86,5 @@ services:
     restart: "no"
 
 volumes:
+  projectpulse_data:
   ollama_data:

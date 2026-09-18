@@ -23,3 +23,26 @@ export async function fetchText(url: string, opts: FetchOpts = {}): Promise<stri
   const cap = opts.maxBytes ?? 5_000_000;
   return buf.subarray(0, cap).toString("utf8");
 }
+
+/**
+ * Fetch a binary asset (image, css, js, …). Best-effort: returns null on any
+ * failure, oversized payload or bad status instead of throwing.
+ */
+export async function fetchBinary(
+  url: string,
+  timeoutMs = 10_000,
+  maxBytes = 2 * 1024 * 1024
+): Promise<Buffer | null> {
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { "user-agent": UA, accept: "*/*" },
+    });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length > 0 && buf.length <= maxBytes ? buf : null;
+  } catch {
+    return null;
+  }
+}

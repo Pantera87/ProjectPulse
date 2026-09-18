@@ -1,9 +1,50 @@
 import { createHash } from "node:crypto";
+import zlib from "node:zlib";
 import * as cheerio from "cheerio";
 
 /** Hash any string (sha256, hex). */
 export function hashText(s: string): string {
   return createHash("sha256").update(s, "utf8").digest("hex");
+}
+
+/**
+ * Snapshot HTML is stored deflate-compressed (as a BLOB in the TEXT column)
+ * to keep the database small — a typical page compresses ~8-10x.
+ */
+export function compressHtml(html: string): Buffer {
+  return zlib.deflateSync(html);
+}
+
+/** Read a snapshot html cell: legacy plain text or a compressed BLOB. */
+export function readHtml(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (ArrayBuffer.isView(v)) {
+    const bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    try {
+      return zlib.inflateSync(Buffer.from(bytes)).toString("utf8");
+    } catch {
+      return "";
+    }
+  }
+  return String(v);
+}
+
+/** Serialize a snapshot html cell for backup JSON (compressed → "zlib:base64"). */
+export function encodeHtmlCell(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (ArrayBuffer.isView(v))
+    return `zlib:${Buffer.from(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)).toString("base64")}`;
+  return String(v);
+}
+
+/** Reverse of encodeHtmlCell (restoring backups). */
+export function decodeHtmlCell(v: unknown): string | Buffer | null {
+  if (v == null) return null;
+  if (typeof v === "string" && v.startsWith("zlib:"))
+    return Buffer.from(v.slice(5), "base64");
+  return (v as string) ?? null;
 }
 
 export interface ParsedPage {

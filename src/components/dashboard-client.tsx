@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { SourceRow } from "@/lib/db";
-import { formatDateTime } from "@/lib/format";
 import ClearUpdates from "./clear-updates";
 import RefreshAll from "./refresh-all";
+import Time from "./time";
 import SourceCard from "./source-card";
 import CategoryIcon from "./category-icon";
 import { Glyph } from "./icons";
@@ -96,21 +96,47 @@ export default function DashboardClient({
   const [grouped, setGrouped] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [density, setDensityState] = useState<"comfortable" | "compact">("comfortable");
+  const [density, setDensityState] = useState<"comfortable" | "compact">("compact");
   const [flashKey, setFlashKey] = useState(0);
   const prevTotal = useRef(initialCounts.total);
+  // Set when the user explicitly picks a density; auto-switching then stops.
+  const densityChosen = useRef(false);
+
+  // Resolution-based default density: comfortable (expanded) on large / 4K
+  // displays, compact on smaller ones.
+  const resolutionDensity = () =>
+    window.innerWidth >= 1920 ? "comfortable" : "compact";
 
   // Density preference: restored from localStorage after mount to avoid
-  // hydration mismatch; persisted on change.
+  // hydration mismatch; persisted on change. When nothing is saved, the
+  // default follows the screen resolution and keeps following it on resize
+  // until the user picks a mode manually.
   useEffect(() => {
+    let saved: string | null = null;
     try {
-      const saved = window.localStorage.getItem("pp-dashboard-density");
-      if (saved === "comfortable" || saved === "compact") setDensityState(saved);
+      saved = window.localStorage.getItem("pp-dashboard-density");
     } catch {
       // ignore
     }
+    if (saved === "comfortable" || saved === "compact") {
+      setDensityState(saved);
+    } else {
+      setDensityState(resolutionDensity());
+    }
+    let t: number | undefined;
+    const onResize = () => {
+      if (densityChosen.current) return;
+      window.clearTimeout(t);
+      t = window.setTimeout(() => setDensityState(resolutionDensity()), 200);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
   const setDensity = (d: "comfortable" | "compact") => {
+    densityChosen.current = true;
     setDensityState(d);
     try {
       window.localStorage.setItem("pp-dashboard-density", d);
@@ -202,11 +228,11 @@ export default function DashboardClient({
 
   const compact = density === "compact";
   const gridCls = compact
-    ? "grid gap-3 sm:grid-cols-2 2xl:grid-cols-3"
+    ? "grid gap-3 sm:grid-cols-2 2xl:grid-cols-3 min-[2560px]:grid-cols-4 min-[3200px]:grid-cols-5"
     : "grid gap-3";
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] min-[2560px]:grid-cols-[minmax(0,1fr)_420px]">
       <div className="min-w-0 space-y-6">
         {/* Unread counters */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -413,7 +439,7 @@ export default function DashboardClient({
                       {u.title}
                     </span>
                     <span className="block truncate text-xs text-slate-500">
-                      {u.source_type} · {u.source_name} · {formatDateTime(u.created_at)}
+                      {u.source_type} · {u.source_name} · <Time iso={u.created_at} />
                     </span>
                   </Link>
                   {u.url && (

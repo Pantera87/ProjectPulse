@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Browser } from "puppeteer";
-import { dataDir } from "./db";
+import { dataDir, getDb, getSetting } from "./db";
 
 /**
  * Visual screenshots via headless Chrome (Puppeteer).
@@ -15,6 +15,19 @@ import { dataDir } from "./db";
 
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
+
+/** Render color scheme for screenshots ("dark" is the default). */
+export type ScreenshotTheme = "dark" | "light";
+const THEME_KEY = "screenshot_theme";
+
+/** Read the configured screenshot theme (defaults to dark). */
+export function screenshotTheme(): ScreenshotTheme {
+  try {
+    return getSetting(getDb(), THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
 
 let browserPromise: Promise<Browser> | null = null;
 
@@ -65,6 +78,11 @@ export async function captureScreenshot(
     try {
       await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
       await page.setUserAgent(UA);
+      // Render the page with the user's preferred color scheme (default dark)
+      // so `prefers-color-scheme` aware sites match the configured theme.
+      await page.emulateMediaFeatures([
+        { name: "prefers-color-scheme", value: screenshotTheme() },
+      ]);
       if (opts.github && process.env.GITHUB_TOKEN) {
         // Logged-in render: avoids the sign-in interstitial and shows more of the page.
         await page.setCookie({

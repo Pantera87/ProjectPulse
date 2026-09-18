@@ -4,11 +4,39 @@
  * catalog of small models and hardware-fit hints.
  */
 import os from "node:os";
+import fs from "node:fs";
 
 const UA = "ProjectPulse/1.0";
 
 function base(url: string): string {
   return url.replace(/\/+$/, "");
+}
+
+/**
+ * Is the app running inside a Docker container? Decides the default Ollama
+ * endpoint (bundled compose service vs. local host loopback).
+ */
+export function isDocker(): boolean {
+  try {
+    if (fs.existsSync("/.dockerenv")) return true;
+    return /docker|containerd|kubepods|lxc/i.test(fs.readFileSync("/proc/1/cgroup", "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The Ollama endpoint to use when no explicit URL is configured:
+ * the OLLAMA_URL env var wins; inside Docker that is the bundled `ollama`
+ * service from docker-compose.yml; on a bare host, local loopback.
+ * 127.0.0.1 (not localhost): on WSL/Docker hosts "localhost" can resolve to
+ * ::1, where a port relay may answer without an Ollama behind it.
+ */
+export function defaultOllamaUrl(): string {
+  return (
+    process.env.OLLAMA_URL?.trim() ||
+    (isDocker() ? "http://ollama:11434" : "http://127.0.0.1:11434")
+  );
 }
 
 async function jget(url: string, path: string, timeoutMs = 10_000) {

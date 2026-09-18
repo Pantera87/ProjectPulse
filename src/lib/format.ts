@@ -5,14 +5,32 @@
  * Locale-dependent formatting like Date.prototype.toLocaleString() with the
  * user's locale produces different output on the server vs. the browser,
  * which causes React hydration mismatches. Pinning the locale to "en-US" and
- * the timezone to UTC makes the string stable across both environments.
+ * a fixed timezone keeps the string stable across both environments.
+ *
+ * The timezone comes from the TZ environment variable (set in
+ * docker-compose.yml). On the server it is read at request time; client
+ * components render timestamps through the <Time/> component, which asks
+ * the server for it via /api/timezone — so changing TZ in the compose file
+ * (and restarting the container) is enough, no image rebuild required.
  */
-export function formatDateTime(iso: string | null | undefined): string {
+
+/** The IANA timezone the UI should display in, falling back to UTC. */
+export function displayTimezone(): string {
+  const tz = process.env.TZ || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return "UTC";
+  }
+}
+
+export function formatDateTime(iso: string | null | undefined, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString("en-US", {
-    timeZone: "UTC",
+    timeZone: timeZone || displayTimezone(),
     month: "short",
     day: "2-digit",
     year: "numeric",

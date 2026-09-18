@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatDateTime } from "@/lib/format";
 import KebabMenu from "./kebab-menu";
+import Time from "./time";
 
 interface Props {
   id: number;
@@ -32,7 +32,11 @@ export default function SourceActions({
   const [busy, setBusy] = useState<string | null>(null);
   const router = useRouter();
   const detail =
-    type === "github" ? `/repos/${id}` : type === "rss" ? `/updates?source_id=${id}` : `/websites/${id}`;
+    type === "github"
+      ? `/repos/${id}`
+      : type === "rss"
+        ? `/feeds/${id}`
+        : `/websites/${id}`;
 
   async function act(name: string, fn: () => Promise<unknown>) {
     setBusy(name);
@@ -112,7 +116,7 @@ export default function SourceActions({
             className="ml-auto text-xs text-slate-500"
             title={lastError ? `error: ${lastError}` : undefined}
           >
-            last checked {formatDateTime(lastCheckedAt)}
+            last checked <Time iso={lastCheckedAt} />
             {lastError && <span className="ml-1 text-red-400">⚠</span>}
           </span>
         )}
@@ -169,7 +173,7 @@ export default function SourceActions({
       </Link>
       {lastCheckedAt && (
         <span className="text-xs text-slate-500">
-          last checked {formatDateTime(lastCheckedAt)}
+          last checked <Time iso={lastCheckedAt} />
         </span>
       )}
       {lastError && <span className="text-xs text-red-400">error: {lastError}</span>}

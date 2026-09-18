@@ -7,21 +7,22 @@ import SourceActions from "@/components/source-actions";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
 import SnapshotViewer from "@/components/snapshot-viewer";
+import SummaryText from "@/components/summary-text";
+import SummarySizeSelect from "@/components/summary-size-select";
 
 export const dynamic = "force-dynamic";
 
-interface Params {
-  id: string;
-  v?: string;
-  diff?: string;
-}
-
 export default async function WebsiteDetailPage({
   params,
+  searchParams,
 }: {
-  params: Promise<Params>;
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id, v, diff } = await params;
+  const { id } = await params;
+  const sp = await searchParams;
+  const v = typeof sp.v === "string" ? sp.v : undefined;
+  const diff = typeof sp.diff === "string" ? sp.diff : undefined;
   const d = getDb();
   const source = d
     .prepare("SELECT * FROM sources WHERE id = ? AND type = 'website'")
@@ -38,8 +39,8 @@ export default async function WebsiteDetailPage({
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
         {source.project_summary && (
           <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
-            <span className="font-semibold text-violet-300">AI summary · </span>
-            {source.project_summary}
+            <span className="mr-2 font-semibold text-violet-300">AI summary</span>
+            <SummaryText text={source.project_summary} />
           </div>
         )}
         <p className="mt-1 text-xs text-slate-500">{source.url}</p>
@@ -69,6 +70,7 @@ export default async function WebsiteDetailPage({
             notes: source.notes,
           }}
         />
+        <SummarySizeSelect sourceId={source.id} initial={source.summary_size} />
       </section>
 
       <section className="glass space-y-3 p-4">

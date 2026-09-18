@@ -96,7 +96,8 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500">Search keywords in:</span>
               {opts.map((o) => (
                 <label key={o} className="flex items-center gap-1 text-slate-400">
                   <input

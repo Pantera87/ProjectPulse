@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AIState } from "@/lib/ai";
 
 export interface AIFormConfig {
@@ -54,6 +54,8 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
   const [deleting, setDeleting] = useState<string | null>(null);
   const [test, setTest] = useState<{ ok: boolean; reply: string | null; error: string | null } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const [detect, setDetect] = useState<{ ok: boolean; url: string | null; version: string | null } | null>(null);
 
   const refresh = useCallback(async () => {
     const j = await fetch("/api/ai").then((r) => r.json()).catch(() => null);
@@ -73,6 +75,48 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
+
+  /** Probe the well-known Ollama endpoints and report the first that answers. */
+  const doDetect = useCallback(async (preferred: string) => {
+    setDetecting(true);
+    setDetect(null);
+    try {
+      const r = await fetch("/api/ai/ollama/detect", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: preferred }),
+      });
+      const j = (await r.json()) as
+        | { ok: boolean; url: string | null; version: string | null }
+        | null;
+      if (j) setDetect(j);
+    } catch {
+      // could not reach the app server itself — the guidance box stays
+    }
+    setDetecting(false);
+  }, []);
+
+  // On open: if the Ollama connection is broken, look for the server once so
+  // the user doesn't have to figure out the address themselves.
+  const didAutoDetect = useRef(false);
+  useEffect(() => {
+    if (didAutoDetect.current) return;
+    didAutoDetect.current = true;
+    if (initial.provider !== "ollama" || initial.ollama?.reachable === true) return;
+    const t = setTimeout(() => void doDetect(initialConfig.ollamaUrl), 0);
+    return () => clearTimeout(t);
+  }, [initial, initialConfig, doDetect]);
+
+  /** One click: point the app at the detected address and save. */
+  const useDetected = async () => {
+    if (!detect?.url) return;
+    const next = { ...form, ollamaUrl: detect.url };
+    setForm(next);
+    const r = await post("/api/ai", next);
+    if (r.ok) setMsg("Saved — Ollama connection now points at the detected address.");
+    setDetect(null);
+    refresh();
+  };
 
   // The switch represents the user's *intent* (the ai.enabled override), not
   // the effective state — so it always flips visibly, even before a provider
@@ -258,8 +302,8 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
 
       {intentOn && !s.configured && (
         <p className="text-xs text-amber-300">
-          No provider configured yet — fill in the fields below (Ollama needs a base URL,
-          Anthropic an API key, MCP a server URL) and press Save.
+          No provider configured yet — fill in the fields below (Anthropic needs an API key,
+          MCP a server URL) and press Save. Ollama is pre-filled with the default address.
         </p>
       )}
 
@@ -284,8 +328,19 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
             "model",
             form.provider === "ollama" ? "qwen2.5:7b" : "gpt-4o-mini / claude-haiku-4-5",
           )}
-        {form.provider === "ollama" &&
-          field("Ollama base URL", "ollamaUrl", "http://localhost:11434")}
+        {form.provider === "ollama" && (
+          <div className="space-y-1.5">
+            {field("Ollama base URL", "ollamaUrl", "http://ollama:11434")}
+            <button
+              onClick={() => doDetect(form.ollamaUrl)}
+              disabled={detecting}
+              className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+              title="Probe the common Ollama endpoints (bundled compose service, local loopback, Docker host) and offer the first one that answers"
+            >
+              {detecting ? "Detecting Ollama…" : "Detect Ollama address"}
+            </button>
+          </div>
+        )}
         {form.provider === "openai" &&
           field("API base URL", "openaiUrl", "https://api.openai.com/v1")}
         {form.provider === "openai" &&
@@ -372,39 +427,57 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
           </div>
           {(!s.ollama || !s.ollama.reachable) && (
             <div className="space-y-1.5 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-              <p className="font-medium">
-                Ollama is not reachable at {form.ollamaUrl || "http://localhost:11434"} — the
-                Download buttons need it (Ollama fetches the model from the official registry,
-                registry.ollama.ai).
-              </p>
-              <ol className="list-decimal space-y-1 pl-4">
-                <li>
-                  Install Ollama:{" "}
-                  <a
-                    href="https://ollama.com/download"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline hover:text-white"
-                  >
-                    ollama.com/download
-                  </a>{" "}
-                  (Windows terminal: <code>winget install Ollama.Ollama</code>)
-                </li>
-                <li>
-                  Start it — after install it runs in the system tray; from a terminal:{" "}
-                  <code>ollama serve</code>
-                </li>
-                <li>
-                  Press Save (with the URL), then Download again. Manual alternative:{" "}
-                  <code>ollama pull qwen2.5:7b</code>
-                </li>
-              </ol>
-              <p className="mt-1">
-                Tip: use <code>http://127.0.0.1:11434</code> instead of <code>localhost</code> —
-                on WSL2/Docker hosts <code>localhost</code> can resolve to <code>::1</code>, where a
-                WSL port relay may answer without an Ollama behind it. From a Docker container, use{" "}
-                <code>http://host.docker.internal:11434</code>.
-              </p>
+              {detecting ? (
+                <p className="font-medium">Looking for an Ollama server…</p>
+              ) : detect?.ok ? (
+                <>
+                  <p className="font-medium">
+                    Found Ollama at {detect.url}
+                    {detect.version ? ` (v${detect.version})` : ""}.
+                  </p>
+                  {detect.url !== form.ollamaUrl && (
+                    <button
+                      onClick={useDetected}
+                      className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 text-[11px] text-emerald-300 transition hover:bg-emerald-400/20"
+                    >
+                      Use {detect.url}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">
+                    Ollama is not reachable at {form.ollamaUrl || "the configured address"} —
+                    the Download buttons need it (Ollama fetches the model from the official
+                    registry, registry.ollama.ai).
+                  </p>
+                  <ol className="list-decimal space-y-1 pl-4">
+                    <li>
+                      Running in Docker? Make sure the <code>ollama</code> service from{" "}
+                      <code>docker-compose.yml</code> is up in your stack — the default address{" "}
+                      <code>http://ollama:11434</code> then works without any further setup.
+                    </li>
+                    <li>
+                      Ollama on the Docker host or another machine? Enter its address above —{" "}
+                      <code>http://host.docker.internal:11434</code> on macOS/Windows Docker,{" "}
+                      <code>http://{`<host-ip>`}:11434</code> elsewhere — then press Save.
+                    </li>
+                    <li>
+                      Or install Ollama on the machine the app runs on (
+                      <a
+                        href="https://ollama.com/download"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline hover:text-white"
+                      >
+                        ollama.com/download
+                      </a>
+                      ), start it, and press{" "}
+                      <span className="font-medium">Detect Ollama address</span> again.
+                    </li>
+                  </ol>
+                </>
+              )}
             </div>
           )}
           {s.ollama && s.ollama.reachable && (

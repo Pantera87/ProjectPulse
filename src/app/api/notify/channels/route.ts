@@ -13,9 +13,11 @@ export const dynamic = "force-dynamic";
 
 const TYPES: ChannelType[] = ["webhook", "ntfy", "telegram", "email"];
 const PRIORITIES: Priority[] = ["critical", "high", "normal"];
-const KINDS: UpdateKind[] = [
+const KINDS = [
   "content_change",
   "release",
+  "readme",
+  "commit",
   "milestone",
   "issue",
   "feed_entry",

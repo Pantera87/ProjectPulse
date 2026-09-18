@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ChannelType, NotifyChannel, NotifyLogRow } from "@/lib/notifiers";
-import { formatDateTime } from "@/lib/format";
+import Time from "./time";
 
 interface Props {
   initialChannels: NotifyChannel[];
@@ -24,7 +24,16 @@ const HINTS: Record<ChannelType, string> = {
   email: "Any SMTP provider works (Gmail app password, Outlook, …).",
 };
 
-const KINDS = ["content_change", "release", "milestone", "issue", "feed_entry", "keyword"] as const;
+const KINDS = [
+  "content_change",
+  "release",
+  "readme",
+  "commit",
+  "milestone",
+  "issue",
+  "feed_entry",
+  "keyword",
+] as const;
 
 export default function NotifySettings({ initialChannels, initialLog, authEnabled }: Props) {
   const [channels, setChannels] = useState<NotifyChannel[]>(initialChannels);
@@ -367,7 +376,7 @@ export default function NotifySettings({ initialChannels, initialLog, authEnable
                   </span>
                 )}
                 <span className="ml-auto text-slate-600">
-                  {formatDateTime(l.created_at)}
+                  <Time iso={l.created_at} />
                 </span>
               </li>
             ))}

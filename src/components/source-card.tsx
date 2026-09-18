@@ -32,8 +32,19 @@ export default function SourceCard({
     source.type === "github"
       ? `/repos/${source.id}`
       : source.type === "rss"
-        ? `/updates?source_id=${source.id}`
+        ? `/feeds/${source.id}`
         : `/websites/${source.id}`;
+
+  // Websites whose checks run through a discovered RSS/Atom feed get a badge.
+  const viaFeed = (() => {
+    if (source.type !== "website" || !source.state_json) return null;
+    try {
+      const st = JSON.parse(source.state_json) as { feed_url?: unknown };
+      return typeof st.feed_url === "string" ? st.feed_url : null;
+    } catch {
+      return null;
+    }
+  })();
 
   if (compact) {
     return (
@@ -59,6 +70,15 @@ export default function SourceCard({
             <Glyph name={TYPE_ICON[source.type] ?? "globe"} className="mr-1 h-3 w-3" />
             {source.type}
           </span>
+          {viaFeed && (
+            <span
+              className="badge border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-300"
+              title={`Checked via feed: ${viaFeed}`}
+            >
+              <Glyph name="rss" className="mr-1 h-3 w-3" />
+              via feed
+            </span>
+          )}
           {unread > 0 && (
             <span className="badge border-rose-400/40 bg-rose-500/10 text-rose-300">
               {unread} unread
@@ -127,6 +147,15 @@ export default function SourceCard({
               <Glyph name={TYPE_ICON[source.type] ?? "globe"} className="mr-1 h-3 w-3" />
               {source.type}
             </span>
+            {viaFeed && (
+              <span
+                className="badge border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-300"
+                title={`Checked via feed: ${viaFeed}`}
+              >
+                <Glyph name="rss" className="mr-1 h-3 w-3" />
+                via feed
+              </span>
+            )}
             {source.category && (
               <span
                 className="badge"

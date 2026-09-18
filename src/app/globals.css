@@ -43,6 +43,15 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* ---------- resolution-adaptive content shell ---------- */
+/* Keeps the classic 72rem (1152px) width on normal displays, then scales
+   smoothly with the viewport on large panels and 4K monitors, capped at
+   160rem. Viewport-based, so OS DPI scaling is handled automatically. */
+.app-shell {
+  width: 100%;
+  max-width: clamp(72rem, 60vw, 160rem);
+}
+
 /* ---------- liquid glass surfaces ---------- */
 
 .glass {

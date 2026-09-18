@@ -15,7 +15,7 @@ export default function ReposPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">GitHub</h1>
-        <RefreshAll />
+        <RefreshAll type="github" />
       </div>
       <AddSourceForm type="github" />
       {rows.length === 0 ? (

@@ -73,7 +73,7 @@ function derive(s: AIState | null): Display {
         dot: "bg-amber-400",
         label: "AI (offline)",
         title:
-          "Ollama server unreachable. Check that it is running — and on WSL/Docker hosts use http://127.0.0.1:11434 (not localhost) in Settings → AI.",
+          "Ollama server unreachable. Open Settings → AI — the app can detect the address automatically, or check that the Ollama server is running.",
       };
     if (!o.modelInstalled)
       return {

@@ -15,7 +15,7 @@ export default function WebsitesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Websites</h1>
-        <RefreshAll />
+        <RefreshAll type="website" />
       </div>
       <AddSourceForm type="website" />
       {rows.length === 0 ? (

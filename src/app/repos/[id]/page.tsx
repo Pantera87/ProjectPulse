@@ -9,16 +9,25 @@ import { formatDateTime } from "@/lib/format";
 import SourceActions from "@/components/source-actions";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
+import TrackingToggles from "@/components/tracking-toggles";
 import MarkReadButton from "@/components/mark-read";
+import SnapshotViewer from "@/components/snapshot-viewer";
+import SummaryText from "@/components/summary-text";
+import SummarySizeSelect from "@/components/summary-size-select";
 
 export const dynamic = "force-dynamic";
 
 export default async function RepoDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const v = typeof sp.v === "string" ? sp.v : undefined;
+  const diff = typeof sp.diff === "string" ? sp.diff : undefined;
   const d = getDb();
   const source = d
     .prepare("SELECT * FROM sources WHERE id = ? AND type = 'github'")
@@ -63,8 +72,8 @@ export default async function RepoDetailPage({
         {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
         {source.project_summary && (
           <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
-            <span className="font-semibold text-violet-300">AI summary · </span>
-            {source.project_summary}
+            <span className="mr-2 font-semibold text-violet-300">AI summary</span>
+            <SummaryText text={source.project_summary} />
           </div>
         )}
         <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">
@@ -107,13 +116,31 @@ export default async function RepoDetailPage({
         )}
       </section>
 
+      <SnapshotViewer sourceId={source.id} baseHref={`/repos/${id}`} v={v} diff={diff} />
+
       <section className="glass space-y-3 p-4">
-        <h2 className="font-semibold">Watch rules</h2>
+        <h2 className="font-semibold">Track changes</h2>
         <p className="text-xs text-slate-500">
-          Rules flag matching releases, README or commit text at the rule&apos;s
-          priority — critical rules are the strongest signal. GitHub milestones
-          and major semver bumps are always flagged as <em>high</em>. Add issue
-          labels to watch new labeled issues/PRs.
+          Create an update on these events — no keywords required. Milestones
+          (new / completed) are always tracked as <em>high</em>.
+        </p>
+        <TrackingToggles
+          sourceId={source.id}
+          initial={{
+            releases: (source.track_releases ?? 1) !== 0,
+            readme: source.track_readme === 1,
+            commits: source.track_commits === 1,
+          }}
+        />
+      </section>
+
+      <section className="glass space-y-3 p-4">
+        <h2 className="font-semibold">Keyword rules</h2>
+        <p className="text-xs text-slate-500">
+          Each rule has keywords (and optionally issue labels) plus checkboxes
+          selecting <em>where</em> those keywords are searched: release notes,
+          README and commit messages. A hit creates an update at the
+          rule&apos;s priority — critical rules are the strongest signal.
         </p>
         <RuleEditor sourceId={source.id} type="github" rules={rulesOf(source)} />
       </section>
@@ -130,6 +157,7 @@ export default async function RepoDetailPage({
             notes: source.notes,
           }}
         />
+        <SummarySizeSelect sourceId={source.id} initial={source.summary_size} />
       </section>
 
       <section className="space-y-2">

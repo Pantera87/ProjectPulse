@@ -15,7 +15,7 @@ export default function FeedsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">RSS / Atom feeds</h1>
-        <RefreshAll />
+        <RefreshAll type="rss" />
       </div>
       <AddSourceForm type="rss" />
       {rows.length === 0 ? (

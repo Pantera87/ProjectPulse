@@ -1,11 +1,13 @@
 import { getDb } from "@/lib/db";
-import { schedulerStatus } from "@/lib/scheduler";
 import { aiState, readAIConfig } from "@/lib/ai";
 import { CATALOG, hardwareHint } from "@/lib/ollama";
 import { readChannels, recentLog } from "@/lib/notifiers";
+import { screenshotTheme } from "@/lib/screenshots";
 import RestoreForm from "@/components/restore-form";
 import AISettings from "@/components/ai-settings";
 import NotifySettings from "@/components/notify-settings";
+import ScreenshotSettings from "@/components/screenshot-settings";
+import SnapshotSettings from "@/components/snapshot-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,6 @@ export default async function SettingsPage() {
          (SELECT COUNT(*) FROM updates) AS updates`
     )
     .get() as { sources: number; snapshots: number; updates: number };
-  const sched = schedulerStatus();
   const ai = await aiState();
   const cfg = readAIConfig();
   const catalog = CATALOG.map((m) => ({ ...m, hint: hardwareHint(m) }));
@@ -40,16 +41,13 @@ export default async function SettingsPage() {
       </section>
 
       <section className="glass space-y-2 p-4">
-        <h2 className="font-semibold">Scheduler</h2>
-        <p className="text-sm text-slate-400">
-          Status: {sched.running ? "running" : "stopped"} · checks every{" "}
-          {sched.intervalMinutes} min · last tick:{" "}
-          {sched.lastTick ?? "—"} · {sched.tickCount} ticks
-        </p>
-        <p className="text-xs text-slate-500">
-          Each source is checked on its own interval (set per source). Set{" "}
-          <code>SCHEDULER_INTERVAL_MINUTES</code> to change the polling cadence.
-        </p>
+        <h2 className="font-semibold">Screenshots</h2>
+        <ScreenshotSettings initialTheme={screenshotTheme()} />
+      </section>
+
+      <section className="glass space-y-3 p-4">
+        <h2 className="font-semibold">Snapshots &amp; summaries</h2>
+        <SnapshotSettings />
       </section>
 
       <section className="glass space-y-2 p-4">
@@ -59,7 +57,7 @@ export default async function SettingsPage() {
           initialConfig={{
             provider: cfg.provider,
             model: cfg.model,
-            ollamaUrl: cfg.ollamaUrl || (cfg.provider === "ollama" ? "http://127.0.0.1:11434" : ""),
+            ollamaUrl: cfg.ollamaUrl,
             openaiUrl: cfg.openaiUrl,
             openaiKey: cfg.openaiKey,
             anthropicKey: cfg.anthropicKey,
