@@ -83,11 +83,23 @@ export async function captureScreenshot(
       await page.emulateMediaFeatures([
         { name: "prefers-color-scheme", value: screenshotTheme() },
       ]);
-      if (opts.github && process.env.GITHUB_TOKEN) {
+      if (opts.github) {
         // Logged-in render: avoids the sign-in interstitial and shows more of the page.
+        if (process.env.GITHUB_TOKEN) {
+          await page.setCookie({
+            name: "private-token",
+            value: process.env.GITHUB_TOKEN,
+            domain: "github.com",
+            path: "/",
+          });
+        }
+        // GitHub ignores `prefers-color-scheme` for logged-out users — its theme
+        // is driven by the `color-mode` cookie the UI writes on theme toggle
+        // (logged-out default is light), so set it explicitly to match the
+        // configured screenshot theme.
         await page.setCookie({
-          name: "private-token",
-          value: process.env.GITHUB_TOKEN,
+          name: "color-mode",
+          value: screenshotTheme(),
           domain: "github.com",
           path: "/",
         });
