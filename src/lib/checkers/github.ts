@@ -73,6 +73,13 @@ export async function checkGithub(
       payload,
     });
     updatesCreated++;
+    // The stored name may be the auto-filled "owner/repo" full name —
+    // notifications/webhooks should only carry the project name
+    // (e.g. "ProjectPulse", not "owner/ProjectPulse").
+    const sourceNameRaw = source.name || repo;
+    const sourceName = sourceNameRaw.startsWith(`${owner}/`)
+      ? sourceNameRaw.slice(owner.length + 1)
+      : sourceNameRaw;
     void notify({
       id,
       title: truncate(title, 300),
@@ -80,7 +87,7 @@ export async function checkGithub(
       url,
       priority,
       kind,
-      sourceName: source.name || `${owner}/${repo}`,
+      sourceName,
       sourceUrl: `https://github.com/${owner}/${repo}`,
     });
   };
@@ -188,6 +195,7 @@ export async function checkGithub(
     if (!source.goal && meta.description)
       touchSource(d, source.id, {
         goal: truncate(meta.description, 500),
+        goal_source: "auto", // the repo description — not AI-generated
         name: source.name || meta.full_name,
       });
     if (meta.archived)
@@ -297,6 +305,8 @@ export async function checkGithub(
           hit?.semantic && hit.semanticSummary
             ? hit.semanticSummary
             : r.body ?? r.name ?? null;
+        let releaseSummarySource: string | null =
+          hit?.semantic && hit.semanticSummary ? "ai" : null;
         if (!hit?.semantic) {
           const notes = [r.name ?? "", r.body ?? ""].filter(Boolean).join("\n");
           if (notes) {
@@ -306,6 +316,7 @@ export async function checkGithub(
             );
             if (aiRes) {
               releaseSummary = aiRes.summary;
+              releaseSummarySource = "ai";
               priority = higherPriority(priority, aiRes.priority);
             }
           }
@@ -328,6 +339,7 @@ export async function checkGithub(
             semantic: !!hit?.semantic,
             semanticTopic: hit?.semanticTopic ?? null,
             semanticSummary: hit?.semanticSummary ?? null,
+            summarySource: releaseSummarySource,
           }
         );
       }
@@ -373,7 +385,8 @@ export async function checkGithub(
             `Labeled "${lbl}": ${i.title}`,
             issueSummary,
             i.html_url,
-            { label: lbl, number: i.number }
+            // Issue summaries only ever come from the AI (or are absent).
+            { label: lbl, number: i.number, summarySource: issueSummary ? "ai" : null }
           );
           seenIssues.push(String(i.number));
         }
@@ -437,7 +450,8 @@ export async function checkGithub(
               "README updated",
               truncate(readmeSummary, 1000),
               readmeUrl ?? `https://github.com/${owner}/${repo}`,
-              { added: added.slice(0, 30) }
+              // No AI → the summary is a heuristic list of added lines.
+              { added: added.slice(0, 30), summarySource: aiRes ? "ai" : null }
             );
             state.readme_hash = h;
           }
@@ -483,7 +497,8 @@ export async function checkGithub(
                 `Commit: ${c.commit.message.split("\n")[0].slice(0, 120)}`,
                 commitSummary,
                 c.html_url,
-                { sha: c.sha }
+                // Commit summaries only ever come from the AI (or are absent).
+                { sha: c.sha, summarySource: commitSummary ? "ai" : null }
               );
             }
             state.seen_commit_shas = [

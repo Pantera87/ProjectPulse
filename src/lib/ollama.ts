@@ -117,20 +117,25 @@ export function normalizeOllamaModel(name: string): string {
 
 /**
  * Model-integrity probe: does Ollama resolve the model's files? Uses
- * GET /api/show, which reads model metadata from disk WITHOUT loading the
- * model into memory — so keep_alive / auto-unload behavior is completely
- * unaffected.
+ * POST /api/show (the endpoint is POST-only in every Ollama version — a GET
+ * gets a 405 back, since the server sets HandleMethodNotAllowed), which reads
+ * model metadata from disk WITHOUT loading the model into memory — so
+ * keep_alive / auto-unload behavior is completely unaffected. The body uses
+ * the long-standing `name` field (still accepted by current Ollama, which
+ * also supports `model`).
  * Returns null when the probe cannot answer (server unreachable, or an old
  * Ollama without /api/show → the check is simply skipped), or false when the
  * server answered but the model is missing/corrupted.
  */
 export async function ollamaModelInfo(url: string, name: string): Promise<boolean | null> {
   try {
-    const res = await fetch(`${base(url)}/api/show?name=${encodeURIComponent(name)}`, {
-      headers: { "user-agent": UA },
+    const res = await fetch(`${base(url)}/api/show`, {
+      method: "POST",
+      headers: { "user-agent": UA, "content-type": "application/json" },
+      body: JSON.stringify({ name }),
       signal: AbortSignal.timeout(10_000),
     });
-    if (res.status === 404) return null; // endpoint not implemented (old Ollama)
+    if (res.status === 404 || res.status === 405) return null; // endpoint not implemented (old Ollama) or blocked by a proxy
     if (!res.ok) return false;
     res.body?.cancel().catch(() => {});
     return true;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import AiBadge from "@/components/ai-badge";
 import MarkReadButton from "@/components/mark-read";
 
 export const dynamic = "force-dynamic";
@@ -51,10 +52,13 @@ export default async function UpdateDetailPage({
   if (!u) notFound();
 
   let aiJudged = false;
+  let aiSummary = false;
   try {
-    aiJudged = !!(u.payload_json && JSON.parse(u.payload_json).semantic === true);
+    const p = u.payload_json ? JSON.parse(u.payload_json) : null;
+    aiJudged = !!p?.semantic;
+    aiSummary = p?.summarySource === "ai";
   } catch {
-    aiJudged = false;
+    // unparseable payload — no AI markings
   }
   const sourceHref = (SOURCE_DETAIL_HREF[u.source_type] ?? ((i: number) => `/updates?source_id=${i}`))(
     u.source_id
@@ -78,13 +82,14 @@ export default async function UpdateDetailPage({
             {u.priority}
           </span>
           <span className="badge">{u.kind}</span>
-          {aiJudged && (
-            <span
-              className="badge text-indigo-300"
-              title="Matched and prioritized by AI"
-            >
-              AI
-            </span>
+          {(aiJudged || aiSummary) && (
+            <AiBadge
+              title={
+                aiJudged
+                  ? "Matched and prioritized by AI"
+                  : "Summary written by AI"
+              }
+            />
           )}
           <span className="ml-auto text-xs text-slate-500">
             {formatDateTime(u.created_at)}

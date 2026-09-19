@@ -224,12 +224,17 @@ export async function checkWebsite(
     const ai = getAI();
     let summary: string | null =
       addedLines.slice(0, 8).join(" | ") || "Page content changed";
+    let summarySource: string | null = null;
     const aiSummary = await ai.summarizeUpdate(diffText, name);
     if (aiSummary) {
       summary = aiSummary.summary;
+      summarySource = "ai";
       priority = higherPriority(priority, aiSummary.priority);
     }
-    if (hit?.semantic && hit.semanticSummary) summary = hit.semanticSummary;
+    if (hit?.semantic && hit.semanticSummary) {
+      summary = hit.semanticSummary;
+      summarySource = "ai";
+    }
 
     const id = insertUpdate(d, {
       source_id: source.id,
@@ -252,6 +257,7 @@ export async function checkWebsite(
         semantic: !!hit?.semantic,
         semanticTopic: hit?.semanticTopic ?? null,
         semanticSummary: hit?.semanticSummary ?? null,
+        summarySource,
       },
     });
     updatesCreated++;
@@ -275,6 +281,7 @@ export async function checkWebsite(
   // check.ts after the check — missing levels only, never overwritten.)
   if (!source.goal) {
     let goal = extractGoalFromPage(page);
+    let goalSource: string | null = null;
     const ai = getAI();
     if (!page.metaDescription) {
       // Full page text as a RAG document where supported (short in-prompt
@@ -282,9 +289,16 @@ export async function checkWebsite(
       const aiGoal = await ai.extractGoal(page.text, [
         { name: "page.txt", content: page.text },
       ]);
-      if (aiGoal) goal = aiGoal;
+      if (aiGoal) {
+        goal = aiGoal;
+        goalSource = "ai";
+      }
     }
-    touchSource(d, source.id, { goal: truncate(goal, 500) });
+    touchSource(d, source.id, {
+      goal: truncate(goal, 500),
+      // Non-AI goals (meta description etc.) are plain auto-extraction.
+      goal_source: goal ? goalSource ?? "auto" : null,
+    });
   }
 
   touchSource(d, source.id, {

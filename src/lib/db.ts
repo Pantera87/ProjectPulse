@@ -31,6 +31,8 @@ export interface SourceRow {
   url: string;
   name: string | null;
   goal: string | null;
+  /** How the goal was set: "ai" | "auto" | "user" (null = legacy/unknown) */
+  goal_source: string | null;
   /** Generic category level — broad domain/family (e.g. "cnc") */
   category: string | null;
   /** Specific subcategory under it (e.g. "cnc-controller-firmware") */
@@ -213,6 +215,7 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "project_summary", "TEXT");
   addColumnIfMissing(d, "sources", "subcategory", "TEXT");
   addColumnIfMissing(d, "sources", "category_source", "TEXT");
+  addColumnIfMissing(d, "sources", "goal_source", "TEXT");
   // Keywordless change-tracking toggles (github sources).
   addColumnIfMissing(d, "sources", "track_releases", "INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing(d, "sources", "track_readme", "INTEGER NOT NULL DEFAULT 0");

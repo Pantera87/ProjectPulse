@@ -1,4 +1,5 @@
 import MarkReadButton from "./mark-read";
+import AiBadge from "./ai-badge";
 import { formatDateTime } from "@/lib/format";
 
 export interface UpdateView {
@@ -28,13 +29,16 @@ const PRIORITY_BADGE: Record<string, string> = {
 };
 
 export default function UpdateItem({ u }: { u: UpdateView }) {
-  // Semantic (AI) hits: the AI judged both the match and the severity, so
-  // mark them with an "AI" chip next to the kind badge.
+  // Semantic (AI) hits: the AI judged both the match and the severity.
+  // summarySource === "ai": the stored summary text was written by the AI.
   let aiJudged = false;
+  let aiSummary = false;
   try {
-    aiJudged = !!(u.payload_json && JSON.parse(u.payload_json).semantic === true);
+    const p = u.payload_json ? JSON.parse(u.payload_json) : null;
+    aiJudged = !!p?.semantic;
+    aiSummary = p?.summarySource === "ai";
   } catch {
-    aiJudged = false;
+    // unparseable payload — no AI markings
   }
   return (
     <li
@@ -51,13 +55,14 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
           {u.priority}
         </span>
         <span className="badge">{u.kind}</span>
-        {aiJudged && (
-          <span
-            className="badge text-indigo-300"
-            title="Matched and prioritized by AI"
-          >
-            AI
-          </span>
+        {(aiJudged || aiSummary) && (
+          <AiBadge
+            title={
+              aiJudged
+                ? "Matched and prioritized by AI"
+                : "Summary written by AI"
+            }
+          />
         )}
         <span className="font-medium">{u.title}</span>
         <span className="text-xs text-slate-500">

@@ -101,15 +101,16 @@ export async function POST(req: Request) {
     d.prepare("DELETE FROM sqlite_sequence WHERE name IN ('sources','snapshots','updates')").run();
 
     const insSource = d.prepare(
-      `INSERT INTO sources (id, type, url, name, goal, category, subcategory, category_source, notes, watch_enabled,
+      `INSERT INTO sources (id, type, url, name, goal, goal_source, category, subcategory, category_source, notes, watch_enabled,
         check_interval_hours, last_checked_at, last_content_hash, last_error,
         muted_until, rules_json, state_json, created_at, logo, project_summary, summary_size,
         track_releases, track_readme, track_commits)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const s of body.sources ?? [])
       insSource.run(
-        s.id, s.type, s.url, s.name ?? null, s.goal ?? null, s.category ?? null,
+        s.id, s.type, s.url, s.name ?? null, s.goal ?? null, s.goal_source ?? null,
+        s.category ?? null,
         s.subcategory ?? null, s.category_source ?? null,
         s.notes ?? null, s.watch_enabled ?? 1, s.check_interval_hours ?? 6,
         s.last_checked_at ?? null, s.last_content_hash ?? null, s.last_error ?? null,

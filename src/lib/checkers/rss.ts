@@ -89,6 +89,8 @@ export async function checkFeedUrl(
         hit?.semantic && hit.semanticSummary
           ? hit.semanticSummary
           : truncate(it.contentSnippet ?? "", 1000);
+      let summarySource: string | null =
+        hit?.semantic && hit.semanticSummary ? "ai" : null;
       let finalPriority = priority;
       if (!hit?.semantic) {
         const aiRes = await getAI().summarizeUpdate(
@@ -97,6 +99,7 @@ export async function checkFeedUrl(
         );
         if (aiRes) {
           summary = aiRes.summary;
+          summarySource = "ai";
           finalPriority = higherPriority(finalPriority, aiRes.priority);
         }
       }
@@ -119,6 +122,7 @@ export async function checkFeedUrl(
           semantic: !!hit?.semantic,
           semanticTopic: hit?.semanticTopic ?? null,
           semanticSummary: hit?.semanticSummary ?? null,
+          summarySource,
         },
       });
       updatesCreated++;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { search } from "@/lib/models";
 import { formatDateTime } from "@/lib/format";
+import AiBadge from "@/components/ai-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,17 @@ const PRIORITY_BADGE: Record<string, string> = {
   high: "border-amber-400/40 bg-amber-400/10 text-amber-300",
   normal: "border-white/10 bg-white/5 text-slate-300",
 };
+
+/** True when the update's payload marks an AI semantic match or an AI summary. */
+function aiUpdate(payloadJson: string | null | undefined): boolean {
+  if (!payloadJson) return false;
+  try {
+    const p = JSON.parse(payloadJson);
+    return !!p.semantic || p.summarySource === "ai";
+  } catch {
+    return false;
+  }
+}
 
 export default async function SearchPage({
   searchParams,
@@ -47,9 +59,27 @@ export default async function SearchPage({
                     {s.name || s.url}
                   </Link>
                   <span className="badge">{s.type}</span>
-                  {s.category && <span className="badge">{s.category}</span>}
+                  {s.category && (
+                    <span className="badge">
+                      {s.category_source === "ai" && (
+                        <span className="mr-1">
+                          <AiBadge title="Category assigned by AI" />
+                        </span>
+                      )}
+                      {s.category}
+                    </span>
+                  )}
                 </div>
-                {s.goal && <p className="mt-1 text-xs text-slate-400">{s.goal}</p>}
+                {s.goal && (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {s.goal_source === "ai" && (
+                      <>
+                        <AiBadge title="Goal extracted by AI" />{" "}
+                      </>
+                    )}
+                    {s.goal}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -75,6 +105,7 @@ export default async function SearchPage({
                     {u.title}
                   </Link>
                   <span className="badge">{u.kind}</span>
+                  {aiUpdate(u.payload_json) && <AiBadge title="Matched and/or summarized by AI" />}
                   <span className={`badge border ${PRIORITY_BADGE[u.priority] ?? PRIORITY_BADGE.normal}`}>
                     {u.priority}
                   </span>

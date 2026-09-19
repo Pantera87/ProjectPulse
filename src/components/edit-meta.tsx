@@ -2,12 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import AiBadge from "./ai-badge";
 
 interface Props {
   sourceId: number;
   initial: {
     name: string | null;
     goal: string | null;
+    goal_source: string | null;
     category: string | null;
     subcategory: string | null;
     notes: string | null;
@@ -56,7 +58,12 @@ export default function EditMeta({ sourceId, initial }: Props) {
         />
       </label>
       <label className="text-xs text-slate-400 sm:col-span-2">
-        Goal (one line — auto-extracted, editable)
+        <span className="flex items-center gap-2">
+          Goal (one line — auto-extracted, editable)
+          {initial.goal_source === "ai" && (
+            <AiBadge title="Goal extracted by AI — edit it to override" />
+          )}
+        </span>
         <input value={goal} onChange={(e) => setGoal(e.target.value)} className={cls} />
       </label>
       <label className="text-xs text-slate-400 sm:col-span-2">

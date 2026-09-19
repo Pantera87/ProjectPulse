@@ -1111,7 +1111,7 @@ async function checkRemoteReachable(cfg: AIConfig): Promise<boolean> {
 }
 
 /**
- * Ollama model-integrity probe (GET /api/show): validates the configured
+ * Ollama model-integrity probe (POST /api/show): validates the configured
  * model's files WITHOUT loading the model into memory, so keep_alive /
  * auto-unload behavior is untouched. Cached 60 s per url|model so the 5 s
  * badge poll costs one probe per minute.

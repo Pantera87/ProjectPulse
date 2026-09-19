@@ -73,6 +73,10 @@ export async function PATCH(
   if (patch.category !== undefined || patch.subcategory !== undefined) {
     patch.category_source = "user";
   }
+  // Manual goal edits count as user-set (no "AI" badge).
+  if (patch.goal !== undefined) {
+    patch.goal_source = "user";
+  }
   touchSource(d, Number(id), patch);
   if (
     patch.name !== undefined ||

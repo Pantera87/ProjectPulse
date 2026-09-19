@@ -5,6 +5,7 @@ import { rulesOf } from "@/lib/models";
 import { isMuted } from "@/lib/check";
 import { formatDateTime } from "@/lib/format";
 import SourceActions from "@/components/source-actions";
+import AiBadge from "@/components/ai-badge";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
 import MarkReadButton from "@/components/mark-read";
@@ -46,10 +47,21 @@ export default async function FeedDetailPage({
           ← Feeds
         </Link>
         <h1 className="mt-1 text-xl font-semibold">{source.name || source.url}</h1>
-        {source.goal && <p className="text-sm text-slate-400">{source.goal}</p>}
+        {source.goal && (
+          <p className="text-sm text-slate-400">
+            {source.goal_source === "ai" && (
+              <>
+                <AiBadge title="Goal extracted by AI" />{" "}
+              </>
+            )}
+            {source.goal}
+          </p>
+        )}
         {source.project_summary && (
           <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
-            <span className="mr-2 font-semibold text-violet-300">AI summary</span>
+            <span className="mr-2 inline-flex items-center gap-1.5 font-semibold text-violet-300">
+              <AiBadge title="Summary written by AI" /> summary
+            </span>
             <SummaryText text={source.project_summary} />
           </div>
         )}
@@ -80,6 +92,7 @@ export default async function FeedDetailPage({
           initial={{
             name: source.name,
             goal: source.goal,
+            goal_source: source.goal_source,
             category: source.category,
             subcategory: source.subcategory,
             notes: source.notes,

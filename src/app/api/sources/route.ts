@@ -66,19 +66,21 @@ export async function POST(req: Request) {
   }
 
   const name = (body.name ?? "").trim() || null;
+  const goal = (body.goal ?? "").trim() || null;
   const category = (body.category ?? "").trim() || null;
   const subcategory = (body.subcategory ?? "").trim() || null;
   const info = d
     .prepare(
-      `INSERT INTO sources (type, url, name, goal, category, subcategory, category_source, notes, watch_enabled,
+      `INSERT INTO sources (type, url, name, goal, goal_source, category, subcategory, category_source, notes, watch_enabled,
         check_interval_hours, rules_json, state_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
     )
     .run(
       type,
       url,
       name,
-      (body.goal ?? "").trim() || null,
+      goal,
+      goal ? "user" : null,
       category,
       category ? subcategory : null,
       category ? "user" : null,
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
       new Date().toISOString()
     );
   const id = Number(info.lastInsertRowid);
-  indexForSearch(d, "source", id, name ?? url, `${body.goal ?? ""} ${category ?? ""} ${subcategory ?? ""}`);
+  indexForSearch(d, "source", id, name ?? url, `${goal ?? ""} ${category ?? ""} ${subcategory ?? ""}`);
   // AI project summary (background — also auto-downloads the Ollama model
   // if AI is enabled but the model is not on the machine yet).
   ensureProjectSummaryById(id);

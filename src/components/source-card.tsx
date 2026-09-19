@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { SourceRow } from "@/lib/db";
 import SourceActions from "./source-actions";
+import AiBadge from "./ai-badge";
 import { Glyph } from "./icons";
 
 const TYPE_BADGE: Record<string, string> = {
@@ -94,6 +95,11 @@ export default function SourceCard({
           <div>
             {source.goal && (
               <p className="line-clamp-1 text-sm text-slate-400" title={source.goal}>
+                {source.goal_source === "ai" && (
+                  <>
+                    <AiBadge title="Goal extracted by AI" />{" "}
+                  </>
+                )}
                 {source.goal}
               </p>
             )}
@@ -102,7 +108,7 @@ export default function SourceCard({
                 className="line-clamp-1 text-xs text-violet-300/90"
                 title={source.project_summary}
               >
-                <span className="font-semibold">AI</span> · {source.project_summary}
+                <AiBadge title="Summary written by AI" /> · {source.project_summary}
               </p>
             )}
           </div>
@@ -162,9 +168,16 @@ export default function SourceCard({
                 title={
                   source.category_source === "heuristic"
                     ? "Category guessed from keywords — not very accurate; verify or set it manually"
-                    : undefined
+                    : source.category_source === "ai"
+                      ? "Category assigned by AI"
+                      : undefined
                 }
               >
+                {source.category_source === "ai" && (
+                  <span className="mr-1">
+                    <AiBadge title="Category assigned by AI" />
+                  </span>
+                )}
                 {source.category}
                 {source.category_source === "heuristic" && (
                   <span className="text-amber-300"> ?</span>
@@ -182,6 +195,11 @@ export default function SourceCard({
           </div>
           {source.goal && (
             <p className="mt-1 line-clamp-2 text-sm text-slate-400" title={source.goal}>
+              {source.goal_source === "ai" && (
+                <>
+                  <AiBadge title="Goal extracted by AI" />{" "}
+                </>
+              )}
               {source.goal}
             </p>
           )}
@@ -190,7 +208,7 @@ export default function SourceCard({
               className="mt-1 line-clamp-2 text-xs text-violet-300/90"
               title={source.project_summary}
             >
-              <span className="font-semibold">AI</span> · {source.project_summary}
+              <AiBadge title="Summary written by AI" /> · {source.project_summary}
             </p>
           )}
         </div>

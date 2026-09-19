@@ -48,7 +48,7 @@ function Nav() {
       <div className="app-shell mx-auto flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
         <Link
           href="/"
-          className="mr-4 flex items-center gap-2"
+          className="mr-4 flex items-center gap-1.5"
           aria-label="ProjectPulse home"
         >
           <img
@@ -57,7 +57,7 @@ function Nav() {
             aria-hidden="true"
             className="h-8 w-8 shrink-0"
           />
-          <span className="grad-text text-sm font-semibold leading-none">
+          <span className="grad-text text-lg font-semibold leading-none">
             ProjectPulse
           </span>
         </Link>
