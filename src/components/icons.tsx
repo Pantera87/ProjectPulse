@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 // Curated Iconify "Glyphs" bodies (80x80 grid, stroke currentColor) —
 // generated, see scripts/fetch-glyphs.mjs.
-import { GLYPHS, GLYPH_WIDTH, GLYPH_HEIGHT } from "@/lib/glyphs.generated";
+import { GLYPHS, GLYPH_DIMS, GLYPH_WIDTH, GLYPH_HEIGHT, GLYPH_STROKE_WIDTH } from "@/lib/glyphs.generated";
 
 /**
  * Minimal inline stroke-icon set (feather-style, 24x24, stroke-based) so the
@@ -261,15 +261,17 @@ export type GlyphName = string;
 export function Glyph({ name, className = "h-4 w-4" }: { name: string; className?: string }) {
   const body = GLYPHS[name];
   if (body) {
-    // Generated bodies are inner-SVG markup for the 80x80 grid: no
-    // stroke-width of their own (inherited from here — 4 ≈ the hand-drawn 2
-    // on the 24 grid) and their fill/stroke attributes match ours.
+    // Generated bodies are inner-SVG markup with no stroke-width of their
+    // own (inherited from here). Most icons are on the 80x80 grid (stroke 4,
+    // ≈ the hand-drawn 2 on the 24 grid); icons off that grid carry their
+    // own grid + stroke in GLYPH_DIMS (e.g. the 24x24 Lucide icons).
+    const d = GLYPH_DIMS[name];
     return (
       <svg
-        viewBox={`0 0 ${GLYPH_WIDTH} ${GLYPH_HEIGHT}`}
+        viewBox={`0 0 ${d?.w ?? GLYPH_WIDTH} ${d?.h ?? GLYPH_HEIGHT}`}
         fill="none"
         stroke="currentColor"
-        strokeWidth={4}
+        strokeWidth={d?.sw ?? GLYPH_STROKE_WIDTH}
         strokeLinecap="round"
         strokeLinejoin="round"
         className={className}

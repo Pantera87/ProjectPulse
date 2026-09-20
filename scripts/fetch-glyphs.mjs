@@ -1,18 +1,24 @@
 #!/usr/bin/env node
 /**
- * Fetch a curated subset of the Iconify "Glyphs" icon set and generate
+ * Fetch a curated subset of Iconify icon sets and generate
  * src/lib/glyphs.generated.ts.
  *
- * Source set: "Glyphs" by Goran Spasojevic (gorango/glyphs), MIT license —
+ * Primary set: "Glyphs" by Goran Spasojevic (gorango/glyphs), MIT license —
  * https://icon-sets.iconify.design/glyphs/ (no attribution required).
- * The set is stroke-based on an 80x80 grid (fill="none"
- * stroke="currentColor"), the same visual family as the hand-drawn icons in
- * src/components/icons.tsx.
+ * Stroke-based on an 80x80 grid (fill="none" stroke="currentColor"), the
+ * same visual family as the hand-drawn icons in src/components/icons.tsx.
+ *
+ * Filler set: "Lucide" (ISC license) fills lifestyle gaps the "Glyphs" set
+ * has none of (coffee/food/drink, a few plants and travel items). It is
+ * 24x24 with a 2px stroke, so generated entries carry their own dimensions
+ * (GLYPH_DIMS) and <Glyph> renders them on the matching grid.
  *
  * What the generated file provides (single source of truth):
  *   GLYPHS  — name -> inner-SVG body, rendered by <Glyph> in icons.tsx
  *   GLYPH_NAMES — the curated names, appended to the AI category prompt so
  *                 the model can pick a glyph for each new category
+ *   GLYPH_DIMS — per-icon grid size + stroke width for every icon that is
+ *                not on the primary 80x80 grid (stroke 4)
  *
  * The file is committed to the repo: the app has NO runtime dependency on
  * the Iconify API (it works fully offline). Re-run to refresh or extend:
@@ -26,7 +32,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const API = "https://api.iconify.design";
-const PREFIX = "glyphs";
+// Default grid: the primary "glyphs" set. Icons off this grid get their own
+// entry in the generated GLYPH_DIMS map (see <Glyph> in src/components/icons.tsx).
+const GLYPH_WIDTH = 80;
+const GLYPH_HEIGHT = 80;
+const GLYPH_STROKE = 4;
 const OUT = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -36,9 +46,10 @@ const OUT = path.join(
 );
 
 /**
- * Curated base glyph names (style variants -bold/-duo/-outline excluded)
- * suited to classifying software projects. Every name is validated against
- * the live collection at generation time.
+ * Curated base glyph names from the primary "Glyphs" set (style variants
+ * -bold/-duo/-outline excluded) for classifying projects — software AND
+ * lifestyle (plants, cars, travel, weather, …). Every name is validated
+ * against the live collection at generation time.
  */
 const CURATED = [
   // AI / neural
@@ -60,7 +71,7 @@ const CURATED = [
   "satellite-dish", "signal", "signal-tower", "window", "wifi",
   // security / privacy
   "badge", "certificate", "key", "keycap", "lock", "lock-open", "person-private",
-  "shield", "shield-exclamation", "user-private", "virus",
+  "shield", "shield-exclamation", "virus",
   // data / documents
   "archive", "bookmark", "bookmarks", "clipboard", "copy", "docs", "file",
   "file-add", "folder", "folder-open", "page-break", "paperclip", "save",
@@ -118,9 +129,52 @@ const CURATED = [
   // navigation / places
   "arrow", "arrow-circle", "arrow-external", "caret", "chevron",
   "chevron-double", "house", "landmark", "map", "map-marker", "road",
-  "route", "stop-sign", "street-view", "u-turn",
+  "route", "stop-sign", "street-view",
   // misc
   "barcode", "calendar", "crown", "disc", "gift", "qr",
+  // plants / nature
+  "hand-holding-seedling", "leaf-1", "maple-leaf", "palm-tree", "tree-1",
+  // cars / vehicles
+  "car-wash", "garage", "kick-scooter", "race-car", "ship-water",
+  // travel / outdoors
+  "camp", "campfire", "hotel", "tent",
+  // weather (dawn/dusk + extremes)
+  "sunny-mostly", "sunrise", "sunset", "temperature-cold", "temperature-hot",
+  "windsock",
+];
+
+/**
+ * Lifestyle icons the "Glyphs" set has none of (verified against the live
+ * Lucide collection): coffee/food/drink plus a few plant and travel extras.
+ * Rendered on a 24x24 grid — see GLYPH_DIMS in the generated file.
+ */
+const LUCIDE = [
+  // coffee / food / drink
+  "beer", "banana", "cake", "candy", "carrot", "cherry", "citrus", "coffee",
+  "cookie", "croissant", "cup-soda", "donut", "egg", "fish", "grape", "martini",
+  "milk", "pizza", "popcorn", "salad", "sandwich", "shrimp", "soup", "utensils",
+  "utensils-crossed", "wine", "ice-cream-bowl", "ice-cream-cone",
+  // plants
+  "clover", "flower", "flower-2", "rose", "sprout", "trees",
+  // travel / outdoors
+  "luggage", "map-pin", "mountain", "mountain-snow", "tractor",
+];
+
+/**
+ * Source sets, in priority order (first set wins on a name collision).
+ * strokeWidth is the inherited stroke <Glyph> uses for the set's grid.
+ */
+const SETS = [
+  {
+    prefix: "glyphs", // MIT — primary 80x80 stroke set
+    strokeWidth: GLYPH_STROKE,
+    names: CURATED,
+  },
+  {
+    prefix: "lucide", // ISC — lifestyle gaps the "glyphs" set doesn't cover
+    strokeWidth: 2,
+    names: LUCIDE,
+  },
 ];
 
 async function getJson(url) {
@@ -130,52 +184,95 @@ async function getJson(url) {
 }
 
 async function main() {
-  // 1. Live name list of the set (flat list under category keys).
-  const collection = await getJson(`${API}/collection?prefix=${PREFIX}`);
-  const all = new Set(Object.values(collection).flat());
-  const missing = CURATED.filter((n) => !all.has(n));
-  if (missing.length) console.warn(`[glyphs] not in set, dropped: ${missing.join(", ")}`);
-  const names = CURATED.filter((n) => all.has(n));
-  if (!names.length) throw new Error("No curated names matched the live collection");
+  const names = []; // ordered, deduped (first set wins)
+  const bodies = {};
+  const dims = {};
 
-  // 2. Bodies for the curated names in one batched request.
-  const data = await getJson(`${API}/${PREFIX}.json?icons=${names.join(",")}`);
-  const width = data.width ?? 80;
-  const height = data.height ?? 80;
-  const got = names.filter((n) => data.icons?.[n]?.body);
-  const lost = names.filter((n) => !data.icons?.[n]?.body);
-  if (lost.length) console.warn(`[glyphs] no body returned, dropped: ${lost.join(", ")}`);
-  if (!got.length) throw new Error("Iconify returned no icon bodies");
+  for (const set of SETS) {
+    // 1. Live name list of the set (flat list under category keys).
+    const collection = await getJson(`${API}/collection?prefix=${set.prefix}`);
+    const all = new Set(
+      Object.values(collection).flat().filter((x) => typeof x === "string")
+    );
+    const missing = set.names.filter((n) => !all.has(n));
+    if (missing.length)
+      console.warn(`[glyphs] ${set.prefix}: not in set, dropped: ${missing.join(", ")}`);
+    const wanted = set.names.filter((n) => all.has(n));
+    if (!wanted.length) continue;
+
+    // 2. Bodies for the wanted names in one batched request.
+    const data = await getJson(`${API}/${set.prefix}.json?icons=${wanted.join(",")}`);
+    const width = data.width ?? 80;
+    const height = data.height ?? 80;
+    const got = wanted.filter((n) => data.icons?.[n]?.body);
+    const lost = wanted.filter((n) => !data.icons?.[n]?.body);
+    if (lost.length)
+      console.warn(`[glyphs] ${set.prefix}: no body returned, dropped: ${lost.join(", ")}`);
+
+    for (const n of got) {
+      if (bodies[n]) {
+        console.warn(`[glyphs] name collision across sets, keeping first: ${n}`);
+        continue;
+      }
+      bodies[n] = data.icons[n].body;
+      dims[n] = {
+        w: data.icons[n].width ?? width,
+        h: data.icons[n].height ?? height,
+        sw: set.strokeWidth,
+      };
+      names.push(n);
+    }
+  }
+  if (!names.length) throw new Error("No curated names matched the live collections");
 
   // 3. Generate the TypeScript module. JSON.stringify each body: SVG markup
   //    only ever needs quote/escape handling, never template interpolation.
-  const entries = got
-    .map((n) => `  ${JSON.stringify(n)}: ${JSON.stringify(data.icons[n].body)},`)
+  const entries = names
+    .map((n) => `  ${JSON.stringify(n)}: ${JSON.stringify(bodies[n])},`)
+    .join("\n");
+  // Only icons off the primary 80x80/stroke-4 grid need their own entry.
+  const dimEntries = names
+    .filter((n) => dims[n].w !== GLYPH_WIDTH || dims[n].h !== GLYPH_HEIGHT || dims[n].sw !== GLYPH_STROKE)
+    .map(
+      (n) =>
+        `  ${JSON.stringify(n)}: { w: ${dims[n].w}, h: ${dims[n].h}, sw: ${dims[n].sw} },`
+    )
     .join("\n");
   const src = `/**
  * GENERATED FILE — do not edit by hand.
  *
- * Curated subset of the Iconify "Glyphs" icon set (MIT, gorango/glyphs),
- * stroke-based on an ${width}x${height} grid. Regenerate with:
+ * Curated subset of two Iconify icon sets, stroke-based (fill="none"
+ * stroke="currentColor"):
+ *   "Glyphs" (MIT, gorango/glyphs) on an 80x80 grid, stroke 4, and
+ *   "Lucide" (ISC) on a 24x24 grid, stroke 2, for lifestyle icons the
+ *   primary set lacks. Regenerate with:
  *
  *   npm run icons:fetch
  *
- * GLYPHS      name -> inner-SVG body (rendered by <Glyph> in icons.tsx)
- * GLYPH_NAMES the curated names — also fed to the AI category prompt
+ * GLYPHS       name -> inner-SVG body (rendered by <Glyph> in icons.tsx)
+ * GLYPH_NAMES  the curated names — also fed to the AI category prompt
+ * GLYPH_DIMS   grid size + stroke width for every icon NOT on the default
+ *              80x80 grid (GLYPH_WIDTH/GLYPH_HEIGHT, stroke
+ *              GLYPH_STROKE_WIDTH)
  */
-export const GLYPH_WIDTH = ${width};
-export const GLYPH_HEIGHT = ${height};
+export const GLYPH_WIDTH = ${GLYPH_WIDTH};
+export const GLYPH_HEIGHT = ${GLYPH_HEIGHT};
+export const GLYPH_STROKE_WIDTH = ${GLYPH_STROKE};
 
 export const GLYPH_NAMES: string[] = [
 ${names.map((n) => `  ${JSON.stringify(n)},`).join("\n")}
 ];
+
+export const GLYPH_DIMS: Record<string, { w: number; h: number; sw: number }> = {
+${dimEntries}
+};
 
 export const GLYPHS: Record<string, string> = {
 ${entries}
 };
 `;
   writeFileSync(OUT, src, "utf8");
-  console.log(`[glyphs] wrote ${OUT} (${got.length}/${names.length} icons, ${width}x${height})`);
+  console.log(`[glyphs] wrote ${OUT} (${names.length} icons)`);
 }
 
 main().catch((e) => {

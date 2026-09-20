@@ -41,8 +41,14 @@ const RULES: Rule[] = [
   [/game|gaming/, "gamepad", "from-purple-500 to-violet-600"],
   [/mobile|android|\bios\b/, "smartphone", "from-teal-500 to-emerald-600"],
   [/health|medical|bio|fitness/, "heart", "from-rose-500 to-red-500"],
+  [/plant|garden|nature|agri|botan|flora|seeds?\b|orchard|greenhouse|herb|vegetable/, "seedling", "from-green-500 to-emerald-600"],
+  [/\bcoffee|cafe|\btea\b|bake|food|recipe|restaurant|kitchen|\bdrink|barista|brew/, "coffee", "from-amber-600 to-orange-500"],
+  [/\bcar(s)?\b|vehicle|driving|garage|automot|motorcycle|racing|fleet/, "car", "from-slate-500 to-slate-600"],
+  [/\btravel|trip|tourism|vacation|hotel|camp|camping|hiking|outdoor/, "ticket", "from-sky-400 to-blue-500"],
+  [/weather|forecast/, "sun", "from-amber-400 to-orange-500"],
   [/finance|payment|trading|bank|budget/, "trending", "from-green-500 to-emerald-600"],
   [/science|research|\bdata\b|analytic/, "star", "from-amber-400 to-yellow-500"],
+  [/\bidea|blog|journal|writing|reading|course|notes?\b/, "lightbulb-1", "from-violet-400 to-purple-500"],
   [/uncategorized/, "folder", "from-slate-500 to-slate-600"],
 ];
 
