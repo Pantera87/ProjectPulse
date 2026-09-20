@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Runtime data: archived page snapshots containing bundled
+    // third-party JS assets (not project source code).
+    "data/**",
   ]),
 ]);
 

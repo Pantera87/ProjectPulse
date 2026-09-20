@@ -1,10 +1,15 @@
 import { Glyph } from "./icons";
+import { GLYPHS } from "@/lib/glyphs.generated";
 
 /**
  * Auto-assigns a glyph + gradient to any category string (AI-assigned
  * categories are free text, e.g. "ai", "cnc", "cnc-controller-firmware").
  * Known domains use keyword rules; anything else falls back to a
  * deterministic hash so the same category always renders the same icon.
+ *
+ * When the AI picked a specific glyph for the category at classification
+ * time (see the categories table / category-icons.ts), that curated Glyphs
+ * icon takes precedence; the keyword/hash rules stay as the fallback.
  */
 
 type Rule = [RegExp, string, string];
@@ -63,11 +68,15 @@ export function iconForCategory(category: string | null | undefined): { glyph: s
 export default function CategoryIcon({
   category,
   size = "md",
+  icon = null,
 }: {
   category: string;
   size?: "sm" | "md";
+  /** AI-picked glyph name for this category (validated against GLYPHS). */
+  icon?: string | null;
 }) {
   const { glyph, gradient } = iconForCategory(category);
+  const name = icon && GLYPHS[icon] ? icon : glyph;
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center bg-gradient-to-br text-white shadow-md ${gradient} ${
@@ -75,7 +84,7 @@ export default function CategoryIcon({
       }`}
       aria-hidden="true"
     >
-      <Glyph name={glyph} className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
+      <Glyph name={name} className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
     </span>
   );
 }

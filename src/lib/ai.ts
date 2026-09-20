@@ -13,6 +13,7 @@
  * null and callers fall back to heuristics. AI_ENABLED=false is a hard
  * kill-switch that overrides the Settings toggle.
  */
+import { existsSync } from "node:fs";
 import { getDb, getSetting, setSetting } from "./db";
 import type { Priority } from "./db";
 import {
@@ -26,6 +27,7 @@ import {
   type PullJob,
 } from "./ollama";
 import { aiActivity, recordAIResult, trackAIWork } from "./ai-activity";
+import { GLYPH_NAMES } from "./glyphs.generated";
 
 export type ProviderKind = "ollama" | "openai" | "anthropic" | "mcp";
 
@@ -62,7 +64,12 @@ export interface SemanticMatch {
  * AI's classification of how important the change is.
  */
 export interface UpdateSummary {
-  /** One or two plain sentences describing what changed. */
+  /**
+   * One to three short sentences describing what changed, in flowing prose
+   * (never bullets or lists, so it reads well as a phone message). When the
+   * content contains multiple changes, only the major ones are kept — in
+   * order of importance; trivial/routine items are omitted.
+   */
   summary: string;
   /**
    * AI-assessed importance of the change: critical = major version / breaking
@@ -79,9 +86,11 @@ export interface AIProvider {
   summarize(diff: string, context: string): Promise<string | null>;
   /**
    * Summarize an update (release notes, diff, feed entry, commit message…)
-   * in one or two plain sentences AND classify its importance
-   * (critical / high / normal). null = AI unavailable / unparseable reply
-   * (callers keep their heuristic summary and priority).
+   * in short plain prose AND classify its importance (critical / high /
+   * normal). When the content holds multiple changes, the summary keeps
+   * only the major ones, most important first (trivial items omitted).
+   * null = AI unavailable / unparseable reply (callers keep their heuristic
+   * summary and priority).
    */
   summarizeUpdate(text: string, context: string): Promise<UpdateSummary | null>;
   /** One-line goal/purpose of software described by text. */
@@ -96,20 +105,31 @@ export interface AIProvider {
   /**
    * Two-level classification of the project's intended use: a GENERIC
    * category (broad domain/family, e.g. "cnc") plus a specific subcategory
-   * (e.g. "cnc-controller-firmware"). null = AI unavailable / unparseable
-   * reply (callers fall back to heuristics).
+   * (e.g. "cnc-controller-firmware"), plus the glyph (one of the curated
+   * Iconify "Glyphs" names, GLYPH_NAMES) that best represents the category.
+   * null = AI unavailable / unparseable reply (callers fall back to
+   * heuristics); icon = null when the model picked nothing valid.
    */
   suggestCategory(
     text: string,
     existing: string[],
     docs?: AIDoc[]
-  ): Promise<{ category: string; subcategory: string | null } | null>;
+  ): Promise<{ category: string; subcategory: string | null; icon: string | null } | null>;
   /**
    * Specific subcategory (a few hyphenated words) for a project that is
    * already in a known category (e.g. "cnc" → "cnc-controller-firmware").
    * null = AI unavailable / unparseable reply.
    */
   suggestSubcategory(text: string, category: string, docs?: AIDoc[]): Promise<string | null>;
+
+  /**
+   * The single glyph (one of the curated Iconify "Glyphs" names,
+   * GLYPH_NAMES) that best represents a known category — used when a category
+   * is renamed by hand and the new slug has no stored icon yet.
+   * null = AI unavailable / unparseable reply (the UI keeps its keyword/hash
+   * fallback from category-icon.tsx).
+   */
+  suggestIcon(category: string, context?: string): Promise<string | null>;
   /**
    * Summarize what a whole project/software is — as a bullet list covering
    * the ENTIRE content (not just its opening). `size` controls how many
@@ -123,19 +143,48 @@ export interface AIProvider {
   ): Promise<string | null>;
   /** Connectivity probe — returns the model's reply to a trivial prompt. */
   ping(): Promise<string | null>;
+  /** Most recent failure reason from the provider (HTTP status, network error,
+   *  …) or null when the last call succeeded / no reason is known. */
+  failureInfo(): string | null;
+}
+
+/** Options for a raw completion. */
+interface CompleteOpts {
+  /** Max tokens the model may produce (thinking tokens included). */
+  maxTokens?: number;
+  /** Documents handed to the provider as RAG files (Ollama ≥ 0.6.2). */
+  docs?: AIDoc[];
+  /**
+   * Accept only the model's FINAL answer. Thinking models (Qwen3,
+   * DeepSeek…) that spend their whole token budget on internal reasoning
+   * would otherwise get their chain-of-thought returned as the reply —
+   * acceptable for ping and free-text prompts, but poison for callers
+   * that expect structured output (slugs, JSON): a "Let me analyze this
+   * project…" preamble would be slugified into a bogus category.
+   */
+  finalOnly?: boolean;
 }
 
 /** Shared prompt-building on top of a raw text completion. */
 abstract class BaseAI implements AIProvider {
   abstract readonly kind: ProviderKind;
   abstract readonly enabled: boolean;
-  protected abstract complete(
-    prompt: string,
-    opts?: { maxTokens?: number; docs?: AIDoc[] }
-  ): Promise<string | null>;
+  protected abstract complete(prompt: string, opts?: CompleteOpts): Promise<string | null>;
   /** Whether the provider can receive RAG documents (Ollama ≥ 0.6.2 only). */
   protected get supportsDocs(): boolean {
     return false;
+  }
+
+  /**
+   * Why the LAST complete() call failed (HTTP status + body snippet, network
+   * error, …). Providers set it inside complete() before returning null;
+   * trackedComplete() reports it to the health registry and failureInfo()
+   * surfaces it to the Test button. null = last call succeeded / no reason.
+   */
+  protected lastError: string | null = null;
+
+  failureInfo(): string | null {
+    return this.lastError;
   }
 
   /**
@@ -160,12 +209,12 @@ abstract class BaseAI implements AIProvider {
    * even when a caller's parser later finds nothing in it — "no match"
    * and "unknown" are answers, not errors.
    */
-  protected async trackedComplete(
-    prompt: string,
-    opts?: { maxTokens?: number; docs?: AIDoc[] }
-  ): Promise<string | null> {
+  protected async trackedComplete(prompt: string, opts?: CompleteOpts): Promise<string | null> {
     const out = await this.complete(prompt, opts);
-    recordAIResult(out !== null, out === null ? `${this.kind} provider returned no response` : undefined);
+    recordAIResult(
+      out !== null,
+      out === null ? (this.lastError ?? `${this.kind} provider returned no response`) : undefined
+    );
     return out;
   }
 
@@ -173,7 +222,7 @@ abstract class BaseAI implements AIProvider {
     const d = diff.length > 4000 ? diff.slice(0, 4000) : diff;
     return this.trackedComplete(
       `Summarize these changes to the project "${context}" in one or two plain sentences. No preamble.\n\n${d}`,
-      { maxTokens: 300 }
+      { maxTokens: 500 }
     );
   }
 
@@ -181,13 +230,17 @@ abstract class BaseAI implements AIProvider {
     const t = text.length > 4000 ? text.slice(0, 4000) : text;
     const out = await this.trackedComplete(
       `Below is a change to the project "${context}".\n` +
-        `1) Summarize the change in one or two plain sentences.\n` +
+        `1) Summarize it in short prose.\n` +
         `2) Classify how important the change is.\n` +
+        `Rules for the summary:\n` +
+        `- Plain language a human can act on, 1-3 short sentences (max 60 words).\n` +
+        `- If the content lists MULTIPLE changes, mention only the MAJOR ones, most important first, as flowing prose (e.g. "Adds X and fixes Y; also improves Z") — and omit trivial or routine items such as typo fixes, doc tweaks, chores, test-only changes and dependency bumps.\n` +
+        `- NEVER use bullet points, lists, numbering or headings: the summary is shown as a short phone message.\n` +
         `Reply with ONLY a JSON object (no other text) with these keys:\n` +
-        `- "summary": one or two plain sentences (max 40 words) describing what changed, in plain language a human can act on\n` +
+        `- "summary": the summary following the rules above\n` +
         `- "priority": "critical" only for a major version, a breaking change, or a security issue; "high" for a significant new feature or fix; "normal" for routine or minor changes\n\n` +
         `${t}`,
-      { maxTokens: 200 }
+      { maxTokens: 600, finalOnly: true }
     );
     return parseUpdateSummary(out);
   }
@@ -198,7 +251,7 @@ abstract class BaseAI implements AIProvider {
       `In one sentence (max 25 words), what is the main goal/purpose of the software described below?${this.docNote(
         !!docs?.length
       )}\n\n${t}`,
-      { maxTokens: 120, docs }
+      { maxTokens: 400, docs, finalOnly: true }
     );
   }
 
@@ -214,7 +267,7 @@ abstract class BaseAI implements AIProvider {
         `- "priority": how important this match is — "critical" only if the text is a direct and significant development about the topic, "high" if clearly related, "normal" if only tangential\n` +
         `- "summary": one plain sentence (max 25 words) explaining what in the text matches the topic and why it matters\n\n` +
         `${t}`,
-      { maxTokens: 200, docs }
+      { maxTokens: 400, docs, finalOnly: true }
     );
     return parseSemanticMatch(out, keywords);
   }
@@ -223,7 +276,7 @@ abstract class BaseAI implements AIProvider {
     text: string,
     existing: string[],
     docs?: AIDoc[]
-  ): Promise<{ category: string; subcategory: string | null } | null> {
+  ): Promise<{ category: string; subcategory: string | null; icon: string | null } | null> {
     const t = this.clip(text, 500, 2000, !!docs?.length);
     const existingList = existing.length
       ? `Reuse one of these existing categories for the category part if it fits: ${existing.join(", ")}.\n`
@@ -234,11 +287,16 @@ abstract class BaseAI implements AIProvider {
       )}\n` +
         `Level 1 "category": the GENERIC domain or family the project belongs to — never the specific product, component or feature (firmware for a CNC controller is "cnc", not "cnc-controller-firmware"). 1-2 words, e.g. ai, engineering, gpu, devops, security.\n` +
         `Level 2 "subcategory": the specific thing it is, a few hyphenated words (e.g. cnc-controller-firmware).\n` +
+        `Also pick the ICON that best represents the CATEGORY, by copying ONE exact name from this list: ${GLYPH_NAMES.join(", ")}.\n` +
         `Base your answer on what the project actually DOES (its features, the problem it solves). The project or repository name is just a label — NEVER repeat the name (or any part of it) as the category or subcategory.\n` +
         `If the text is too thin to classify confidently, reply "unknown" — do not guess.\n` +
         `${existingList}` +
-        `Reply with ONLY: category/subcategory (or just the category if the subcategory is unclear), or "unknown" if it cannot be determined.\n\n${t}`,
-      { maxTokens: 24, docs }
+        `Reply with ONLY: category/subcategory icon (or "category icon" if the subcategory is unclear), or "unknown" if it cannot be determined.\n\n${t}`,
+      // Generous budget: thinking models (Qwen3, …) spend their first
+      // tokens on internal reasoning before producing the short slug.
+      // finalOnly: an empty final answer must stay null (heuristic
+      // fallback), never a slugified chain-of-thought.
+      { maxTokens: 300, docs, finalOnly: true }
     );
     return parseCategoryPair(out);
   }
@@ -251,9 +309,27 @@ abstract class BaseAI implements AIProvider {
       )}\n` +
         `Give the specific SUBCATEGORY: a short lowercase slug of a few hyphenated words describing the specific thing it is (e.g. cnc-controller-firmware — not the generic category itself, and not the project name).\n` +
         `Reply with only the subcategory, or "unknown" if it cannot be determined.\n\n${t}`,
-      { maxTokens: 16, docs }
+      // Generous budget (thinking models reason first) and finalOnly:
+      // never slugify a chain-of-thought preamble into a subcategory.
+      { maxTokens: 300, docs, finalOnly: true }
     );
     return normalizeCategory(out);
+  }
+
+  async suggestIcon(category: string, context?: string): Promise<string | null> {
+    const c = context ? ` The project it tracks: "${context}".` : "";
+    const out = await this.trackedComplete(
+      `Pick the ICON that best represents the software category "${category}".${c}\n` +
+        `Copy ONE exact name from this list: ${GLYPH_NAMES.join(", ")}.\n` +
+        `Reply with ONLY the icon name, or "unknown" if none fits.\n`,
+      // Same budget rule as suggestCategory: thinking models spend their
+      // first tokens on internal reasoning before the short name.
+      { maxTokens: 300, finalOnly: true }
+    );
+    if (!out) return null;
+    // A hallucinated name is dropped, never a valid pick (parseCategoryPair).
+    const clean = out.trim().toLowerCase().replace(/["'\s]+/g, "");
+    return GLYPH_NAMES.includes(clean) ? clean : null;
   }
 
   async summarizeProject(
@@ -272,12 +348,15 @@ abstract class BaseAI implements AIProvider {
         !!docs?.length
       )}\n` +
         `Reply with ONLY ${count} bullet points, one per line, each starting with "- ". No preamble, no headings, no numbering.\n\n${t}`,
-      { maxTokens: 500, docs }
+      { maxTokens: size === "long" ? 2000 : size === "short" ? 700 : 1200, docs, finalOnly: true }
     );
   }
 
   async ping(): Promise<string | null> {
-    return this.trackedComplete("Reply with exactly one word: OK", { maxTokens: 8 });
+    // 128 (not 8): thinking models (Qwen3, DeepSeek…) spend their first tokens
+    // on internal reasoning, so the trivial prompt still needs real budget
+    // to leave a final answer.
+    return this.trackedComplete("Reply with exactly one word: OK", { maxTokens: 128 });
   }
 }
 
@@ -296,16 +375,23 @@ class NullProvider implements AIProvider {
   async semanticMatch(): Promise<SemanticMatch | null> {
     return null;
   }
-  async suggestCategory(): Promise<{ category: string; subcategory: string | null } | null> {
+  async suggestCategory(): Promise<{ category: string; subcategory: string | null; icon: string | null } | null> {
     return null;
   }
   async suggestSubcategory(): Promise<string | null> {
+    return null;
+  }
+
+  async suggestIcon(): Promise<string | null> {
     return null;
   }
   async summarizeProject(): Promise<string | null> {
     return null;
   }
   async ping(): Promise<string | null> {
+    return null;
+  }
+  failureInfo(): string | null {
     return null;
   }
 }
@@ -385,10 +471,49 @@ function parseSemanticMatch(out: string | null, keywords: string[]): SemanticMat
   };
 }
 
+/**
+ * Strip a model's internal reasoning blocks (its "think" tags) from a
+ * reply when a serving stack inlines them in the answer instead of a
+ * separate reasoning_content field (e.g. vLLM without a reasoning
+ * parser). An UNCLOSED opening tag (the token budget ran out
+ * mid-thought) swallows the rest of the reply too. Empty result = the
+ * reply was pure thinking.
+ */
+// The thinking model's reasoning tags ("think" and "/think" wrapped in
+// angle brackets, e.g. Qwen3's). Built from char codes on purpose: a raw
+// tag in this file gets mangled by markup-aware tooling.
+const THINK_OPEN = String.fromCharCode(60) + "think";
+const THINK_CLOSE = String.fromCharCode(60) + "/think" + String.fromCharCode(62);
+
+function stripThinkingBlocks(text: string): string {
+  let s = text;
+  let idx: number;
+  while ((idx = s.indexOf(THINK_OPEN)) !== -1) {
+    const end = s.indexOf(THINK_CLOSE, idx);
+    if (end === -1) {
+      // Unclosed: the token budget ran out mid-thought — the rest of the
+      // reply is still thinking.
+      s = s.slice(0, idx);
+      break;
+    }
+    s = s.slice(0, idx) + " " + s.slice(end + THINK_CLOSE.length);
+  }
+  return s.trim();
+}
+
 /** Normalize a model reply into a valid category slug (null when unusable). */
 export function normalizeCategory(out: string | null): string | null {
   if (!out) return null;
-  const s = out
+  // Thinking-model leak guard: a valid reply is a short slug (at most a few
+  // words), never prose — a chain-of-thought preamble ("Let me analyze
+  // this project PRs…") or a sentence must not be slugified into a bogus
+  // category. (Primary fix is finalOnly in the providers; this catches
+  // anything that leaks through other paths, e.g. MCP.)
+  const raw = stripThinkingBlocks(out);
+  if (!raw) return null;
+  if (raw.split(/\s+/).filter(Boolean).length > 4) return null;
+  if (/[.!?]/.test(raw)) return null;
+  const s = raw
     .trim()
     .toLowerCase()
     .replace(/["'.]+/g, "")
@@ -405,21 +530,39 @@ export function normalizeCategory(out: string | null): string | null {
 }
 
 /**
- * Parse a "category/subcategory" model reply. Missing or unusable
- * subcategory → null; unusable category → null.
+ * Parse a "category/subcategory icon" model reply. The icon is the LAST
+ * whitespace-separated token when (and only when) it matches a curated
+ * Glyphs name — a hallucinated icon is dropped (icon = null), never a
+ * category. Missing or unusable subcategory → null; unusable category →
+ * null.
  */
 function parseCategoryPair(
   out: string | null
-): { category: string; subcategory: string | null } | null {
+): { category: string; subcategory: string | null; icon: string | null } | null {
   if (!out) return null;
-  const clean = out.trim().toLowerCase().replace(/^["'\s]+|["'\s]+$/g, "");
+  // Strip inline thinking blocks BEFORE the "/" split: a closing tag
+  // contains a slash that would otherwise be mistaken for the
+  // category/subcategory separator.
+  out = stripThinkingBlocks(out);
+  let clean = out.trim().toLowerCase().replace(/^["'\s]+|["'\s]+$/g, "");
+  // Trailing icon: last token of the whole reply, only when it is one of
+  // the curated names (the model was told to copy it verbatim).
+  let icon: string | null = null;
+  const m = clean.match(/\s([a-z0-9]+(?:-[a-z0-9]+)*)$/);
+  if (m && GLYPH_NAMES.includes(m[1])) {
+    icon = m[1];
+    clean = clean.slice(0, m.index).trim();
+  }
+  // "n/a" as a WHOLE reply means "not applicable" — reject it before the
+  // "/" split below would turn it into the bogus pair {n, a}.
+  if (["n/a", "n.a", "n a"].includes(clean)) return null;
   const i = clean.indexOf("/");
   const catPart = i === -1 ? clean : clean.slice(0, i);
   const subPart = i === -1 ? "" : clean.slice(i + 1);
   const category = normalizeCategory(catPart);
   if (!category) return null;
   const subcategory = subPart.trim() ? normalizeCategory(subPart) : null;
-  return { category, subcategory };
+  return { category, subcategory, icon };
 }
 
 /* ------------------------------------------------------------------ */
@@ -493,10 +636,7 @@ class OllamaProvider extends BaseAI {
     return this.ragOk;
   }
 
-  protected async complete(
-    prompt: string,
-    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
-  ): Promise<string | null> {
+  protected async complete(prompt: string, opts: CompleteOpts = {}): Promise<string | null> {
     try {
       const state = await ollamaModelState(this.url, this.model);
       if (state === "missing") {
@@ -535,7 +675,10 @@ class OllamaProvider extends BaseAI {
       });
       if (!res.ok) return null;
       const json = (await res.json()) as { response?: string };
-      const out = (json.response ?? "").trim();
+      // Strip inline thinking blocks: some Ollama versions return a
+      // thinking model's reasoning (Qwen3, …) inside the response instead
+      // of a separate reasoning_content field.
+      const out = stripThinkingBlocks(json.response ?? "");
       return out.length > 0 ? out : null;
     } catch {
       return null;
@@ -599,7 +742,7 @@ class OllamaProvider extends BaseAI {
       });
       if (!res.ok) return null;
       const json = (await res.json()) as { message?: { content?: string } };
-      const out = (json.message?.content ?? "").trim();
+      const out = stripThinkingBlocks(json.message?.content ?? "");
       return out.length > 0 ? out : null;
     } catch {
       return null;
@@ -627,48 +770,142 @@ function versionGte(v: string, min: string): boolean {
 /* OpenAI-compatible (OpenAI, LM Studio, vLLM, Ollama /v1, …)          */
 /* ------------------------------------------------------------------ */
 
+/** This process runs inside a Docker container (docker run creates /.dockerenv). */
+function inDocker(): boolean {
+  try {
+    return existsSync("/.dockerenv");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Turn a failed fetch into a short, human-readable reason. undici reports
+ * the underlying socket error on `e.cause` (code ECONNREFUSED, ENOTFOUND, …)
+ * and AbortSignal.timeout throws a TimeoutError — map those to actionable
+ * text instead of the bare "fetch failed".
+ */
+function describeFetchError(e: unknown, url: string): string {
+  const err = e as { name?: string; message?: string; cause?: { code?: string; message?: string } } | null;
+  const code = err?.cause?.code;
+  if (err?.name === "TimeoutError" || err?.name === "AbortError")
+    return "timed out — the endpoint did not answer in time";
+  if (code === "ECONNREFUSED")
+    return `connection refused — nothing is listening at ${url} (server not running, or wrong address/port)`;
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN")
+    return `host not found — check the address in "${url}" (typo, DNS, or the server is on another machine)`;
+  if (code === "ECONNRESET" || code === "UND_ERR_SOCKET")
+    return `connection reset — ${err?.cause?.message ?? "the server dropped the connection"}`;
+  let out = `request failed — ${err?.message || String(e)}`;
+  // The classic Docker gotcha: the URL looks right on the HOST machine, but
+  // inside the container localhost/127.0.0.1 is the container itself.
+  if (/localhost|127\.0\.0\.1|\[?::1\]?/.test(url) && inDocker()) {
+    out +=
+      " — ProjectPulse runs inside Docker, so localhost points at the container, not your machine. Use http://host.docker.internal:<port>/v1 (Windows/macOS) or the host's LAN IP instead.";
+  }
+  return out;
+}
+
 class OpenAICompatibleProvider extends BaseAI {
   readonly kind = "openai" as const;
   readonly enabled = true;
   private base: string;
   private key: string;
   private model: string;
+  /**
+   * Qwen3 is a "thinking" model: it generates a long chain of thought in
+   * addition to the answer, and `max_tokens` covers BOTH — with thinking on,
+   * a ~400-token CoT leaves a 300-token budget with nothing for the answer
+   * and the reply comes back with empty `content`. Qwen3's chat template
+   * supports the `/no_think` soft switch, and vLLM additionally honours
+   * `chat_template_kwargs.enable_thinking` — send both so whichever layer
+   * the server implements turns reasoning off. (Only for Qwen3 — other
+   * models never see these.)
+   */
+  private noThink: boolean;
 
   constructor(base: string, key: string, model: string) {
     super();
     this.base = base.replace(/\/+$/, "");
     this.key = key;
     this.model = model;
+    this.noThink = /qwen3/i.test(model);
   }
 
   /** No RAG support here — docs (if any) are ignored; BaseAI keeps the full
    *  in-prompt truncation budget. */
-  protected async complete(
-    prompt: string,
-    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
-  ): Promise<string | null> {
+  protected async complete(prompt: string, opts: CompleteOpts = {}): Promise<string | null> {
+    const url = `${this.base}/chat/completions`;
+    this.lastError = null;
     try {
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (this.key) headers.authorization = `Bearer ${this.key}`;
-      const res = await fetch(`${this.base}/chat/completions`, {
+      const res = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify({
           model: this.model,
-          messages: [{ role: "user", content: prompt }],
+          messages: [
+            { role: "user", content: this.noThink ? `${prompt} /no_think` : prompt },
+          ],
           temperature: 0.1,
           max_tokens: opts.maxTokens ?? 300,
           stream: false,
+          // vLLM: template-level switch for Qwen3 (ignored by non-vLLM servers).
+          ...(this.noThink ? { chat_template_kwargs: { enable_thinking: false } } : {}),
         }),
         signal: AbortSignal.timeout(120_000),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        // Keep the server's error body (truncated) — it usually says exactly
+        // what is wrong (invalid key, unknown model, …).
+        let body = "";
+        try {
+          body = (await res.text()).trim().slice(0, 300);
+        } catch {
+          // body unreadable — the status code alone is still useful
+        }
+        const hint =
+          res.status === 401 || res.status === 403
+            ? " (check the API key)"
+            : res.status === 404
+              ? ` (check the model name "${this.model}" and that the base URL ends in /v1)`
+              : "";
+        this.lastError =
+          `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""} from ${url}${hint}` +
+          (body ? ` — ${body}` : "");
+        return null;
+      }
       const json = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
+        choices?: {
+          message?: { content?: string; reasoning_content?: string };
+        }[];
       };
-      const out = (json.choices?.[0]?.message?.content ?? "").trim();
-      return out.length > 0 ? out : null;
-    } catch {
+      const choice = json.choices?.[0];
+      // Some serving stacks inline a thinking model's internal thinking
+      // blocks in the answer instead of a separate reasoning_content field
+      // — strip them so only the final answer remains (empty when the reply
+      // was pure thinking).
+      const out = stripThinkingBlocks(choice?.message?.content ?? "");
+      if (out) return out;
+      // Thinking models (Qwen3, DeepSeek, …) put their chain-of-thought in
+      // reasoning_content; when the token budget is eaten by thinking, the
+      // final content is empty. For free-text callers (ping, summarize, …)
+      // the reasoning text still proves the model ran and is the best
+      // available answer. Structured callers pass finalOnly and get null
+      // instead, so their heuristics take over rather than a slugified
+      // chain-of-thought (e.g. "Let me analyze this project…" becoming a
+      // bogus category slug).
+      if (!opts.finalOnly) {
+        const reasoning = (choice?.message?.reasoning_content ?? "").trim();
+        if (reasoning) return reasoning;
+      }
+      this.lastError = opts.finalOnly
+        ? `Model "${this.model}" produced no final answer — its internal reasoning (thinking model, e.g. Qwen3/DeepSeek) used the whole token budget`
+        : `Endpoint answered OK but returned an empty completion for model "${this.model}" — if this is a thinking model (Qwen3, DeepSeek…), its internal reasoning used the whole token budget`;
+      return null;
+    } catch (e) {
+      this.lastError = describeFetchError(e, url);
       return null;
     }
   }
@@ -691,10 +928,7 @@ class AnthropicProvider extends BaseAI {
   }
 
   /** No RAG support here — docs (if any) are ignored. */
-  protected async complete(
-    prompt: string,
-    opts: { maxTokens?: number; docs?: AIDoc[] } = {}
-  ): Promise<string | null> {
+  protected async complete(prompt: string, opts: CompleteOpts = {}): Promise<string | null> {
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -778,7 +1012,7 @@ class MCPProvider extends BaseAI {
     return "prompt";
   }
 
-  protected async complete(prompt: string, _opts?: { maxTokens?: number; docs?: AIDoc[] }): Promise<string | null> {
+  protected async complete(prompt: string, _opts?: CompleteOpts): Promise<string | null> {
     try {
       await this.ensure();
       const res = await this.client!.callTool(
@@ -796,6 +1030,7 @@ class MCPProvider extends BaseAI {
         : String(content ?? "").trim();
       return out.length > 0 ? out : null;
     } catch {
+      this.lastError = `MCP server call failed — check that the MCP server at ${this.url} is running and reachable`;
       this.client = null;
       this.toolDef = null;
       return null;
@@ -1202,6 +1437,7 @@ export async function testAI(): Promise<{
         ok: false,
         reply: null,
         error:
+          ai.failureInfo() ??
           "No response. Check the provider URL/key/model — and for Ollama, that the model is downloaded (see the model list below).",
       };
 }

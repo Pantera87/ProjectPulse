@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import KebabMenu from "./kebab-menu";
 import Time from "./time";
 import { useAiBusy } from "./ai-activity-provider";
+import { Glyph } from "./icons";
+import StatusDot from "./status-dot";
+
 
 interface Props {
   id: number;
@@ -44,10 +47,35 @@ export default function SourceActions({
         ? `/feeds/${id}`
         : `/websites/${id}`;
 
+  // Mirror the floating "Check now" pill's state so the two buttons never
+  // fire at the same time. The events carry the action name as detail; only
+  // "check" is mirrored here.
+  useEffect(() => {
+    const onStart = (e: Event) => {
+      if ((e as CustomEvent).detail === "check") setBusy("check");
+    };
+    const onEnd = () => setBusy((b) => (b === "check" ? null : b));
+    window.addEventListener("source-action-start", onStart);
+    window.addEventListener("source-action-end", onEnd);
+    return () => {
+      window.removeEventListener("source-action-start", onStart);
+      window.removeEventListener("source-action-end", onEnd);
+    };
+  }, []);
+
   async function act(name: string, fn: () => Promise<unknown>) {
     setBusy(name);
-    await fn();
-    setBusy(null);
+    // Announce the action so the floating "Check now" pill (and any other
+    // mirror) can show the same busy state while the request runs.
+    window.dispatchEvent(
+      new CustomEvent("source-action-start", { detail: name })
+    );
+    try {
+      await fn();
+    } finally {
+      setBusy(null);
+      window.dispatchEvent(new CustomEvent("source-action-end"));
+    }
     router.refresh();
   }
 
@@ -83,18 +111,20 @@ export default function SourceActions({
 
   if (compact) {
     return (
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      <div data-source-actions className="flex flex-wrap items-center gap-2 text-sm">
         <button
           onClick={runCheck}
           disabled={checkDisabled}
-          className="btn-primary px-3 py-1 text-sm"
+          className="btn-primary flex h-7 w-7 items-center justify-center px-0"
           title={
             aiBusy && busy === null
               ? "AI is processing — the check button unlocks when it finishes"
-              : undefined
+              : busy === "check"
+                ? "Checking…"
+                : "Check now"
           }
         >
-          {busy === "check" ? "Checking…" : aiBusy ? "AI working…" : "Check now"}
+          <Glyph name="bolt" className={`h-3.5 w-3.5 ${busy === "check" ? "animate-pulse" : ""}`} />
         </button>
         <KebabMenu
           title="More actions"
@@ -122,21 +152,20 @@ export default function SourceActions({
             { label: "Delete", onClick: runDelete, danger: true, disabled: busy !== null },
           ]}
         />
-        {lastCheckedAt && (
-          <span
-            className="ml-auto text-xs text-slate-500"
-            title={lastError ? `error: ${lastError}` : undefined}
-          >
-            last checked <Time iso={lastCheckedAt} />
-            {lastError && <span className="ml-1 text-red-400">⚠</span>}
-          </span>
-        )}
+        <span className="ml-auto">
+          <StatusDot
+            lastCheckedAt={lastCheckedAt}
+            intervalHours={intervalHours}
+            lastError={lastError}
+            withTime={!!lastCheckedAt}
+          />
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div data-source-actions className="flex flex-wrap items-center gap-2 text-sm">
       <button
         onClick={runCheck}
         disabled={checkDisabled}

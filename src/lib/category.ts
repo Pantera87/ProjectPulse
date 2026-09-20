@@ -6,12 +6,15 @@
  *
  * Websites and feeds: KEYWORDS are checked first (text.ts `suggestCategory`
  * over the name/goal/summary — and the full page/feed content when that is
- * thin) — cheap and instant, no AI latency. Only when no keyword matches
- * does the AI classify: it sees the stored summary/goal AND, when those are
- * too thin to classify from, the FULL content of the project (whole page
- * text for websites, feed text for RSS), handed over as a RAG document where
- * the provider supports it (Ollama ≥ 0.6.2) — reusing existing category
- * slugs for consistency and returning both levels in one call. For GITHUB
+ * thin) — cheap and instant, no AI latency. A keyword match stores the guess
+ * immediately, but the AI still classifies in the SAME pass (both levels in
+ * one call) and replaces the guess, so one pass always completes the pair;
+ * the guess only survives when the AI is off or comes back unsure. The AI
+ * sees the stored summary/goal AND, when those are too thin to classify
+ * from, the FULL content of the project (whole page text for websites, feed
+ * text for RSS), handed over as a RAG document where the provider supports
+ * it (Ollama ≥ 0.6.2) — reusing existing category slugs for consistency.
+ * For GITHUB
  * sources the model classifies in a priority cascade instead: the repo's
  * TOPICS first, then topics + ABOUT section, and only when neither yields a
  * confident answer is the full README ingested (the stored AI summary
@@ -35,7 +38,6 @@
  */
 import type Database from "better-sqlite3";
 import type { SourceRow } from "./db";
-import { getDb } from "./db";
 import { getAI } from "./ai";
 import type { AIDoc } from "./ai";
 import { suggestCategory as heuristicCategory } from "./text";
@@ -47,6 +49,7 @@ import {
 } from "./project-context";
 import { parseGithubRef } from "./github";
 import { indexForSearch, touchSource } from "./models";
+import { ensureCategoryIcon, getCategoryIcon, setCategoryIcon } from "./category-icons";
 
 /** Distinct non-null category slugs currently in use (for prompt reuse). */
 function existingCategories(d: Database.Database): string[] {
@@ -151,13 +154,23 @@ async function ensureCategoryGithub(
   const persist = (
     category: string,
     subcategory: string | null,
-    catSource: string
+    catSource: string,
+    icon: string | null = null,
+    reclassified = false
   ): string => {
     touchSource(d, row.id, {
       category,
       subcategory,
       category_source: catSource,
+      subcategory_source: subcategory ? catSource : null,
     });
+    // The AI picked a glyph for this category in the current call. When the
+    // source was RE-classified the edit forces a fresh search — store the new
+    // pick even if the category already has a stored icon. Otherwise store
+    // only when none is stored yet (a previous pick is never changed).
+    // setCategoryIcon validates the name; invalid picks are dropped.
+    if (icon && (reclassified || !getCategoryIcon(d, category)))
+      setCategoryIcon(d, category, icon);
     indexForSearch(
       d,
       "source",
@@ -169,15 +182,32 @@ async function ensureCategoryGithub(
   };
 
   // AI over the tiers, most-signal-cheapest first; the full content is
-  // tried last (RAG document where the provider supports it).
+  // tried last (RAG document where the provider supports it). A reply that
+  // has the category but no subcategory is completed in the SAME pass with
+  // one targeted follow-up over the same tier's text, so the pair is never
+  // left half-filled for a later check.
   const aiClassify = async (): Promise<
-    { category: string; subcategory: string | null } | null
+    { category: string; subcategory: string | null; icon: string | null } | null
   > => {
     if (!ai.enabled) return null;
+    const complete = async (
+      r: { category: string; subcategory: string | null; icon: string | null },
+      text: string,
+      docs?: AIDoc[]
+    ): Promise<{ category: string; subcategory: string | null; icon: string | null }> => {
+      if (r.subcategory) return r;
+      try {
+        const sub = await ai.suggestSubcategory(text, r.category, docs);
+        if (sub && sub !== nameSlug(row.name)) return { ...r, subcategory: sub };
+      } catch {
+        // best-effort — retried on the next check
+      }
+      return r;
+    };
     for (const text of lightTiers) {
       try {
         const r = await ai.suggestCategory(text, existing);
-        if (r && !echoesName(r, row.name)) return r;
+        if (r && !echoesName(r, row.name)) return complete(r, text);
       } catch {
         // best-effort — try the next tier
       }
@@ -185,10 +215,9 @@ async function ensureCategoryGithub(
     const full = await fullText();
     if (full) {
       try {
-        const r = await ai.suggestCategory(full, existing, [
-          { name: contextDocName("github"), content: full },
-        ]);
-        if (r && !echoesName(r, row.name)) return r;
+        const docs = [{ name: contextDocName("github"), content: full }];
+        const r = await ai.suggestCategory(full, existing, docs);
+        if (r && !echoesName(r, row.name)) return complete(r, full, docs);
       } catch {
         // best-effort
       }
@@ -200,7 +229,14 @@ async function ensureCategoryGithub(
   // replace the guess with the AI's answer.
   if (row.category && row.category_source === "heuristic") {
     const r = await aiClassify();
-    if (r) return persist(r.category, r.subcategory, "ai");
+    if (r)
+      return persist(
+        r.category,
+        r.subcategory,
+        "ai",
+        r.icon,
+        r.category.toLowerCase() !== row.category.toLowerCase()
+      );
     if (row.subcategory) return row.category;
     // AI unavailable/unsure — keep the guess; fall through to complete the
     // still-missing subcategory below.
@@ -210,7 +246,7 @@ async function ensureCategoryGithub(
 
   if (!row.category) {
     const r = await aiClassify();
-    if (r) return persist(r.category, r.subcategory, "ai");
+    if (r) return persist(r.category, r.subcategory, "ai", r.icon);
 
     // Keyword fallback: generic category only, not very accurate — run over
     // the same tier order (topics first, full text last) and flagged in the
@@ -250,7 +286,7 @@ async function ensureCategoryGithub(
       }
     }
     if (sub && sub !== nameSlug(row.name)) {
-      touchSource(d, row.id, { subcategory: sub });
+      touchSource(d, row.id, { subcategory: sub, subcategory_source: "ai" });
       indexForSearch(
         d,
         "source",
@@ -279,8 +315,29 @@ export async function ensureCategoryForSource(
   // re-classify from the full content below.
   let row = source;
   if (row.category && categoryMirrorsName(row)) {
-    touchSource(d, row.id, { category: null, subcategory: null, category_source: null });
-    row = { ...row, category: null, subcategory: null, category_source: null };
+    touchSource(d, row.id, {
+      category: null,
+      subcategory: null,
+      category_source: null,
+      subcategory_source: null,
+    });
+    row = {
+      ...row,
+      category: null,
+      subcategory: null,
+      category_source: null,
+      subcategory_source: null,
+    };
+  }
+  // A subcategory without its category is an orphan (the generic level was
+  // cleared) — drop it so the pair is re-derived together below.
+  if (!row.category && row.subcategory) {
+    touchSource(d, row.id, {
+      subcategory: null,
+      category_source: null,
+      subcategory_source: null,
+    });
+    row = { ...row, subcategory: null, category_source: null, subcategory_source: null };
   }
 
   // GitHub sources use the tiered cascade (topics → about → full README);
@@ -317,7 +374,22 @@ export async function ensureCategoryForSource(
             category: r.category,
             subcategory: r.subcategory,
             category_source: "ai",
+            subcategory_source: r.subcategory ? "ai" : null,
           });
+          // The AI re-classified the source — the fresh icon pick from this
+          // call replaces any previously stored one; if it came back without
+          // a glyph, run a forced icon search in the background instead.
+          const reclassified =
+            r.category.toLowerCase() !== row.category.toLowerCase();
+          if (r.icon) {
+            if (reclassified) setCategoryIcon(d, r.category, r.icon);
+            else if (!getCategoryIcon(d, r.category)) setCategoryIcon(d, r.category, r.icon);
+          } else if (reclassified) {
+            const context = [row.name ?? "", row.goal ?? ""]
+              .filter(Boolean)
+              .join(" — ");
+            void ensureCategoryIcon(d, r.category, context || undefined, true).catch(() => {});
+          }
           indexForSearch(
             d,
             "source",
@@ -340,14 +412,17 @@ export async function ensureCategoryForSource(
 
   if (!row.category) {
     // Keywords first: cheap and instant, no AI latency. A match stores a
-    // quick (flagged) generic guess — the upgrade pass (above here at a
-    // later check) re-classifies it with AI and completes the subcategory.
+    // quick (flagged) generic guess immediately, but the AI classification
+    // still runs in the SAME pass right below (both levels in one call) —
+    // the source never waits for a later check to get the accurate pair.
     const kw = heuristicCategory(text);
+    let guess: string | null = null;
     if (kw) {
       touchSource(d, row.id, {
         category: kw,
         subcategory: null,
         category_source: "heuristic",
+        subcategory_source: null,
       });
       indexForSearch(
         d,
@@ -356,14 +431,16 @@ export async function ensureCategoryForSource(
         row.name ?? row.url,
         `${row.goal ?? ""} ${kw}`
       );
-      return kw;
+      guess = kw;
     }
 
-    // No keywords matched — the AI reads the whole project (full page/feed
-    // content, handed over as a RAG document where supported) and returns
-    // both levels in one call.
+    // The AI reads the whole project (full page/feed content, handed over as
+    // a RAG document where supported) and returns both levels in one call —
+    // completing the pair in this same pass, never category-now /
+    // subcategory-later.
     let cat: string | null = null;
     let sub: string | null = null;
+    let icon: string | null = null;
     const ai = getAI();
     if (ai.enabled) {
       try {
@@ -371,18 +448,36 @@ export async function ensureCategoryForSource(
         if (r && !echoesName(r, row.name)) {
           cat = r.category;
           sub = r.subcategory;
+          icon = r.icon;
         }
       } catch {
         // best-effort — retried on the next check
       }
     }
-    if (!cat) return null;
+    // AI off or unsure — keep the keyword guess (already stored) if there
+    // was one; nothing could be determined otherwise.
+    if (!cat) return guess;
+    // The model sometimes answers the category but not the subcategory —
+    // complete it in the SAME pass with one targeted follow-up, so the pair
+    // is never left half-filled for a later check.
+    if (!sub) {
+      try {
+        const followUp = await ai.suggestSubcategory(text, cat, docs);
+        sub = followUp && followUp !== nameSlug(row.name) ? followUp : null;
+      } catch {
+        sub = null; // best-effort — retried on the next check
+      }
+    }
 
     touchSource(d, row.id, {
       category: cat,
       subcategory: sub,
       category_source: "ai",
+      subcategory_source: sub ? "ai" : null,
     });
+    // The AI picked a glyph for the new category — store only when it has no
+    // stored AI icon yet (a previous pick is never changed).
+    if (icon && !getCategoryIcon(d, cat)) setCategoryIcon(d, cat, icon);
     // Category is part of the source's search body — keep the index in sync.
     indexForSearch(
       d,
@@ -402,7 +497,7 @@ export async function ensureCategoryForSource(
     try {
       const sub = await ai.suggestSubcategory(text, row.category, docs);
       if (sub && sub !== nameSlug(row.name)) {
-        touchSource(d, row.id, { subcategory: sub });
+        touchSource(d, row.id, { subcategory: sub, subcategory_source: "ai" });
         indexForSearch(
           d,
           "source",
@@ -416,42 +511,4 @@ export async function ensureCategoryForSource(
     }
   }
   return row.category;
-}
-
-/**
- * Fire-and-forget entry point (used when a project is added). Right after
- * adding, the first attempt can come up empty — the AI model may still be
- * loading or downloading, or the page fetch may have hit a transient error.
- * Waiting for the next scheduled check could take up to a week, so while the
- * source still has NO category at all, retry twice more (~30 s apart). A
- * keyword-guessed category is left alone here — the upgrade pass at a later
- * check refines it with AI.
- */
-export function ensureCategoryById(id: number): void {
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  void (async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const d = getDb();
-        const row = d
-          .prepare("SELECT * FROM sources WHERE id = ?")
-          .get(id) as SourceRow | undefined;
-        if (!row) return;
-        if (
-          !row.category ||
-          !row.subcategory ||
-          row.category_source === "heuristic" ||
-          categoryMirrorsName(row)
-        )
-          await ensureCategoryForSource(d, row);
-      } catch {
-        // best-effort — the next scheduled check retries
-      }
-      const fresh = getDb()
-        .prepare("SELECT * FROM sources WHERE id = ?")
-        .get(id) as SourceRow | undefined;
-      if (fresh?.category || attempt === 2 || !getAI().enabled) return;
-      await sleep(30_000);
-    }
-  })();
 }

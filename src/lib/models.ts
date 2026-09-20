@@ -104,11 +104,10 @@ export const SNAPSHOT_KEEP = Number(process.env.SNAPSHOT_KEEP_VERSIONS) || 1;
  *  - "full": archived HTML with assets (photos, css, js) saved locally +
  *            the raw page (rich offline view)
  *  - "html": just the raw page HTML (no asset downloads)
- *  - "screenshot": only the rendered PNG (smallest)
  * Default: "full".
  */
-export type SnapshotMode = "full" | "html" | "screenshot";
-export const SNAPSHOT_MODES: SnapshotMode[] = ["full", "html", "screenshot"];
+export type SnapshotMode = "full" | "html";
+export const SNAPSHOT_MODES: SnapshotMode[] = ["full", "html"];
 
 /** The configured snapshot storage mode (Settings → Snapshots). */
 export function snapshotMode(d: Database.Database): SnapshotMode {
@@ -127,7 +126,7 @@ export function snapshotKeep(d: Database.Database): number {
   return Number.isFinite(s) && s >= 1 ? Math.min(Math.floor(s), 500) : 1;
 }
 
-/** Remove the on-disk files (archived assets + screenshot) of one version. */
+/** Remove the on-disk files (archived assets + legacy screenshot) of one version. */
 function removeSnapshotFiles(sourceId: number, version: number) {
   try {
     fs.rmSync(path.join(dataDir(), "archive", String(sourceId), `v${version}`), {
@@ -144,7 +143,7 @@ function removeSnapshotFiles(sourceId: number, version: number) {
 
 /**
  * Keep only the newest `snapshotKeep(d)` versions of a source's snapshots.
- * Dropped versions' archived assets and screenshots are removed from disk.
+ * Dropped versions' archived assets and legacy screenshots are removed.
  */
 export function pruneSnapshots(d: Database.Database, sourceId: number) {
   const keep = snapshotKeep(d);
@@ -175,7 +174,7 @@ export function pruneAllSnapshots(d: Database.Database) {
 }
 
 /**
- * Delete every snapshot of one source: rows + archived assets +
+ * Delete every snapshot of one source: rows + archived assets + legacy
  * per-version screenshots. Returns the number of removed rows.
  */
 export function deleteSnapshotsForSource(d: Database.Database, sourceId: number): number {
@@ -204,8 +203,8 @@ export function deleteSnapshotsForSource(d: Database.Database, sourceId: number)
 }
 
 /**
- * Delete ALL snapshots of all sources: rows + the whole archive + per-version
- * screenshots. Returns the number of removed rows.
+ * Delete ALL snapshots of all sources: rows + the whole archive + legacy
+ * per-version screenshots. Returns the number of removed rows.
  */
 export function deleteAllSnapshots(d: Database.Database): number {
   const rows = d
@@ -263,6 +262,7 @@ const PATCHABLE = [
   "category",
   "subcategory",
   "category_source",
+  "subcategory_source",
   "watch_enabled",
   "check_interval_hours",
   "muted_until",
@@ -312,6 +312,7 @@ export function sourceToPlain(
     category: s.category,
     subcategory: s.subcategory,
     category_source: s.category_source,
+    subcategory_source: s.subcategory_source,
     notes: s.notes,
     watch_enabled: s.watch_enabled,
     check_interval_hours: s.check_interval_hours,

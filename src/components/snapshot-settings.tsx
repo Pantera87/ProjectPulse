@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 /**
  * Snapshot storage settings: how many versions to keep, what to store for
- * new snapshots (full offline archive / HTML / screenshot only) and the
- * global AI summary length — plus a danger button clearing all snapshots.
+ * new snapshots (full offline archive / HTML) and the global AI summary
+ * length — plus a danger button clearing all snapshots.
  */
 export default function SnapshotSettings() {
   const router = useRouter();
@@ -52,7 +52,7 @@ export default function SnapshotSettings() {
   async function clearAll() {
     if (
       !confirm(
-        "Delete ALL snapshots of ALL projects (stored pages, offline archives and screenshots)? This cannot be undone."
+        "Delete ALL snapshots of ALL projects (stored pages and offline archives)? This cannot be undone."
       )
     )
       return;
@@ -100,7 +100,6 @@ export default function SnapshotSettings() {
           [
             ["full", "Full offline archive (page + assets)"],
             ["html", "HTML only"],
-            ["screenshot", "Screenshot only"],
           ] as [string, string][]
         ).map(([value, label]) => (
           <label key={value} className="flex items-center gap-1.5 text-slate-300">

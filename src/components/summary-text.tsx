@@ -4,7 +4,7 @@
  * Renders a stored AI project summary. AI summaries are bullet lists (one
  * point per line) — render them as a proper list; any non-bullet summary
  * (older rows, non-AI providers) falls back to plain text.
- * (The "AI" badge lives in the surrounding summary box header.)
+ * (The "AI" corner badge lives on the surrounding summary box.)
  */
 export default function SummaryText({ text }: { text: string }) {
   const items = text

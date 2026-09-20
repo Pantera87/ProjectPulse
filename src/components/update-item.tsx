@@ -42,10 +42,20 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
   }
   return (
     <li
-      className={`rounded-xl border px-3 py-2 backdrop-blur-md ${STYLES[u.priority] ?? STYLES.normal} ${
+      className={`relative rounded-xl border px-3 py-2 backdrop-blur-md ${STYLES[u.priority] ?? STYLES.normal} ${
         u.read_at ? "opacity-60" : ""
       }`}
     >
+      {(aiJudged || aiSummary) && (
+        <AiBadge
+          corner
+          title={
+            aiJudged
+              ? "Matched and prioritized by AI"
+              : "Summary written by AI"
+          }
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span
           className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
@@ -55,15 +65,6 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
           {u.priority}
         </span>
         <span className="badge">{u.kind}</span>
-        {(aiJudged || aiSummary) && (
-          <AiBadge
-            title={
-              aiJudged
-                ? "Matched and prioritized by AI"
-                : "Summary written by AI"
-            }
-          />
-        )}
         <span className="font-medium">{u.title}</span>
         <span className="text-xs text-slate-500">
           {u.source_type} · {u.source_name}

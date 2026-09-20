@@ -39,6 +39,8 @@ export interface SourceRow {
   subcategory: string | null;
   /** How the category was assigned: "ai" | "heuristic" | "user" (null = legacy/unknown) */
   category_source: string | null;
+  /** How the subcategory was assigned: "ai" | "user" (null = legacy/unknown) */
+  subcategory_source: string | null;
   notes: string | null;
   watch_enabled: number;
   check_interval_hours: number;
@@ -208,6 +210,14 @@ function migrate(d: Database.Database) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_notification_log_created ON notification_log(created_at);
+
+    -- AI-picked icon per category (curated Iconify "Glyphs" name, see
+    -- src/lib/glyphs.generated.ts). One row per category slug; the keyword/
+    -- hash fallback in category-icon.tsx applies when a category has no row.
+    CREATE TABLE IF NOT EXISTS categories (
+      category TEXT PRIMARY KEY,
+      icon TEXT NOT NULL
+    );
   `);
   // Columns added after initial release — guard for existing databases.
   addColumnIfMissing(d, "snapshots", "screenshot", "TEXT");
@@ -215,6 +225,7 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "project_summary", "TEXT");
   addColumnIfMissing(d, "sources", "subcategory", "TEXT");
   addColumnIfMissing(d, "sources", "category_source", "TEXT");
+  addColumnIfMissing(d, "sources", "subcategory_source", "TEXT");
   addColumnIfMissing(d, "sources", "goal_source", "TEXT");
   // Keywordless change-tracking toggles (github sources).
   addColumnIfMissing(d, "sources", "track_releases", "INTEGER NOT NULL DEFAULT 1");

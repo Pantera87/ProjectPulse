@@ -1,19 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import fs from "node:fs";
-import path from "node:path";
-import { getDb, dataDir, type SourceRow } from "@/lib/db";
+import { getDb, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
 import { isMuted } from "@/lib/check";
 import { formatDateTime } from "@/lib/format";
 import SourceActions from "@/components/source-actions";
+import FloatingCheckButton from "@/components/floating-check-button";
 import AiBadge from "@/components/ai-badge";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
 import TrackingToggles from "@/components/tracking-toggles";
 import MarkReadButton from "@/components/mark-read";
 import SnapshotViewer from "@/components/snapshot-viewer";
-import ScreenshotDeleteButton from "@/components/screenshot-delete-button";
 import SummaryText from "@/components/summary-text";
 import SummarySizeSelect from "@/components/summary-size-select";
 
@@ -35,10 +33,6 @@ export default async function RepoDetailPage({
     .prepare("SELECT * FROM sources WHERE id = ? AND type = 'github'")
     .get(Number(id)) as SourceRow | undefined;
   if (!source) notFound();
-
-  const hasRepoShot = fs.existsSync(
-    path.join(dataDir(), `screenshots/github-${source.id}.png`)
-  );
 
   const updates = d
     .prepare(
@@ -82,9 +76,10 @@ export default async function RepoDetailPage({
           </p>
         )}
         {source.project_summary && (
-          <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+          <div className="relative mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+            <AiBadge corner title="Summary written by AI" />
             <span className="mr-2 inline-flex items-center gap-1.5 font-semibold text-violet-300">
-              <AiBadge title="Summary written by AI" /> summary
+              summary
             </span>
             <SummaryText text={source.project_summary} />
           </div>
@@ -104,35 +99,7 @@ export default async function RepoDetailPage({
         lastError={source.last_error}
       />
 
-      <section className="glass space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Repository screenshot</h2>
-          <div className="flex items-center gap-3">
-            {hasRepoShot && <ScreenshotDeleteButton sourceId={source.id} />}
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-indigo-300 hover:underline"
-            >
-              Open on GitHub →
-            </a>
-          </div>
-        </div>
-        {hasRepoShot ? (
-          <img
-            src={`/api/sources/${source.id}/screenshot?repo=1`}
-            alt="GitHub repository page"
-            className="w-full rounded-lg border border-white/15 bg-white"
-          />
-        ) : (
-          <p className="text-sm text-slate-500">
-            No screenshot yet — run “Check now” to capture the repository page
-            (it is also captured automatically on the next scheduled check,
-            and re-captured whenever the README changes).
-          </p>
-        )}
-      </section>
+      <FloatingCheckButton id={source.id} />
 
       <SnapshotViewer sourceId={source.id} baseHref={`/repos/${id}`} v={v} diff={diff} />
 
@@ -172,7 +139,9 @@ export default async function RepoDetailPage({
             goal: source.goal,
             goal_source: source.goal_source,
             category: source.category,
+            category_source: source.category_source,
             subcategory: source.subcategory,
+            subcategory_source: source.subcategory_source,
             notes: source.notes,
           }}
         />

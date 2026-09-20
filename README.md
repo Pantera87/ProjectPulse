@@ -31,6 +31,8 @@
 <div align="center">
   <hr/>
   <p>
+    <a href="#screenshots">Screenshots</a>
+    <span>&nbsp;·&nbsp;</span>
     <a href="#features">Features</a>
     <span>&nbsp;·&nbsp;</span>
     <a href="#how-it-works">How it works</a>
@@ -47,6 +49,23 @@
   </p>
   <hr/>
 </div>
+
+## Screenshots
+
+| Dashboard | Updates feed |
+|---|---|
+| ![Dashboard](public/screenshots/dashboard.png) | ![Updates feed](public/screenshots/updates.png) |
+| Project cards with activity sparklines, unread counts and the "needs attention" strip | Priority-sorted updates with AI summaries, digest windows and full-text search |
+
+| Website snapshot | Keyword rules |
+|---|---|
+| ![Website snapshot](public/screenshots/website-snapshot.png) | ![Keyword rules](public/screenshots/keyword-rules.png) |
+| Offline snapshots rendered in a sandboxed iframe, with version history and text diffs | Word-boundary rules with negation, priorities and issue-label watching |
+
+| GitHub tracking | AI model manager |
+|---|---|
+| ![GitHub tracking](public/screenshots/github-repo.png) | ![AI model manager](public/screenshots/settings-ai.png) |
+| Releases, README diffs, milestones and state-change scans per repo | Ollama model catalog with sizes, accuracy and hardware hints, one-click download |
 
 ## Features
 
@@ -152,6 +171,15 @@ Every source type gets a two-level classification, auto-assigned:
   re-classified from content on the next check.
 - Values set by AI or by the user are otherwise **never overwritten**, and both
   levels are always editable.
+- **Per-category icons** — when classifying, the AI also picks the glyph that
+  best represents the new category from a curated ~300 stroke icons of the
+  Iconify ["Glyphs"] set (MIT), bundled at build time in
+  `src/lib/glyphs.generated.ts` — zero runtime network dependency. The pick
+  is stored once per category (`categories` table) and the dashboard renders
+  every category's gradient tile with it. Without AI (or when the model
+  picked nothing valid) the tile falls back to keyword rules / a
+  deterministic hash, exactly as before. Extend or refresh the bundled set
+  with `npm run icons:fetch`.
 
 ### Updates feed & dashboard
 
@@ -221,7 +249,7 @@ All extras are env-driven and off by default:
 | Variable | Effect |
 |---|---|
 | `AUTH_PASSWORD` | enables a login screen (single shared password) |
-| `WEBHOOK_URL` | POSTs every new update as JSON `{title, url, priority, kind, …}` |
+| `WEBHOOK_URL` | POSTs every new update as a short JSON message `{title, url, summary}` — the summary is the AI's plain-prose summary of the major changes (no bullets) |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | AI via local Ollama (see [AI](#ai-optional)); the compose file sets `OLLAMA_URL` to the bundled service by default |
 | `OLLAMA_KEEP_ALIVE` | minutes a model stays loaded after use before Ollama frees the RAM (default 5; also settable in Settings) |
 | `OPENAI_URL` / `OPENAI_API_KEY` | AI via any OpenAI-compatible endpoint |
@@ -314,6 +342,7 @@ is downloaded manually.
 npm install
 npm run dev        # http://localhost:4701, data in ./data
 npm run build      # production build
+npm run icons:fetch  # refresh the bundled category glyph set (offline once generated)
 ```
 
 ## Project structure
@@ -336,7 +365,10 @@ npm run build      # production build
   (GitHub: tiered topics → about → full README, README only ingested when
   the light tiers are unsure; RAG document for the full tier) with
   keyword-hint fallback (backfilled on add + first check; name-echoing
-  values are re-classified)
+  values are re-classified); `src/lib/category-icons.ts` — per-category
+  AI-picked icon (stored in the `categories` table);
+  `src/lib/glyphs.generated.ts` — bundled curated Iconify "Glyphs" bodies
+  (regenerate with `npm run icons:fetch`)
 - `src/lib/notifiers.ts` — notifier seam (webhook implementation)
 - `src/middleware.ts` — optional password auth gate
 - API routes under `src/app/api/` mirror the pages; UI is Next.js App Router

@@ -72,7 +72,17 @@ export default async function UpdateDetailPage({
         </Link>
       </div>
 
-      <article className="glass-strong rise space-y-4 p-5">
+      <article className="glass-strong rise relative space-y-4 p-5">
+        {(aiJudged || aiSummary) && (
+          <AiBadge
+            corner
+            title={
+              aiJudged
+                ? "Matched and prioritized by AI"
+                : "Summary written by AI"
+            }
+          />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase ${
@@ -82,15 +92,6 @@ export default async function UpdateDetailPage({
             {u.priority}
           </span>
           <span className="badge">{u.kind}</span>
-          {(aiJudged || aiSummary) && (
-            <AiBadge
-              title={
-                aiJudged
-                  ? "Matched and prioritized by AI"
-                  : "Summary written by AI"
-              }
-            />
-          )}
           <span className="ml-auto text-xs text-slate-500">
             {formatDateTime(u.created_at)}
           </span>

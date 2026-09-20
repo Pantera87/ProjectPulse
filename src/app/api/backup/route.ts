@@ -26,6 +26,7 @@ export function GET() {
     snapshots,
     updates: d.prepare("SELECT * FROM updates").all(),
     settings: d.prepare("SELECT * FROM settings").all(),
+    categories: d.prepare("SELECT * FROM categories").all(),
   };
   return new NextResponse(JSON.stringify(payload, null, 2), {
     headers: {
@@ -48,11 +49,12 @@ interface BackupBody {
   snapshots?: Row[];
   updates?: Row[];
   settings?: Row[];
+  categories?: Row[];
 }
 
 /** Validate the uploaded backup shape before touching the database. */
 function validate(body: BackupBody): string | null {
-  const tables = ["sources", "snapshots", "updates", "settings"] as const;
+  const tables = ["sources", "snapshots", "updates", "settings", "categories"] as const;
   for (const t of tables) {
     const rows = body[t];
     if (rows !== undefined && !Array.isArray(rows))
@@ -75,6 +77,10 @@ function validate(body: BackupBody): string | null {
   for (const st of body.settings ?? []) {
     if (typeof st.key !== "string" || !st.key)
       return `settings: every row needs a non-empty key`;
+  }
+  for (const c of body.categories ?? []) {
+    if (typeof c.category !== "string" || !c.category || typeof c.icon !== "string" || !c.icon)
+      return `categories: every row needs a non-empty category and icon`;
   }
   return null;
 }
@@ -101,17 +107,17 @@ export async function POST(req: Request) {
     d.prepare("DELETE FROM sqlite_sequence WHERE name IN ('sources','snapshots','updates')").run();
 
     const insSource = d.prepare(
-      `INSERT INTO sources (id, type, url, name, goal, goal_source, category, subcategory, category_source, notes, watch_enabled,
+      `INSERT INTO sources (id, type, url, name, goal, goal_source, category, subcategory, category_source, subcategory_source, notes, watch_enabled,
         check_interval_hours, last_checked_at, last_content_hash, last_error,
         muted_until, rules_json, state_json, created_at, logo, project_summary, summary_size,
         track_releases, track_readme, track_commits)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const s of body.sources ?? [])
       insSource.run(
         s.id, s.type, s.url, s.name ?? null, s.goal ?? null, s.goal_source ?? null,
         s.category ?? null,
-        s.subcategory ?? null, s.category_source ?? null,
+        s.subcategory ?? null, s.category_source ?? null, s.subcategory_source ?? null,
         s.notes ?? null, s.watch_enabled ?? 1, s.check_interval_hours ?? 6,
         s.last_checked_at ?? null, s.last_content_hash ?? null, s.last_error ?? null,
         s.muted_until ?? null, s.rules_json ?? "[]", s.state_json ?? "{}",
@@ -141,6 +147,9 @@ export async function POST(req: Request) {
     d.prepare("DELETE FROM settings").run();
     const insSet = d.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
     for (const st of body.settings ?? []) insSet.run(st.key, st.value);
+    d.prepare("DELETE FROM categories").run();
+    const insCat = d.prepare("INSERT INTO categories (category, icon) VALUES (?, ?)");
+    for (const c of body.categories ?? []) insCat.run(c.category, c.icon);
 
     // Rebuild the FTS index (same title/body format as source creation in
     // api/sources/route.ts — otherwise search stays empty after restore).
@@ -168,6 +177,7 @@ export async function POST(req: Request) {
       snapshots: (body.snapshots ?? []).length,
       updates: (body.updates ?? []).length,
       settings: (body.settings ?? []).length,
+      categories: (body.categories ?? []).length,
     },
   });
 }

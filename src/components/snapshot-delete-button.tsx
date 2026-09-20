@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * Client-side "Delete snapshots" button for the snapshot viewer: removes
- * every snapshot of a source (rows + archived assets + screenshots).
+ * every snapshot of a source (rows + archived assets).
  */
 export default function SnapshotDeleteButton({ sourceId }: { sourceId: number }) {
   const [busy, setBusy] = useState(false);
@@ -14,7 +14,7 @@ export default function SnapshotDeleteButton({ sourceId }: { sourceId: number })
   async function del() {
     if (
       !confirm(
-        "Delete ALL stored snapshots of this project (page archives and screenshots)?"
+        "Delete ALL stored snapshots of this project (stored pages and offline archives)?"
       )
     )
       return;

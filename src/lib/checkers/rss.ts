@@ -130,6 +130,7 @@ export async function checkFeedUrl(
         id,
         title: it.title,
         summary: truncate(summary, 300),
+        fullSummary: summary,
         url: it.link || source.url,
         priority: finalPriority,
         kind: hit ? "keyword" : "feed_entry",
@@ -150,6 +151,42 @@ export async function checkFeedUrl(
       : { last_content_hash: hashText(entries.map((e) => e.guid).join("\n")) }),
     last_error: null,
   });
+
+  // Goal backfill — the feed's own <title> as a plain auto-extraction, or the
+  // AI over a sample of recent entry titles when the feed has no title. Runs
+  // on every successful fetch, so a goal the user cleared is restored on the
+  // next check. Re-read the row: the website "via feed" fast path may have
+  // just filled the goal from the page itself.
+  const freshGoal = (
+    d.prepare("SELECT goal FROM sources WHERE id = ?").get(source.id) as
+      | { goal: string | null }
+      | undefined
+  )?.goal;
+  if (!source.goal && !freshGoal) {
+    let goal = (xml.match(/<title[^>]*>([^<]{15,500})<\/title>/i)?.[1] ?? "").trim();
+    let goalSource: string | null = null;
+    if (!goal) {
+      const sample = entries
+        .slice(0, 8)
+        .map((it) => it.title)
+        .filter(Boolean)
+        .join("\n");
+      if (sample) {
+        const aiGoal = await getAI().extractGoal(sample, [
+          { name: "feed-entries.txt", content: sample },
+        ]);
+        if (aiGoal) {
+          goal = aiGoal;
+          goalSource = "ai";
+        }
+      }
+    }
+    if (goal)
+      touchSource(d, source.id, {
+        goal: truncate(goal, 500),
+        goal_source: goalSource ?? "auto",
+      });
+  }
 
   // Keep the latest feed snapshot for reference (best-effort)
   if (!opts.skipSnapshot && xml.length > 2) {

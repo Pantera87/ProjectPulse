@@ -7,6 +7,7 @@ import {
   touchSource,
 } from "@/lib/models";
 import { getAI } from "@/lib/ai";
+import { ensureCategoryIcon } from "@/lib/category-icons";
 import { requeueProjectSummaries } from "@/lib/project-summary";
 
 export const dynamic = "force-dynamic";
@@ -69,10 +70,9 @@ export async function PATCH(
     patch.summary_size =
       v === null || v === "" ? null : (SUMMARY_SIZES as string[]).includes(String(v)) ? String(v) : (row as { summary_size: string | null }).summary_size;
   }
-  // Manual category/subcategory edits count as user-set (no "guessed" badge).
-  if (patch.category !== undefined || patch.subcategory !== undefined) {
-    patch.category_source = "user";
-  }
+  // Manual edits count as user-set, per field (no "AI" badge on that field).
+  if (patch.category !== undefined) patch.category_source = "user";
+  if (patch.subcategory !== undefined) patch.subcategory_source = "user";
   // Manual goal edits count as user-set (no "AI" badge).
   if (patch.goal !== undefined) {
     patch.goal_source = "user";
@@ -94,6 +94,21 @@ export async function PATCH(
       } ${patch.subcategory ?? (row as { subcategory: string | null }).subcategory ?? ""}`
     );
   }
+  // Category edited by hand → run a FRESH icon check in the background (force:
+  // even a slug that already has a stored AI icon gets re-searched), so Save
+  // stays instant (the glyph appears on the next render once it is stored).
+  {
+    const newCat = typeof patch.category === "string" ? patch.category.trim() : null;
+    const oldCat = String((row as { category: string | null }).category ?? "").trim();
+    if (newCat && newCat.toLowerCase() !== oldCat.toLowerCase()) {
+      const context =
+        [String((row as { name: string | null }).name ?? ""), (row as { goal: string | null }).goal ?? ""]
+          .filter(Boolean)
+          .join(" — ");
+      void ensureCategoryIcon(d, newCat, context || undefined, true).catch(() => {});
+    }
+  }
+
   // Summary length changed → regenerate this source's summary in the background
   // (only when AI is enabled, so a stored summary is never lost).
   if (patch.summary_size !== undefined && getAI().enabled) {

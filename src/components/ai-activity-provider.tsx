@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * Shared AI activity state (client side), polled every 2 s from
@@ -52,6 +53,8 @@ export function useAiBusy(): boolean {
 
 export default function AiActivityProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<AIActivityState>(IDLE);
+  const router = useRouter();
+  const wasBusy = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -74,6 +77,15 @@ export default function AiActivityProvider({ children }: { children: ReactNode }
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+
+  // When AI work finishes, background jobs (category/subcategory cascades,
+  // project summaries, requeues, scheduler checks) may have written fresh
+  // values to the DB after this page rendered — re-run the server
+  // components so the boxes show the new values without a manual refresh.
+  useEffect(() => {
+    if (wasBusy.current && !activity.busy) router.refresh();
+    wasBusy.current = activity.busy;
+  }, [activity.busy, router]);
 
   const value = useMemo(() => ({ activity }), [activity]);
   return <ActivityContext.Provider value={value}>{children}</ActivityContext.Provider>;

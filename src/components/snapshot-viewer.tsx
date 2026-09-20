@@ -23,7 +23,7 @@ export default function SnapshotViewer({
   const d = getDb();
   const snapshots = d
     .prepare(
-      `SELECT id, version, fetched_at, title, screenshot,
+      `SELECT id, version, fetched_at, title,
          LENGTH(COALESCE(html_local, html)) AS size,
          html_local IS NOT NULL AS archived
        FROM snapshots
@@ -34,7 +34,6 @@ export default function SnapshotViewer({
     version: number;
     fetched_at: string;
     title: string | null;
-    screenshot: string | null;
     size: number;
     archived: number;
   }[];
@@ -84,7 +83,7 @@ export default function SnapshotViewer({
       )
     : null;
   // The archived copy is self-contained (assets rewritten to local URLs),
-  // so it renders fully offline; prefer it over the raw/screenshot views.
+  // so it renders fully offline; prefer it over the raw HTML view.
   const archived = row?.archived
     ? readHtml(
         (
@@ -154,34 +153,12 @@ export default function SnapshotViewer({
           </p>
         </div>
       ) : html ? (
-        row?.screenshot ? (
-          <div className="space-y-2">
-            <img
-              src={`/api/sources/${sourceId}/screenshot?version=${version}`}
-              alt={`Snapshot v${version}`}
-              className="w-full rounded-lg border border-white/15 bg-white"
-            />
-            <p className="text-xs text-slate-500">
-              Visual screenshot · captured{" "}
-              {formatDateTime(row.fetched_at)} ·{" "}
-              <a
-                href={`/api/sources/${sourceId}/snapshots?version=${version}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-indigo-300 hover:underline"
-              >
-                open raw HTML
-              </a>
-            </p>
-          </div>
-        ) : (
-          <iframe
-            title="website snapshot"
-            sandbox=""
-            srcDoc={html}
-            className="h-[70vh] w-full rounded-lg border border-white/15 bg-white"
-          />
-        )
+        <iframe
+          title="website snapshot"
+          sandbox=""
+          srcDoc={html}
+          className="h-[70vh] w-full rounded-lg border border-white/15 bg-white"
+        />
       ) : (
         <p className="text-sm text-slate-500">
           No snapshot yet — run “Check now” to capture the first snapshot.

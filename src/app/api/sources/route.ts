@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getDb, type SourceType, type WatchRule } from "@/lib/db";
 import { indexForSearch } from "@/lib/models";
 import { parseGithubRef } from "@/lib/github";
-import { ensureProjectSummaryById } from "@/lib/project-summary";
-import { ensureCategoryById } from "@/lib/category";
+import { enrichSourceInitially } from "@/lib/check";
+import { ensureCategoryIcon } from "@/lib/category-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -71,9 +71,9 @@ export async function POST(req: Request) {
   const subcategory = (body.subcategory ?? "").trim() || null;
   const info = d
     .prepare(
-      `INSERT INTO sources (type, url, name, goal, goal_source, category, subcategory, category_source, notes, watch_enabled,
+      `INSERT INTO sources (type, url, name, goal, goal_source, category, subcategory, category_source, subcategory_source, notes, watch_enabled,
         check_interval_hours, rules_json, state_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)`
     )
     .run(
       type,
@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       category,
       category ? subcategory : null,
       category ? "user" : null,
+      category ? "user" : null,
       (body.notes ?? "").trim() || null,
       body.watch_enabled ?? 1,
       body.check_interval_hours ?? 6,
@@ -92,11 +93,16 @@ export async function POST(req: Request) {
     );
   const id = Number(info.lastInsertRowid);
   indexForSearch(d, "source", id, name ?? url, `${goal ?? ""} ${category ?? ""} ${subcategory ?? ""}`);
-  // AI project summary (background — also auto-downloads the Ollama model
-  // if AI is enabled but the model is not on the machine yet).
-  ensureProjectSummaryById(id);
-  // AI category auto-assignment (background; summary-driven re-classification
-  // with richer context completes later and wins; heuristic covers AI-off).
-  ensureCategoryById(id);
+  // One serialized background pass populates everything (first check →
+  // goal + initial updates → project summary → category/subcategory),
+  // retrying briefly while fields are still missing (e.g. model loading).
+  enrichSourceInitially(id);
+  // Category saved by hand → ask the AI for a glyph in the background
+  // (skipped when the category already has a stored AI icon — a previous
+  // pick is never changed; the glyph appears on the next render once stored).
+  if (category) {
+    const context = [name ?? "", goal ?? ""].filter(Boolean).join(" — ");
+    void ensureCategoryIcon(d, category, context || undefined).catch(() => {});
+  }
   return NextResponse.json({ id }, { status: 201 });
 }

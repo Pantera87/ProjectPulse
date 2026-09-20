@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb, getSetting, setSetting } from "@/lib/db";
+import { getDb, setSetting } from "@/lib/db";
 import { SNAPSHOT_MODES, snapshotMode, type SnapshotMode } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
@@ -11,14 +11,14 @@ export function GET() {
 
 /**
  * POST /api/settings/snapshot-mode { mode }
- * "full" | "html" | "screenshot" — what new snapshots store.
+ * "full" | "html" — what new snapshots store.
  */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { mode?: unknown };
   const mode = body.mode as SnapshotMode;
   if (!SNAPSHOT_MODES.includes(mode)) {
     return NextResponse.json(
-      { error: 'mode must be "full", "html" or "screenshot"' },
+      { error: 'mode must be "full" or "html"' },
       { status: 400 }
     );
   }

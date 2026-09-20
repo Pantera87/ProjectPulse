@@ -25,15 +25,31 @@ import {
   touchSource,
   higherPriority,
 } from "../models";
-import { markdownSectionAnchor, truncate, hashText, parseHtml, normalizeForHash, compressHtml } from "../text";
-import { fetchText } from "../http";
+import { markdownSectionAnchor, truncate, hashText, parseHtml, normalizeForHash, compressHtml, moveReadmeToTop } from "../text";
+import { fetchText, downloadFile } from "../http";
 import { archivePageHtml } from "../archive";
 import { notify } from "../notifiers";
-import { captureScreenshot, downloadFile, fileIsStale } from "../screenshots";
 import type { CheckResult } from "./website";
 
 const pushCap = <T,>(arr: T[], item: T, cap: number): T[] =>
   [...arr, item].slice(-cap);
+
+/**
+ * No-AI fallback for release notes: pull out the salient lines (bullet
+ * lines first, otherwise plain non-empty lines) and join them into a single
+ * readable line — the raw multi-line notes would be a wall of text in a
+ * notification message.
+ */
+function salientNotesLines(notes: string, fallback: string, cap = 4): string {
+  const lines = notes
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const bullets = lines
+    .filter((l) => /^[-*]\s+/.test(l))
+    .map((l) => l.replace(/^[-*]\s+/, ""));
+  return (bullets.length ? bullets : lines).slice(0, cap).join(" · ") || fallback;
+}
 
 export async function checkGithub(
   d: Database.Database,
@@ -53,7 +69,6 @@ export async function checkGithub(
   const firstRun = state.seen_tags === undefined;
   const seenTags: string[] = state.seen_tags ?? [];
   let updatesCreated = 0;
-  let readmeChanged = false;
 
   const emit = (
     priority: "critical" | "high" | "normal",
@@ -61,7 +76,9 @@ export async function checkGithub(
     title: string,
     summary: string | null,
     url: string,
-    payload: unknown
+    payload: unknown,
+    /** Untruncated summary for the webhook (defaults to `summary`). */
+    fullSummary?: string | null
   ) => {
     const id = insertUpdate(d, {
       source_id: source.id,
@@ -84,6 +101,7 @@ export async function checkGithub(
       id,
       title: truncate(title, 300),
       summary: summary ? truncate(summary, 300) : null,
+      fullSummary: fullSummary ?? summary,
       url,
       priority,
       kind,
@@ -167,6 +185,23 @@ export async function checkGithub(
     }
   }
 
+  // Goal backfill (repo description) — fetched up front so it also runs on
+  // the idle path below; a goal the user cleared is restored on the next
+  // check.
+  if (!source.goal) {
+    try {
+      const m = await github.repo(owner, repo);
+      if (m.description)
+        touchSource(d, source.id, {
+          goal: truncate(m.description, 500),
+          goal_source: "auto", // the repo description — not AI-generated
+          name: source.name || m.full_name,
+        });
+    } catch {
+      // best-effort — the full check below retries
+    }
+  }
+
   if (feedUnchanged && !watchReadme && !watchCommits && !watchIssues) {
     // Idle cycle: no new releases and nothing else to watch — milestones
     // (always tracked) are the only API call.
@@ -190,41 +225,33 @@ export async function checkGithub(
   }
 
   try {
-    // --- Repo meta: goal backfill ---
+    // --- Repo meta ---
     const meta = await github.repo(owner, repo);
-    if (!source.goal && meta.description)
-      touchSource(d, source.id, {
-        goal: truncate(meta.description, 500),
-        goal_source: "auto", // the repo description — not AI-generated
-        name: source.name || meta.full_name,
-      });
     if (meta.archived)
       touchSource(d, source.id, {
         name: `${source.name || meta.full_name} [archived]`,
       });
 
     // --- Project logo (repo avatar) ---
-    // (The repo-page screenshot is captured at the end of the check, after
-    // README change detection, so a changed README triggers a fresh capture.)
     const logoRel = `logos/${source.id}.png`;
     if (await downloadFile(meta.owner.avatar_url, logoRel)) {
       touchSource(d, source.id, { logo: logoRel });
     }
 
     // --- Offline snapshot of the repo page (versioned, hash-gated) ---
-    // Best-effort: the repo screenshot above already covers the visual.
+    // The page is stored with the README moved to the top, so the snapshot
+    // viewer starts at the beginning of the README.
     try {
       const pageUrl = `https://github.com/${owner}/${repo}`;
-      const pageHtml = await fetchText(pageUrl, { timeoutMs: 60_000 });
+      const pageHtml = moveReadmeToTop(await fetchText(pageUrl, { timeoutMs: 60_000 }));
       const pageHash = hashText(normalizeForHash(parseHtml(pageHtml).text));
       const mode = snapshotMode(d);
       // Also re-store when no snapshot row is left (e.g. the user deleted
       // them all), even if the page hash is unchanged.
       if (
-        mode !== "screenshot" &&
-        (state.page_hash === undefined ||
-          state.page_hash !== pageHash ||
-          maxSnapshotVersion(d, source.id) === 0)
+        state.page_hash === undefined ||
+        state.page_hash !== pageHash ||
+        maxSnapshotVersion(d, source.id) === 0
       ) {
         const version = maxSnapshotVersion(d, source.id) + 1;
         let htmlLocal: string | null = null;
@@ -301,17 +328,21 @@ export async function checkGithub(
           priority = "high";
         // Optional AI summary + importance classification of the release
         // notes (skipped when a semantic rule match already summarized it).
+        // Without AI, the raw multi-line notes are reduced to their salient
+        // lines so the update stays a readable message, not a wall of text.
+        const rawNotes = [r.name ?? "", r.body ?? ""].filter(Boolean).join("\n");
         let releaseSummary: string | null =
           hit?.semantic && hit.semanticSummary
             ? hit.semanticSummary
-            : r.body ?? r.name ?? null;
+            : rawNotes
+              ? salientNotesLines(rawNotes, r.tag_name ?? "")
+              : null;
         let releaseSummarySource: string | null =
           hit?.semantic && hit.semanticSummary ? "ai" : null;
         if (!hit?.semantic) {
-          const notes = [r.name ?? "", r.body ?? ""].filter(Boolean).join("\n");
-          if (notes) {
+          if (rawNotes) {
             const aiRes = await getAI().summarizeUpdate(
-              notes,
+              rawNotes,
               `${owner}/${repo} release ${r.tag_name}`
             );
             if (aiRes) {
@@ -414,7 +445,6 @@ export async function checkGithub(
           if (state.readme_hash === undefined) {
             state.readme_hash = h; // baseline — no update
           } else if (h !== state.readme_hash) {
-            readmeChanged = true; // refresh the repo-page screenshot too
             const prevText = state.readme_text ?? "";
             const patch = createPatch(
               "README.md",
@@ -581,16 +611,6 @@ export async function checkGithub(
           state.readme_matched[key] = hit !== null;
         else state.readme_matched = { [key]: hit !== null };
       }
-    }
-
-    // --- Visual screenshot of the repo page (README framed at the top) ---
-    // Captured when the file is missing or older than 30 days (backfill —
-    // e.g. after a manual delete) or when the README changed this check.
-    const shotRel = `screenshots/github-${source.id}.png`;
-    if (fileIsStale(shotRel, 30) || readmeChanged) {
-      await captureScreenshot(`https://github.com/${owner}/${repo}`, shotRel, {
-        github: true,
-      });
     }
 
     touchSource(d, source.id, {

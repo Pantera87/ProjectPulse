@@ -13,7 +13,6 @@ import {
 import { findRuleHitSmart } from "../rules";
 import { getAI } from "../ai";
 import { fetchText } from "../http";
-import { captureScreenshot } from "../screenshots";
 import { archivePageHtml } from "../archive";
 import {
   insertUpdate,
@@ -57,6 +56,31 @@ export async function checkWebsite(
   }
 
   const page = parseHtml(html);
+  // Goal backfill — runs on EVERY successful fetch (including the
+  // unchanged-page and feed fast paths below), so a goal the user cleared is
+  // restored on the next check. (Category/subcategory backfill happens in
+  // check.ts after the check — missing levels only, never overwritten.)
+  if (!source.goal) {
+    let goal = extractGoalFromPage(page);
+    let goalSource: string | null = null;
+    if (!page.metaDescription) {
+      const ai = getAI();
+      // Full page text as a RAG document where supported (short in-prompt
+      // anchor otherwise).
+      const aiGoal = await ai.extractGoal(page.text, [
+        { name: "page.txt", content: page.text },
+      ]);
+      if (aiGoal) {
+        goal = aiGoal;
+        goalSource = "ai";
+      }
+    }
+    touchSource(d, source.id, {
+      goal: truncate(goal, 500),
+      // Non-AI goals (meta description etc.) are plain auto-extraction.
+      goal_source: goal ? goalSource ?? "auto" : null,
+    });
+  }
   const normalized = normalizeForHash(page.text);
   const newHash = hashText(normalized);
   const firstCheck = !source.last_content_hash;
@@ -105,23 +129,6 @@ export async function checkWebsite(
   }
 
   if (!firstCheck && !rebaseline && newHash === source.last_content_hash) {
-    // Backfill a visual screenshot for the latest snapshot if missing
-    // (e.g. first check after upgrading to the screenshot feature).
-    const last = d
-      .prepare(
-        `SELECT version, screenshot FROM snapshots WHERE source_id = ? ORDER BY version DESC LIMIT 1`
-      )
-      .get(source.id) as { version: number; screenshot: string | null } | undefined;
-    if (last && !last.screenshot) {
-      const rel = `screenshots/${source.id}-v${last.version}.png`;
-      if (await captureScreenshot(source.url, rel)) {
-        d.prepare(`UPDATE snapshots SET screenshot = ? WHERE source_id = ? AND version = ?`).run(
-          rel,
-          source.id,
-          last.version
-        );
-      }
-    }
     touchSource(d, source.id, {
       last_checked_at: new Date().toISOString(),
       state_json: JSON.stringify(state),
@@ -137,7 +144,7 @@ export async function checkWebsite(
     )
     .get(source.id) as { html: unknown } | undefined;
 
-  // Store new snapshot version (storage mode: full / html / screenshot)
+  // Store new snapshot version (storage mode: full / html)
   const version = maxSnapshotVersion(d, source.id) + 1;
   const mode = snapshotMode(d);
   let htmlLocal: string | null = null;
@@ -156,22 +163,12 @@ export async function checkWebsite(
     source.id,
     version,
     new Date().toISOString(),
-    mode === "screenshot" ? null : compressHtml(html),
+    compressHtml(html),
     newHash,
     page.title || null,
     htmlLocal ? compressHtml(htmlLocal) : null
   );
   pruneSnapshots(d, source.id);
-
-  // Visual screenshot of the rendered page for this snapshot version (best-effort)
-  const shotRel = `screenshots/${source.id}-v${version}.png`;
-  if (await captureScreenshot(source.url, shotRel)) {
-    d.prepare(`UPDATE snapshots SET screenshot = ? WHERE source_id = ? AND version = ?`).run(
-      shotRel,
-      source.id,
-      version
-    );
-  }
 
   let updatesCreated = 0;
 
@@ -268,36 +265,13 @@ export async function checkWebsite(
     void notify({
       id,
       title: String(u?.title ?? ""),
-      summary: String(u?.summary ?? null),
+      summary: u?.summary ? String(u.summary) : null,
+      fullSummary: u?.summary ? String(u.summary) : null,
       url: source.url,
       priority,
       kind: hit ? "keyword" : "content_change",
       sourceName: name,
       sourceUrl: source.url,
-    });
-  }
-
-  // Goal backfill on first check. (Category/subcategory backfill happens in
-  // check.ts after the check — missing levels only, never overwritten.)
-  if (!source.goal) {
-    let goal = extractGoalFromPage(page);
-    let goalSource: string | null = null;
-    const ai = getAI();
-    if (!page.metaDescription) {
-      // Full page text as a RAG document where supported (short in-prompt
-      // anchor otherwise).
-      const aiGoal = await ai.extractGoal(page.text, [
-        { name: "page.txt", content: page.text },
-      ]);
-      if (aiGoal) {
-        goal = aiGoal;
-        goalSource = "ai";
-      }
-    }
-    touchSource(d, source.id, {
-      goal: truncate(goal, 500),
-      // Non-AI goals (meta description etc.) are plain auto-extraction.
-      goal_source: goal ? goalSource ?? "auto" : null,
     });
   }
 

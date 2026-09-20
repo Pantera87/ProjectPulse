@@ -27,7 +27,13 @@ export type ChannelType = "webhook" | "ntfy" | "telegram" | "email";
 export interface UpdateEvent {
   id: number;
   title: string;
+  /** Short summary (≤ 300 chars) used by ntfy / telegram / email. */
   summary: string | null;
+  /**
+   * Untruncated summary of the major changes, used by the webhook whose
+   * payload is a short phone-style message. Falls back to `summary`.
+   */
+  fullSummary?: string | null;
   url: string | null;
   priority: Priority;
   kind: UpdateKind;
@@ -170,13 +176,17 @@ export async function sendChannel(ch: NotifyChannel, ev: UpdateEvent): Promise<v
   switch (ch.type) {
     case "webhook": {
       if (!ch.url) throw new Error("webhook channel has no URL");
+      // Minimal phone-style payload: just the title, the link, and the
+      // (untruncated) plain-prose summary of the major changes.
       await fetch(ch.url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          ...ev,
           app: "projectpulse",
           sent_at: new Date().toISOString(),
+          title: ev.title,
+          url: ev.url,
+          summary: ev.fullSummary ?? ev.summary,
         }),
         signal: AbortSignal.timeout(10_000),
       });

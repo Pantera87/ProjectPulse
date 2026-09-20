@@ -52,22 +52,6 @@ export async function summarizeProjectForSource(
   return stored;
 }
 
-/** Fire-and-forget entry point (used when a project is added). */
-export function ensureProjectSummaryById(id: number): void {
-  void (async () => {
-    try {
-      const d = getDb();
-      const row = d
-        .prepare("SELECT * FROM sources WHERE id = ?")
-        .get(id) as SourceRow | undefined;
-      if (!row) return;
-      await summarizeProjectForSource(d, row);
-    } catch {
-      // best-effort — the next scheduled check retries
-    }
-  })();
-}
-
 /**
  * Clear the stored summaries of the given sources (of ALL sources when
  * omitted) and regenerate them in the background at the currently configured

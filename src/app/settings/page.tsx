@@ -2,11 +2,9 @@ import { getDb } from "@/lib/db";
 import { aiState, readAIConfig } from "@/lib/ai";
 import { CATALOG, hardwareHint } from "@/lib/ollama";
 import { readChannels, recentLog } from "@/lib/notifiers";
-import { screenshotTheme } from "@/lib/screenshots";
 import RestoreForm from "@/components/restore-form";
 import AISettings from "@/components/ai-settings";
 import NotifySettings from "@/components/notify-settings";
-import ScreenshotSettings from "@/components/screenshot-settings";
 import SnapshotSettings from "@/components/snapshot-settings";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +36,6 @@ export default async function SettingsPage() {
           updates — stored in the <code>DATA_DIR</code> volume (SQLite).
         </p>
         <RestoreForm />
-      </section>
-
-      <section className="glass space-y-2 p-4">
-        <h2 className="font-semibold">Screenshots</h2>
-        <ScreenshotSettings initialTheme={screenshotTheme()} />
       </section>
 
       <section className="glass space-y-3 p-4">

@@ -5,6 +5,7 @@ import { checkGithub } from "./checkers/github";
 import { checkRss } from "./checkers/rss";
 import { getDb } from "./db";
 import type { CheckResult } from "./checkers/website";
+import { getAI } from "./ai";
 import { summarizeProjectForSource } from "./project-summary";
 import { categoryMirrorsName, ensureCategoryForSource } from "./category";
 
@@ -77,6 +78,40 @@ export async function checkSourceById(id: number): Promise<CheckResult> {
   if (!row)
     return { ok: false, changed: false, updatesCreated: 0, error: "Source not found" };
   return checkSource(d, row);
+}
+
+/**
+ * Populate ALL of a freshly added source's fields in ONE serialized pass —
+ * never category-now and subcategory-later across separate jobs: a full
+ * check (fetches the initial updates and the goal) → project summary
+ * backfill → category/subcategory backfill, all awaited in order inside
+ * checkSource. Right after adding, the first attempt can still come up
+ * empty (the AI model may be loading/downloading, or the fetch hit a
+ * transient error), so while fields are missing, retry twice more
+ * (~30 s apart).
+ */
+export function enrichSourceInitially(id: number): void {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  void (async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await checkSourceById(id);
+      } catch {
+        // best-effort — the next attempt (or the scheduler) retries
+      }
+      const row = getDb()
+        .prepare("SELECT * FROM sources WHERE id = ?")
+        .get(id) as SourceRow | undefined;
+      if (!row) return;
+      const complete =
+        !!row.goal &&
+        !!row.category &&
+        !!row.subcategory &&
+        !!row.project_summary;
+      if (complete || attempt === 2 || !getAI().enabled) return;
+      await sleep(30_000);
+    }
+  })();
 }
 
 export function isMuted(s: SourceRow): boolean {

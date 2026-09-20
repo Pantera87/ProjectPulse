@@ -6,7 +6,8 @@
     "dev": "next dev -p 4701",
     "build": "next build",
     "start": "next start -p 4701",
-    "lint": "eslint"
+    "lint": "eslint",
+    "icons:fetch": "node scripts/fetch-glyphs.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -15,7 +16,6 @@
     "diff": "^9.0.0",
     "next": "16.3.5",
     "nodemailer": "^10.0.10",
-    "puppeteer": "^25.11.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "rss-parser": "^3.13.0"
@@ -30,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "puppeteer-core": "^25.11.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

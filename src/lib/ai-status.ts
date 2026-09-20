@@ -45,11 +45,17 @@ export interface AiStatusDisplay {
 }
 
 /** 3+ failed AI calls within the last hour → the engine is broken even if
- *  the endpoint itself still answers (e.g. model OOM, bad model files). */
+ *  the endpoint itself still answers (e.g. model OOM, bad model files).
+ *  A SUCCESS recorded after the last failure means the engine recovered,
+ *  so the badge returns to green as soon as calls succeed again (the
+ *  failures only age out of the count after an hour). */
 function healthBroken(
   h: AiStatus["health"]
 ): h is NonNullable<AiStatus["health"]> {
-  return !!h && h.failures >= 3;
+  if (!h || h.failures < 3) return false;
+  // Both are ISO strings — lexicographic compare is chronological.
+  if (h.lastSuccessAt && h.lastErrorAt && h.lastSuccessAt > h.lastErrorAt) return false;
+  return true;
 }
 
 function healthTitle(h: NonNullable<AiStatus["health"]>): string {

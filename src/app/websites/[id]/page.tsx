@@ -4,6 +4,7 @@ import { getDb, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
 import { isMuted } from "@/lib/check";
 import SourceActions from "@/components/source-actions";
+import FloatingCheckButton from "@/components/floating-check-button";
 import AiBadge from "@/components/ai-badge";
 import EditMeta from "@/components/edit-meta";
 import RuleEditor from "@/components/rule-editor";
@@ -48,9 +49,10 @@ export default async function WebsiteDetailPage({
           </p>
         )}
         {source.project_summary && (
-          <div className="mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+          <div className="relative mt-2 max-w-2xl rounded-lg border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-sm text-slate-300">
+            <AiBadge corner title="Summary written by AI" />
             <span className="mr-2 inline-flex items-center gap-1.5 font-semibold text-violet-300">
-              <AiBadge title="Summary written by AI" /> summary
+              summary
             </span>
             <SummaryText text={source.project_summary} />
           </div>
@@ -68,6 +70,8 @@ export default async function WebsiteDetailPage({
         lastError={source.last_error}
       />
 
+      <FloatingCheckButton id={source.id} />
+
       <SnapshotViewer sourceId={source.id} baseHref={`/websites/${id}`} v={v} diff={diff} />
 
       <section className="glass space-y-3 p-4">
@@ -79,7 +83,9 @@ export default async function WebsiteDetailPage({
             goal: source.goal,
             goal_source: source.goal_source,
             category: source.category,
+            category_source: source.category_source,
             subcategory: source.subcategory,
+            subcategory_source: source.subcategory_source,
             notes: source.notes,
           }}
         />

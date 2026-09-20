@@ -80,6 +80,34 @@ export function parseHtml(html: string): ParsedPage {
 }
 
 /**
+ * Reorder a GitHub repository page so the README block appears at the very
+ * top of the page: stored snapshots then render starting at the beginning of
+ * the README (the rest of the page — file list, about, … — follows below).
+ * Handles both GitHub layouts: the `#readme` wrapper div and the bare
+ * `<article class="markdown-body">` (current logged-out view, which has no
+ * #readme element). The block is wrapped in `container-xl` so GitHub's CSS
+ * keeps constraining its width. No-op when the page has no README block
+ * (repo without README) or on any parse error.
+ */
+export function moveReadmeToTop(html: string): string {
+  try {
+    const $ = cheerio.load(html);
+    const body = $("body");
+    if (!body.length) return html;
+    const readme = $("#readme").first();
+    const block = readme.length ? readme : $("article.markdown-body").first();
+    if (!block.length) return html;
+    // Insert an empty wrapper at the top of <body>, then move the README
+    // block (whole element, keeping its own classes) into it.
+    body.prepend('<div class="container-xl"></div>');
+    $("body > .container-xl").first().append(block);
+    return $.html();
+  } catch {
+    return html;
+  }
+}
+
+/**
  * Normalize text for change detection: collapse whitespace, drop lines that
  * are obviously volatile (dates, times, random tokens) so cosmetic updates
  * do not trigger false positives.

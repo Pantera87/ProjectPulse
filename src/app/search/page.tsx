@@ -60,7 +60,16 @@ export default async function SearchPage({
                   </Link>
                   <span className="badge">{s.type}</span>
                   {s.category && (
-                    <span className="badge">
+                    <span
+                      className="badge"
+                      title={
+                        s.category_source === "heuristic"
+                          ? "Category guessed from keywords — not very accurate"
+                          : s.category_source === "ai"
+                            ? "Category assigned by AI"
+                            : undefined
+                      }
+                    >
                       {s.category_source === "ai" && (
                         <span className="mr-1">
                           <AiBadge title="Category assigned by AI" />
@@ -95,7 +104,10 @@ export default async function SearchPage({
         ) : (
           <ul className="space-y-2">
             {updates.map((u) => (
-              <li key={u.id} className="glass px-3 py-2">
+              <li key={u.id} className="glass relative px-3 py-2">
+                {aiUpdate(u.payload_json) && (
+                  <AiBadge corner title="Matched and/or summarized by AI" />
+                )}
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Link
                     href={`/updates/${u.id}`}
@@ -105,7 +117,6 @@ export default async function SearchPage({
                     {u.title}
                   </Link>
                   <span className="badge">{u.kind}</span>
-                  {aiUpdate(u.payload_json) && <AiBadge title="Matched and/or summarized by AI" />}
                   <span className={`badge border ${PRIORITY_BADGE[u.priority] ?? PRIORITY_BADGE.normal}`}>
                     {u.priority}
                   </span>

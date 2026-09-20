@@ -67,7 +67,6 @@ export async function GET(
     .prepare(
       `SELECT id, version, fetched_at, title,
          LENGTH(COALESCE(html_local, html)) AS size,
-         screenshot,
          html_local IS NOT NULL AS archived
        FROM snapshots
        WHERE source_id = ? ORDER BY version DESC`
@@ -76,7 +75,7 @@ export async function GET(
   return NextResponse.json({ snapshots: rows });
 }
 
-/** Delete every snapshot of this source (rows + archives + screenshots). */
+/** Delete every snapshot of this source (rows + archived assets). */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
