@@ -19,7 +19,7 @@ services:
       # WEBHOOK_URL: "http://host/hook"     # forwards each new update as JSON
       # AI_ENABLED: "false"                # set "false" to force heuristics (hard kill-switch)
       OLLAMA_URL: "http://ollama:11434"    # bundled ollama service (below) — the default; change to point elsewhere
-      # OLLAMA_MODEL: "qwen2.5:7b"         # model pulled by the ollama-init service
+      # OLLAMA_MODEL: "qwen3.5:4b"         # model pulled by the ollama-init service
       # OLLAMA_KEEP_ALIVE: "5"             # auto-unload the model N minutes after use ("never" = keep loaded)
       # OPENAI_URL: "https://api.openai.com/v1"   # any OpenAI-compatible endpoint
       # OPENAI_API_KEY: "sk-..."
@@ -77,7 +77,7 @@ services:
   ollama-init:
     image: ollama/ollama:latest
     entrypoint: ["ollama"]
-    command: ["pull", "qwen2.5:7b"]
+    command: ["pull", "qwen3.5:4b"]
     environment:
       - OLLAMA_HOST=http://ollama:11434
     volumes:

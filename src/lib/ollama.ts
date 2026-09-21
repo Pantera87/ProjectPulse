@@ -107,7 +107,7 @@ export async function ollamaSnapshot(url: string): Promise<OllamaSnapshot> {
 
 /**
  * Normalize an Ollama model name for comparison: trim, lowercase, drop a
- * trailing ":latest" — so "qwen2.5", "qwen2.5:latest" and "Qwen2.5:Latest"
+ * trailing ":latest" — so "qwen3.5", "qwen3.5:latest" and "Qwen3.5:Latest"
  * all refer to the same model.
  */
 export function normalizeOllamaModel(name: string): string {
@@ -282,25 +282,25 @@ export interface CatalogModel {
   q4GB: number;
   ctx: string;
   blurb: string;
-  /** accuracy tier — the settings model list is grouped by this (high on top) */
-  accuracy: "high" | "mid" | "low";
+  /** accuracy tier — the settings model list is grouped by this (power on top) */
+  accuracy: "power" | "high" | "mid" | "low";
 }
 
 /** The model used everywhere (defaults, pre-pull, UI hints) unless the user
  *  chose another one in Settings. Plain tags are Ollama's standard Q4_K_M
- *  builds — e.g. qwen2.5:7b already IS the Q4_K_M quantization. */
-export const DEFAULT_OLLAMA_MODEL = "qwen2.5:7b";
+ *  builds — e.g. qwen3.5:4b already IS the Q4_K_M quantization. */
+export const DEFAULT_OLLAMA_MODEL = "qwen3.5:4b";
 
 export const CATALOG: CatalogModel[] = [
-  { name: "qwen2.5:1.5b", family: "Qwen 2.5", params: "1.5B", q4GB: 1.0, ctx: "32k", accuracy: "low", blurb: "Basic accuracy; fast on almost any hardware, excellent for quick short-text summarization." },
   { name: "llama3.2:1b", family: "Llama 3.2", params: "1B", q4GB: 0.8, ctx: "128k", accuracy: "low", blurb: "Basic accuracy; lightest general-purpose model, very long context." },
-  { name: "gemma2:2b", family: "Gemma 2", params: "2B", q4GB: 1.6, ctx: "8k", accuracy: "low", blurb: "Basic accuracy; small and multilingual; fine for summaries, short context." },
-  { name: "qwen2.5:3b", family: "Qwen 2.5", params: "3B", q4GB: 2.0, ctx: "32k", accuracy: "mid", blurb: "Moderately accurate; noticeably better quality at low cost." },
-  { name: "llama3.2:3b", family: "Llama 3.2", params: "3B", q4GB: 2.0, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; solid mid-size model with a very long context window." },
-  { name: "phi-4-mini", family: "Phi-4-mini", params: "3.8B", q4GB: 2.5, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; punches above its weight on reasoning and summarization." },
-  { name: "qwen2.5:7b", family: "Qwen 2.5", params: "7B", q4GB: 4.7, ctx: "32k", accuracy: "high", blurb: "Default. Very accurate — best local quality for most use; needs ~6 GB free RAM." },
+  { name: "qwen3.5:0.8b", family: "Qwen 3.5", params: "0.8B", q4GB: 1.0, ctx: "256k", accuracy: "low", blurb: "Basic accuracy; fast on almost any hardware, excellent for quick short-text summarization." },
+  { name: "qwen3.5:2b", family: "Qwen 3.5", params: "2B", q4GB: 2.7, ctx: "256k", accuracy: "low", blurb: "Basic accuracy; small and fast, with a very long context window." },
+  { name: "phi4-mini", family: "Phi-4-mini", params: "3.8B", q4GB: 2.5, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; punches above its weight on reasoning and summarization." },
+  { name: "qwen3.5:4b", family: "Qwen 3.5", params: "4B", q4GB: 3.4, ctx: "256k", accuracy: "mid", blurb: "Default. Best quality-to-size balance for CPU — a thinking model with a very long context window." },
   { name: "llama3.1:8b", family: "Llama 3.1", params: "8B", q4GB: 4.9, ctx: "128k", accuracy: "high", blurb: "Very accurate; strong all-rounder with a long context window." },
-  { name: "gemma2:9b", family: "Gemma 2", params: "9B", q4GB: 5.4, ctx: "8k", accuracy: "high", blurb: "Very accurate; highest quality here, but short context and the heaviest download." },
+  { name: "qwen3.5:9b", family: "Qwen 3.5", params: "9B", q4GB: 6.6, ctx: "256k", accuracy: "high", blurb: "Very accurate; high-quality thinking model with a very long context window." },
+  { name: "gemma4:12b", family: "Gemma 4", params: "12B", q4GB: 7.6, ctx: "256k", accuracy: "high", blurb: "Very accurate; strong multilingual model with a long context window." },
+  { name: "gemma4:26b", family: "Gemma 4", params: "26B", q4GB: 19, ctx: "256k", accuracy: "power", blurb: "Power. MoE with ~3.8B active parameters — top quality here, but needs ~20 GB free RAM." },
 ];
 
 /** Total system RAM in GB. */

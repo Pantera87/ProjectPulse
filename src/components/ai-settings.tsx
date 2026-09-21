@@ -24,7 +24,7 @@ export interface CatalogRow {
   q4GB: number;
   ctx: string;
   blurb: string;
-  accuracy: "high" | "mid" | "low";
+  accuracy: "power" | "high" | "mid" | "low";
   hint: { label: string; tone: "good" | "ok" | "bad" };
 }
 
@@ -42,7 +42,8 @@ const TONE: Record<string, string> = {
 };
 
 /** Model list sections — highest accuracy on top. */
-const ACCURACY_GROUPS: { key: "high" | "mid" | "low"; label: string }[] = [
+const ACCURACY_GROUPS: { key: "power" | "high" | "mid" | "low"; label: string }[] = [
+  { key: "power", label: "Power (high RAM)" },
   { key: "high", label: "High accuracy" },
   { key: "mid", label: "Mid accuracy" },
   { key: "low", label: "Low accuracy" },
@@ -226,7 +227,7 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
     const ok = window.confirm(
       `Delete ALL ${names.length} installed Ollama model(s) and reset AI?\n\n${names.join(
         "\n"
-      )}\n\nThis frees the disk space and the model selection goes back to the default (qwen2.5:7b), which is downloaded automatically on the next AI use.`
+      )}\n\nThis frees the disk space and the model selection goes back to the default (qwen3.5:4b), which is downloaded automatically on the next AI use.`
     );
     if (!ok) return;
     setMsg(null);
@@ -242,15 +243,15 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
       }
     }
     // Start AI over: model selection back to the default (Ollama provider only).
-    if (form.provider === "ollama" && form.model !== "qwen2.5:7b") {
-      const next = { ...form, model: "qwen2.5:7b" };
+    if (form.provider === "ollama" && form.model !== "qwen3.5:4b") {
+      const next = { ...form, model: "qwen3.5:4b" };
       setForm(next);
       await post("/api/ai", next);
     }
     setMsg(
       failed.length
         ? `Deleted ${names.length - failed.length} of ${names.length} model(s). Failed: ${failed.join("; ")}`
-        : `All models deleted and AI reset — the default model (qwen2.5:7b) downloads automatically on the next AI use.`
+        : `All models deleted and AI reset — the default model (qwen3.5:4b) downloads automatically on the next AI use.`
     );
     refresh();
     setDeleting(null);
@@ -327,7 +328,7 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
           field(
             "Model",
             "model",
-            form.provider === "ollama" ? "qwen2.5:7b" : "gpt-4o-mini / claude-haiku-4-5",
+            form.provider === "ollama" ? "qwen3.5:4b" : "gpt-4o-mini / claude-haiku-4-5",
           )}
         {form.provider === "ollama" && (
           <div className="space-y-1.5">
@@ -395,7 +396,7 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
                 onClick={deleteAllAndReset}
                 disabled={deleting !== null}
                 className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-[11px] text-rose-300 transition hover:bg-rose-400/20 disabled:opacity-50"
-                title="Delete every installed Ollama model and reset the model selection to the default (qwen2.5:7b)"
+                title="Delete every installed Ollama model and reset the model selection to the default (qwen3.5:4b)"
               >
                 {deleting === "all"
                   ? "Deleting all…"

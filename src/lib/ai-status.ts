@@ -93,7 +93,7 @@ export function deriveAiStatus(s: AiStatus | null): AiStatusDisplay {
   // Enabled
   if (s.provider === "ollama") {
     const o = s.ollama;
-    const model = s.model ?? "qwen2.5:7b";
+    const model = s.model ?? "qwen3.5:4b";
     const pull = o?.pulls?.[model];
     if (pull && pull.status === "downloading")
       return {

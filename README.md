@@ -203,7 +203,7 @@ docker compose up -d --build
 AI runs out of the box on the bundled **Ollama** container: the compose file
 sets `OLLAMA_URL=http://ollama:11434` (the service name on the Docker network
 — no IP to look up), and `ollama-init` pre-downloads the default model
-(`qwen2.5:7b`, override with `OLLAMA_MODEL`) once the server is up.
+(`qwen3.5:4b`, override with `OLLAMA_MODEL`) once the server is up.
 Downloaded models persist in the `ollama_data` named volume. To use a remote
 provider instead, remove the two `ollama*` services from the compose file and
 pick the provider in Settings. If your Ollama server lives elsewhere (e.g. on
@@ -285,17 +285,18 @@ Configurable in Settings → AI, or via env as defaults:
 
 | Provider | What it needs | Notes |
 |---|---|---|
-| **Ollama** (default) | bundled `ollama` service in `docker-compose.yml` — `OLLAMA_URL` is set to `http://ollama:11434` by default (auto-detected in Settings if Ollama lives elsewhere) | Local models (`qwen2.5:7b` default — very accurate; smaller models in the Settings catalog are moderately accurate or basic; override with `OLLAMA_MODEL`, pre-pulled on container startup by `ollama-init`). Models load on first use. |
+| **Ollama** (default) | bundled `ollama` service in `docker-compose.yml` — `OLLAMA_URL` is set to `http://ollama:11434` by default (auto-detected in Settings if Ollama lives elsewhere) | Local models (`qwen3.5:4b` default — the best quality-to-size balance for CPU; the Settings catalog has smaller (basic) models, larger (very accurate) ones and a power option; override with `OLLAMA_MODEL`, pre-pulled on container startup by `ollama-init`). Models load on first use. |
 | **OpenAI-compatible** | base URL (+ key for hosted APIs) | OpenAI, LM Studio, vLLM, Ollama's `/v1`, any gateway. |
 | **Anthropic** | API key | Claude via the Messages API. |
 | **MCP** | MCP server URL (Streamable HTTP) | Run the AI on another machine (e.g. a desktop with a GPU) and point ProjectPulse at an MCP server there; tool + argument are auto-detected (or set explicitly). |
 
 ### Model manager (Ollama)
 
-Settings → AI lists a curated catalog of small models (the standard Q4_K_M
-builds) with their size, context, an accuracy hint (*very accurate* 7B+ /
-*moderately accurate* 3B / *basic* ≤ 2B) and a hardware-fit hint for *this*
-server (based on system RAM — Node cannot read VRAM).
+Settings → AI lists a curated catalog of models (the standard Q4_K_M
+builds) with their size, context, an accuracy hint (*power* MoE for
+RAM-rich servers / *very accurate* 8B+ / *moderately accurate* 3–4B /
+*basic* ≤ 2B) and a hardware-fit hint for *this* server (based on system
+RAM — Node cannot read VRAM).
 
 - Status per model: *installed / loaded / downloading %*
 - One-click **Download** and **Delete** per model

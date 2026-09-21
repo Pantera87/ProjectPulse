@@ -2,7 +2,7 @@
  * AI provider seam.
  *
  * Providers (selected in Settings or via env):
- *   - Ollama: local models (qwen2.5:7b default); the model is loaded
+ *   - Ollama: local models (qwen3.5:4b default); the model is loaded
  *     on first use and auto-downloaded when AI is requested without it.
  *   - OpenAI-compatible: any /v1/chat/completions endpoint (OpenAI, LM
  *     Studio, vLLM, Ollama's /v1, gateways…).
@@ -584,7 +584,7 @@ async function ollamaModelState(
   if (hit && Date.now() - hit.at < PRESENCE_TTL) return hit.state;
   const installed = await ollamaInstalled(url);
   if (installed === null) return "unknown"; // server unreachable — fail softly
-  // Normalized compare: "qwen2.5", "qwen2.5:latest" and "Qwen2.5" all match
+  // Normalized compare: "qwen3.5", "qwen3.5:latest" and "Qwen3.5" all match
   // the same install (exact-string compare broke on missing ":tag").
   const want = normalizeOllamaModel(model);
   const state =
@@ -1410,7 +1410,7 @@ export async function aiState(): Promise<AIState> {
     const { getPullJobs, normalizeOllamaModel } = await import("./ollama");
     const snap = await cachedOllamaSnapshot(cfg.ollamaUrl);
     const model = cfg.model || DEFAULT_OLLAMA_MODEL;
-    // Normalized compare: "qwen2.5", "qwen2.5:latest" and "Qwen2.5" all
+    // Normalized compare: "qwen3.5", "qwen3.5:latest" and "Qwen3.5" all
     // match the same install (exact-string compare broke on the missing tag).
     const modelKey = normalizeOllamaModel(model);
     state.ollama = {
