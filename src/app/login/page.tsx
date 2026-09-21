@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Image from "next/image";
 
 function LoginInner() {
   const [password, setPassword] = useState("");
@@ -34,10 +35,12 @@ function LoginInner() {
         className="glass w-full max-w-sm space-y-4 p-6"
       >
         <div className="mx-auto mb-3 flex w-44 flex-col items-center">
-          <img
+          <Image
             src="/logo.png"
             alt=""
             aria-hidden="true"
+            width={48}
+            height={48}
             className="h-12 w-12"
           />
           <h1 className="grad-text -mt-1.5 text-center text-lg font-semibold leading-none">

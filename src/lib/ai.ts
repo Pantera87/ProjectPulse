@@ -21,9 +21,11 @@ import {
   defaultOllamaUrl,
   getPullJobs,
   ollamaInstalled,
+  ollamaSnapshot,
   ollamaVersion,
   startPull,
   normalizeOllamaModel,
+  type OllamaSnapshot,
   type PullJob,
 } from "./ollama";
 import { aiActivity, recordAIResult, trackAIWork } from "./ai-activity";
@@ -1365,6 +1367,25 @@ async function probeOllamaModel(cfg: AIConfig): Promise<boolean | null> {
   return ok;
 }
 
+/**
+ * Ollama status snapshot cache (60 s per URL). The navbar badge and settings
+ * page poll /api/ai every few seconds, and each fresh snapshot costs three
+ * HTTP calls to Ollama (/api/tags, /api/ps, /api/version) — on an always-on
+ * machine that keeps the server busy for no visible reason. Model download
+ * progress is unaffected: `pulls` comes from the live in-memory job registry,
+ * not the snapshot.
+ */
+const SNAP_TTL_MS = 60_000;
+let snapCache: { url: string; at: number; snap: OllamaSnapshot } | null = null;
+
+async function cachedOllamaSnapshot(url: string): Promise<OllamaSnapshot> {
+  if (snapCache && snapCache.url === url && Date.now() - snapCache.at < SNAP_TTL_MS)
+    return snapCache.snap;
+  const snap = await ollamaSnapshot(url);
+  snapCache = { url, at: Date.now(), snap };
+  return snap;
+}
+
 /** Full AI state for the UI (navbar badge + settings page). */
 export async function aiState(): Promise<AIState> {
   const cfg = readAIConfig();
@@ -1386,8 +1407,8 @@ export async function aiState(): Promise<AIState> {
     state.reachable = await checkRemoteReachable(cfg);
   }
   if (cfg.provider === "ollama" && cfg.ollamaUrl) {
-    const { ollamaSnapshot, getPullJobs, normalizeOllamaModel } = await import("./ollama");
-    const snap = await ollamaSnapshot(cfg.ollamaUrl);
+    const { getPullJobs, normalizeOllamaModel } = await import("./ollama");
+    const snap = await cachedOllamaSnapshot(cfg.ollamaUrl);
     const model = cfg.model || DEFAULT_OLLAMA_MODEL;
     // Normalized compare: "qwen2.5", "qwen2.5:latest" and "Qwen2.5" all
     // match the same install (exact-string compare broke on the missing tag).

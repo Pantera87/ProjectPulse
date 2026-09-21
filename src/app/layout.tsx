@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import Image from "next/image";
 import "./globals.css";
 import { ensureStartup } from "@/lib/startup";
 import { getDb } from "@/lib/db";
@@ -51,10 +52,12 @@ function Nav() {
           className="mr-4 flex items-center gap-1.5"
           aria-label="ProjectPulse home"
         >
-          <img
+          <Image
             src="/logo.png"
             alt=""
             aria-hidden="true"
+            width={32}
+            height={32}
             className="h-8 w-8 shrink-0"
           />
           <span className="grad-text text-lg font-semibold leading-none">
@@ -87,8 +90,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Nav />
           <main className="app-shell mx-auto flex-1 px-4 py-6">{children}</main>
         </AiActivityProvider>
-        <footer className="app-shell mx-auto px-4 pb-4 text-xs text-slate-500">
-          ProjectPulse — local project tracker.
+        <footer className="app-shell mx-auto flex items-center justify-between px-4 pb-4 text-xs text-slate-500">
+          <span>ProjectPulse — local project tracker.</span>
+          <a
+            href="https://github.com/pantera87/ProjectPulse"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-slate-300 hover:underline"
+          >
+            GitHub
+          </a>
         </footer>
       </body>
     </html>

@@ -66,7 +66,10 @@ export default function AISettings({ initial, initialConfig, catalog, authEnable
   const hasActivePull =
     !!s.ollama && Object.values(s.ollama.pulls).some((p) => p.status === "downloading");
   useEffect(() => {
-    const iv = setInterval(refresh, hasActivePull ? 2000 : 20000);
+    const iv = setInterval(() => {
+      if (document.hidden) return; // no hidden-tab polling (visibilitychange reloads)
+      refresh();
+    }, hasActivePull ? 2000 : 20000);
     // Re-check immediately when the tab becomes visible again (e.g. the
     // user came back from another tab — a download may have finished).
     const onVisible = () => {

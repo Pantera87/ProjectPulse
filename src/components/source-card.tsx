@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { SourceRow } from "@/lib/db";
 import SourceActions from "./source-actions";
 import AiBadge from "./ai-badge";
@@ -125,9 +126,11 @@ export default function SourceCard({
             icon={categoryIcon}
           />
           {source.type === "github" && source.logo && (
-            <img
+            <Image
               src={`/api/sources/${source.id}/logo`}
               alt=""
+              width={16}
+              height={16}
               className="h-4 w-4 shrink-0 rounded"
             />
           )}
@@ -245,9 +248,11 @@ export default function SourceCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {source.type === "github" && source.logo && (
-              <img
+              <Image
                 src={`/api/sources/${source.id}/logo`}
                 alt=""
+                width={20}
+                height={20}
                 className="h-5 w-5 rounded"
               />
             )}

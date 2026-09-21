@@ -63,7 +63,9 @@ services:
       - ollama_data:/root/.ollama
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 10s
+      # 60 s cadence — the 10 s default kept waking the Ollama server on an
+      # always-on machine for no reason (the app probes Ollama itself).
+      interval: 60s
       timeout: 5s
       retries: 12
     restart: unless-stopped

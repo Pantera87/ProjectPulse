@@ -6,9 +6,10 @@ import { deriveAiStatus } from "@/lib/ai-status";
 import type { AiStatus } from "@/lib/ai-status";
 
 /** Top-nav badge showing whether AI is on, which model is loaded, and
- *  download progress. Polls /api/ai every 5 s (server-side probes are
- *  cached, so this costs one Ollama call per 10–60 s) and re-checks
- *  immediately when the tab becomes visible again. Click → Settings. */
+ *  download progress. Polls /api/ai every 15 s (server-side probes are
+ *  cached for 60 s, so this costs at most one Ollama call per minute) and
+ *  re-checks immediately when the tab becomes visible again. Click →
+ *  Settings. */
 export default function AiStatus() {
   const [s, setS] = useState<AiStatus | null>(null);
   useEffect(() => {
@@ -21,7 +22,10 @@ export default function AiStatus() {
         })
         .catch(() => {});
     load();
-    const iv = setInterval(load, 5_000);
+    const iv = setInterval(() => {
+      if (document.hidden) return; // paused in hidden tabs; visibilitychange reloads
+      load();
+    }, 15_000);
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };

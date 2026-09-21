@@ -152,7 +152,10 @@ export async function POST(req: Request) {
     for (const c of body.categories ?? []) insCat.run(c.category, c.icon);
 
     // Rebuild the FTS index (same title/body format as source creation in
-    // api/sources/route.ts — otherwise search stays empty after restore).
+    // api/sources/route.ts and update insertion in models.ts — otherwise
+    // search stays empty after restore). Updates must be indexed here
+    // explicitly: the one-time backfill in db.ts never re-runs because the
+    // fts_update_backfill_v1 flag is restored from the backup settings.
     for (const s of body.sources ?? [])
       indexForSearch(
         d,
@@ -160,6 +163,14 @@ export async function POST(req: Request) {
         s.id as number,
         (s.name as string) ?? (s.url as string),
         `${s.goal ?? ""} ${s.category ?? ""} ${s.subcategory ?? ""}`
+      );
+    for (const u of body.updates ?? [])
+      indexForSearch(
+        d,
+        "update",
+        u.id as number,
+        u.title as string,
+        `${u.summary ?? ""}`
       );
     });
     tx();

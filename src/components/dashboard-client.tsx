@@ -189,7 +189,10 @@ export default function DashboardClient({
   }, []);
 
   useEffect(() => {
-    const iv = setInterval(load, 30_000);
+    const iv = setInterval(() => {
+      if (document.hidden) return; // no hidden-tab polling (visibilitychange reloads)
+      load();
+    }, 30_000);
     return () => clearInterval(iv);
   }, [load]);
 

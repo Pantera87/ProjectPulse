@@ -136,6 +136,9 @@ export function getDb(): Database.Database {
   const file = path.join(dir, "projectpulse.db");
   db = new Database(file);
   db.pragma("journal_mode = WAL");
+  // WAL + NORMAL: correct under WAL, and skips the extra full-disk sync per
+  // write (FULL) — fewer disk wakeups on an always-on machine.
+  db.pragma("synchronous = NORMAL");
   db.pragma("foreign_keys = ON");
   migrate(db);
   return db;

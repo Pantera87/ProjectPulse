@@ -50,7 +50,7 @@ export function findRuleHit(
   let best: RuleHit | null = null;
   for (const rule of rules) {
     if (!rule.sources.includes(sourceKind)) continue;
-    for (const { kind, text } of texts) {
+    for (const { text } of texts) {
       const matched = ruleMatchesText(rule, text);
       if (matched.length > 0) {
         const hit: RuleHit = { rule, priority: rule.priority, matched };

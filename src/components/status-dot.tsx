@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import Time from "./time";
 
 export type SourceStatus = "never" | "fresh" | "stale" | "error";
@@ -35,8 +35,9 @@ const LABEL: Record<SourceStatus, string> = {
  * Colored dot for a source's check health: green = fresh, amber = overdue,
  * red = last check errored, grey = never checked. The full detail goes in the
  * tooltip (and optionally a relative timestamp next to the dot) instead of a
- * "last checked …" text line. Status is computed after mount so the server
- * render (neutral dot) and the client never disagree.
+ * "last checked …" text line. Status is computed after mount (the value
+ * depends on Date.now()) so the server render (neutral dot) and the client
+ * never disagree.
  */
 export default function StatusDot({
   lastCheckedAt,
@@ -49,12 +50,15 @@ export default function StatusDot({
   lastError: string | null;
   withTime?: boolean;
 }) {
-  const [st, setSt] = useState<SourceStatus | null>(null);
-  useEffect(() => {
-    setSt(statusOf(lastCheckedAt, intervalHours, lastError));
-  }, [lastCheckedAt, intervalHours, lastError]);
-
-  const resolved = st ?? "never";
+  // Mount detection without an effect: the server/SSR snapshot reads the
+  // neutral "never" dot, the client recomputes the time-dependent status
+  // once after hydration.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const resolved = mounted ? statusOf(lastCheckedAt, intervalHours, lastError) : "never";
   const title =
     LABEL[resolved] +
     (lastCheckedAt ? ` (${lastCheckedAt})` : "") +

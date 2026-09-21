@@ -5,8 +5,9 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Shared AI activity state (client side), polled every 2 s from
- * /api/ai/activity (see src/lib/ai-activity.ts for the server side).
+ * Shared AI activity state (client side), polled every 5 s from
+ * /api/ai/activity (see src/lib/ai-activity.ts for the server side). Polling
+ * pauses while the tab is hidden (reloaded on visibilitychange).
  *
  * `useAiBusy()` → true while the server is running any AI work (update
  * summaries, project summaries, classifications, background requeues…).
@@ -34,7 +35,13 @@ const IDLE: AIActivityState = {
   lastErrorAt: null,
 };
 
-const POLL_MS = 2000;
+/**
+ * Activity polling: 5 s cadence (AI phases are seconds-to-minutes long, so a
+ * faster tick only burned battery on an always-open dashboard) and fully
+ * paused while the tab is hidden — the visibilitychange listener below
+ * reloads immediately when the tab comes back.
+ */
+const POLL_MS = 5000;
 
 interface ActivityContextValue {
   activity: AIActivityState;
@@ -58,15 +65,26 @@ export default function AiActivityProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     let alive = true;
+    let lastJson = "";
     const load = () =>
       fetch("/api/ai/activity", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => {
-          if (alive && j && typeof j === "object" && "busy" in j) setActivity(j as AIActivityState);
+          if (!alive || !j || typeof j !== "object" || !("busy" in j)) return;
+          // Skip the state update when nothing changed — otherwise every poll
+          // re-renders every consumer of this context for no reason.
+          const next = JSON.stringify(j);
+          if (next !== lastJson) {
+            lastJson = next;
+            setActivity(j as AIActivityState);
+          }
         })
         .catch(() => {}); // offline/dev glitch — keep the last state
     load();
-    const iv = setInterval(load, POLL_MS);
+    const iv = setInterval(() => {
+      if (document.hidden) return; // paused in hidden tabs; visibilitychange reloads
+      load();
+    }, POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };

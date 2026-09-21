@@ -8,4 +8,7 @@ data
 Dockerfile
 docker-compose.yml
 README.md
+# README-only assets (GitHub page) — not needed in the runtime image
+public/screenshots
+public/logowithbg.png
 .env*

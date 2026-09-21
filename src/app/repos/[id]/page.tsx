@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getDb, type SourceRow } from "@/lib/db";
 import { rulesOf } from "@/lib/models";
@@ -57,9 +58,11 @@ export default async function RepoDetailPage({
         </Link>
         <div className="mt-1 flex items-center gap-3">
           {source.logo && (
-            <img
+            <Image
               src={`/api/sources/${source.id}/logo`}
               alt=""
+              width={40}
+              height={40}
               className="h-10 w-10 rounded-lg border border-white/15 bg-white/5"
             />
           )}

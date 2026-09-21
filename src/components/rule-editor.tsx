@@ -24,11 +24,9 @@ const SOURCE_OPTIONS: Record<string, string[]> = {
   rss: ["feed"],
 };
 
-const inputCls = "input-glass w-full";
-
 export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
   const [rules, setRules] = useState<Rule[]>(initial);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const router = useRouter();
 
   const opts = SOURCE_OPTIONS[type] ?? ["content"];
@@ -52,7 +50,7 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ rules_json: JSON.stringify(cleaned) }),
     });
-    setStatus(res.ok ? "Rules saved" : "Save failed");
+    setStatus(res.ok ? { ok: true, text: "Rules saved" } : { ok: false, text: "Save failed" });
     router.refresh();
   }
 
@@ -150,7 +148,13 @@ export default function RuleEditor({ sourceId, type, rules: initial }: Props) {
         >
           Save rules
         </button>
-        {status && <span className="text-xs text-emerald-400">{status}</span>}
+        {status && (
+          <span
+            className={`text-xs ${status.ok ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {status.text}
+          </span>
+        )}
       </div>
     </div>
   );
