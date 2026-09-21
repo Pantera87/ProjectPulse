@@ -7,8 +7,13 @@ data
 .gitignore
 Dockerfile
 docker-compose.yml
-README.md
+# docs / agent notes — not needed in the build
+*.md
 # README-only assets (GitHub page) — not needed in the runtime image
 public/screenshots
 public/logowithbg.png
+# dev/build leftovers — not needed by `next build` or `node server.js`
+*.tsbuildinfo
+eslint.config.mjs
+scripts
 .env*

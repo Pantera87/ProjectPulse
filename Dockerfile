@@ -5,7 +5,8 @@ FROM node:24 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY next.config.ts tsconfig.json postcss.config.mjs ./
-COPY src src
+# NOTE: don't COPY src here — npm ci only needs the manifests, and touching
+# this layer on every source change would force a full reinstall each build.
 RUN npm ci
 
 # ---- Stage 2: build the app (slim, reuses node_modules from deps) ----
