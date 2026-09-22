@@ -71,7 +71,6 @@
 
 - **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, last 10 versions kept.
 - **Change tracking** — scheduled checks detect page changes; every change produces a new snapshot version plus an update entry with a text diff.
-- **Websites via feed** — if a watched website publishes an RSS/Atom feed (declared in the page or at a common path), it is discovered automatically and checked via the feed instead of re-scraping the page — with the same keyword rules, and an automatic fallback to page snapshots if the feed breaks.
 - **GitHub tracking** — keywordless change tracking (new releases / README changes / new commits — per-repo toggles), milestones, issue-label watching, and README/commit keyword scans.
 - **Feeds** — RSS/Atom feeds as first-class sources.
 - **Priority keyword rules** — word-boundary matching with negation and priorities (e.g. flag anything mentioning *kernel, linux* as *critical*), plus an optional AI semantic second pass.
@@ -87,14 +86,9 @@
   rendered in a sandboxed iframe; last 10 versions kept).
 - **Track updates**: a scheduled check extracts the page's main text,
   normalizes it and hashes it. On change: a new snapshot version is stored and
-  an update entry with a text diff is created.
-- **Via feed (automatic)**: if the site declares an RSS/Atom feed
-  (`<link rel="alternate">`) or serves one at a common path (`/feed`,
-  `/feed.xml`, …), it is discovered on the next check and subsequent checks
-  run through the feed instead of the page — cheaper and more reliable, same
-  keyword rules. The source gets a "via feed" badge. If the feed fails three
-  checks in a row, the feed is dropped, the site is re-discovered and normal
-  page checking resumes.
+  an update entry with a text diff is created. The check always looks at the
+  current content of the tracked page itself (its own feed, if any, is
+  ignored) — so an update is only raised when that specific page changes.
 - **Keyword rules** per site: e.g. a critical rule `kernel, linux` → the moment
   those words appear in newly added page text, the update is *critical*. With
   AI enabled, a semantic second pass also flags text that *relates to* the
@@ -153,6 +147,9 @@ Every source type gets a two-level classification, auto-assigned:
 - **Subcategory** — the specific one (e.g. `inference-engine`)
 
 - AI assigns both levels when available; the dashboard groups projects by category.
+- A cheap keyword **pre-pass** over the repo's **topics** (then topics +
+  **about**) runs BEFORE any AI call — a confident topic match assigns the
+  category with zero model calls; only a miss falls through to the cascade.
 - **GitHub** sources use a priority cascade over the repo's own signals: its
   **topics** first, then topics + **about** section, and only when neither
   gives a confident answer is the **full README** ingested (the stored AI
@@ -346,7 +343,11 @@ is downloaded manually.
 - If the Ollama connection is broken, Settings → AI looks for the server
   automatically (**Detect Ollama address** probes the bundled compose service,
   local loopback and the Docker host) and offers one click to use the address
-  that answers.
+  that answers. A stored address that stops answering (e.g. a host loopback
+  saved before the compose service existed) is also **self-healed
+  automatically**: the app probes the known endpoints once and persists the
+  one that answers — no extra polling (zero cost in steady state, ~3 tiny
+  probes/minute at worst).
 - The navbar badge always shows the AI state: off / not configured /
   downloading / ready (model loaded).
 

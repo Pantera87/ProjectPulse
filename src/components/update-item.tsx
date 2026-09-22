@@ -1,6 +1,6 @@
 import MarkReadButton from "./mark-read";
 import AiBadge from "./ai-badge";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, repoDisplayName } from "@/lib/format";
 
 export interface UpdateView {
   id: number;
@@ -67,7 +67,7 @@ export default function UpdateItem({ u }: { u: UpdateView }) {
         <span className="badge">{u.kind}</span>
         <span className="font-medium">{u.title}</span>
         <span className="text-xs text-slate-500">
-          {u.source_type} · {u.source_name}
+          {u.source_type} · {repoDisplayName(u.source_type, u.source_name)}
         </span>
         {u.url && (
           <a href={u.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-300 hover:underline">

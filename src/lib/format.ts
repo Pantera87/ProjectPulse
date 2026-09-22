@@ -25,6 +25,22 @@ export function displayTimezone(): string {
   }
 }
 
+/**
+ * Display name for a GitHub source in the updates feed: auto-filled names
+ * arrive as the API's "owner/repo" full name, but updates only show the
+ * repository name (e.g. "ProjectPulse", not "owner/ProjectPulse").
+ * Non-GitHub sources and custom names pass through unchanged.
+ */
+export function repoDisplayName(
+  sourceType: string,
+  name: string | null | undefined
+): string | null | undefined {
+  if (!name) return name;
+  if (sourceType !== "github") return name;
+  const m = name.match(/^[\w.-]+\/([\w.-]+)$/);
+  return m ? m[1] : name;
+}
+
 export function formatDateTime(iso: string | null | undefined, timeZone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);

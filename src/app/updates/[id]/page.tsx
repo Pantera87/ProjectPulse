@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, repoDisplayName } from "@/lib/format";
 import AiBadge from "@/components/ai-badge";
 import MarkReadButton from "@/components/mark-read";
 
@@ -103,7 +103,7 @@ export default async function UpdateDetailPage({
           <span>
             {u.source_type} ·{" "}
             <Link href={sourceHref} className="text-indigo-300 hover:underline">
-              {u.source_name ?? u.source_url}
+              {repoDisplayName(u.source_type, u.source_name) ?? u.source_url}
             </Link>
           </span>
           {u.url && (

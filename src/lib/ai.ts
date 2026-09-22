@@ -25,6 +25,7 @@ import {
   ollamaVersion,
   startPull,
   normalizeOllamaModel,
+  resolveOllamaUrl,
   type OllamaSnapshot,
   type PullJob,
 } from "./ollama";
@@ -657,6 +658,12 @@ class OllamaProvider extends BaseAI {
    * the in-prompt anchor must keep the full (larger) budget, not the tiny
    * with-doc one, and the "document attached" note would be a lie.
    */
+  /**
+   * Set by attemptComplete() when the last failure is connection-level
+   * (refused / DNS / timeout) — the address itself is suspect, not the
+   * request. Triggers the stale-URL self-heal in complete().
+   */
+  private urlDown = false;
   private ragOk = false;
   protected get supportsDocs(): boolean {
     return this.ragOk;
@@ -664,10 +671,47 @@ class OllamaProvider extends BaseAI {
 
   protected async complete(prompt: string, opts: CompleteOpts = {}): Promise<string | null> {
     this.lastError = null;
+    // Thinking models: the /no_think soft switch keeps internal reasoning
+    // from eating the token budget (see the noThink field above).
+    if (this.noThink) prompt = `${prompt} /no_think`;
+    let out = await this.attemptComplete(prompt, opts);
+    if (out) return out;
+    // Connection-level failure (refused / DNS / timeout): the stored URL may
+    // be STALE — the classic Docker case, where an address saved on the host
+    // (loopback) points at the container itself. Resolve the known endpoints;
+    // when one answers, persist it and retry the request ONCE. In steady
+    // state this branch is never reached (the stored URL answers).
+    if (this.urlDown) {
+      const healed = await resolveOllamaUrl(this.url);
+      if (healed && healed !== this.url) {
+        this.url = healed;
+        this.ragOk = false; // the RAG flag was probed against the old address
+        this.persistOllamaUrl(healed);
+        this.lastError = null;
+        out = await this.attemptComplete(prompt, opts);
+        if (out) return out;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Persist a healed Ollama address so every later call (and every restart)
+   * uses the endpoint that actually answers. Best-effort: when the DB is not
+   * ready the in-memory retry of this request still works.
+   */
+  private persistOllamaUrl(url: string): void {
     try {
-      // Thinking models: the /no_think soft switch keeps internal reasoning
-      // from eating the token budget (see the noThink field above).
-      if (this.noThink) prompt = `${prompt} /no_think`;
+      saveAIConfig({ ollamaUrl: url });
+    } catch {
+      // best-effort
+    }
+  }
+
+  /** One full attempt against this.url. Sets urlDown on connection-level errors. */
+  private async attemptComplete(prompt: string, opts: CompleteOpts): Promise<string | null> {
+    this.urlDown = false;
+    try {
       const state = await ollamaModelState(this.url, this.model);
       if (state === "missing") {
         // Auto-download is reserved for the DEFAULT model: user-picked
@@ -727,6 +771,7 @@ class OllamaProvider extends BaseAI {
       const out = stripThinkingBlocks(json.response ?? "");
       return out.length > 0 ? out : null;
     } catch (e) {
+      this.urlDown = isConnectionlessError(e);
       this.lastError = describeFetchError(e, `${this.url}/api/generate`);
       return null;
     }
@@ -851,6 +896,27 @@ function describeFetchError(e: unknown, url: string): string {
       " — ProjectPulse runs inside Docker, so localhost points at the container, not your machine. Use http://host.docker.internal:<port>/v1 (Windows/macOS) or the host's LAN IP instead.";
   }
   return out;
+}
+
+/**
+ * True when a failed fetch is a connection-level problem — nothing
+ * listening, host unresolvable, or no answer in time. The ADDRESS is
+ * suspect in that case (the request itself is fine), which is what the
+ * stale-URL self-heal looks for.
+ */
+function isConnectionlessError(e: unknown): boolean {
+  const err = e as { name?: string; cause?: { code?: string } } | null;
+  const code = err?.cause?.code;
+  return (
+    err?.name === "TimeoutError" ||
+    err?.name === "AbortError" ||
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "EAI_AGAIN" ||
+    code === "ECONNRESET" ||
+    code === "ENETUNREACH" ||
+    code === "EHOSTUNREACH"
+  );
 }
 
 class OpenAICompatibleProvider extends BaseAI {
@@ -1453,7 +1519,23 @@ export async function aiState(): Promise<AIState> {
   }
   if (cfg.provider === "ollama" && cfg.ollamaUrl) {
     const { getPullJobs, normalizeOllamaModel } = await import("./ollama");
-    const snap = await cachedOllamaSnapshot(cfg.ollamaUrl);
+    let snap = await cachedOllamaSnapshot(cfg.ollamaUrl);
+    if (!snap.reachable) {
+      // The stored address does not answer (e.g. a host loopback saved
+      // before the compose service existed) — self-heal: probe the known
+      // endpoints and persist the one that answers, so the next status load
+      // (and every later call) uses a working URL with no user action.
+      const healed = await resolveOllamaUrl(cfg.ollamaUrl);
+      if (healed && healed !== cfg.ollamaUrl) {
+        cfg.ollamaUrl = healed;
+        try {
+          saveAIConfig({ ollamaUrl: healed });
+        } catch {
+          // best-effort
+        }
+        snap = await cachedOllamaSnapshot(healed);
+      }
+    }
     const model = cfg.model || DEFAULT_OLLAMA_MODEL;
     // Normalized compare: "qwen3.5", "qwen3.5:latest" and "Qwen3.5" all
     // match the same install (exact-string compare broke on the missing tag).

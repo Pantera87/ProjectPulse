@@ -103,11 +103,6 @@ export interface SourceState {
   seen_feed_ids?: string[];
   readme_matched?: Record<string, boolean>;
   prev_tag?: string;
-  /** Website: auto-discovered RSS/Atom feed checked instead of page scraping */
-  feed_url?: string;
-  feed_discovery_done?: boolean;
-  /** Consecutive feed-check failures (feed dropped + re-discovered at 3) */
-  feed_fails?: number;
   /** Hash of the GitHub releases Atom feed (cheap idle-cycle pre-check) */
   prev_release_feed_hash?: string;
   /** "ok" | "missing" — last known state of the releases Atom feed */

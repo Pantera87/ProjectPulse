@@ -17,20 +17,6 @@ import { notify } from "../notifiers";
 import { fetchFeed } from "../feed";
 import type { CheckResult } from "./website";
 
-export interface FeedCheckOpts {
-  /**
-   * Keep the source's existing `last_content_hash` untouched. Used by the
-   * website "via feed" fast path, which must keep its *page* hash so a
-   * fallback scrape can still compare against it.
-   */
-  skipPageHash?: boolean;
-  /**
-   * Don't store a feed XML snapshot. Websites keep their HTML snapshots for
-   * the snapshot viewer; a feed XML blob there would be confusing.
-   */
-  skipSnapshot?: boolean;
-}
-
 /** Check an RSS/Atom source (the feed lives at the source's own URL). */
 export async function checkRss(
   d: Database.Database,
@@ -40,16 +26,13 @@ export async function checkRss(
 }
 
 /**
- * Check any RSS/Atom feed URL for new entries (state tracked in
- * `state_json.seen_feed_ids`). Shared by RSS sources and the website
- * "via feed" fast path, which reuses the exact same entry-matching logic
- * (keyword rules + AI semantic pass) as dedicated feeds.
+ * Check an RSS/Atom feed URL for new entries (state tracked in
+ * `state_json.seen_feed_ids`).
  */
 export async function checkFeedUrl(
   d: Database.Database,
   source: SourceRow,
-  feedUrl: string,
-  opts: FeedCheckOpts = {}
+  feedUrl: string
 ): Promise<CheckResult> {
   let xml: string;
   let entries: Awaited<ReturnType<typeof fetchFeed>>["items"];
@@ -146,23 +129,15 @@ export async function checkFeedUrl(
   touchSource(d, source.id, {
     last_checked_at: new Date().toISOString(),
     state_json: JSON.stringify(state),
-    ...(opts.skipPageHash
-      ? {}
-      : { last_content_hash: hashText(entries.map((e) => e.guid).join("\n")) }),
+    last_content_hash: hashText(entries.map((e) => e.guid).join("\n")),
     last_error: null,
   });
 
   // Goal backfill — the feed's own <title> as a plain auto-extraction, or the
   // AI over a sample of recent entry titles when the feed has no title. Runs
   // on every successful fetch, so a goal the user cleared is restored on the
-  // next check. Re-read the row: the website "via feed" fast path may have
-  // just filled the goal from the page itself.
-  const freshGoal = (
-    d.prepare("SELECT goal FROM sources WHERE id = ?").get(source.id) as
-      | { goal: string | null }
-      | undefined
-  )?.goal;
-  if (!source.goal && !freshGoal) {
+  // next check.
+  if (!source.goal) {
     let goal = (xml.match(/<title[^>]*>([^<]{15,500})<\/title>/i)?.[1] ?? "").trim();
     let goalSource: string | null = null;
     if (!goal) {
@@ -189,7 +164,7 @@ export async function checkFeedUrl(
   }
 
   // Keep the latest feed snapshot for reference (best-effort)
-  if (!opts.skipSnapshot && xml.length > 2) {
+  if (xml.length > 2) {
     const version = maxSnapshotVersion(d, source.id) + 1;
     d.prepare(
       `INSERT INTO snapshots (source_id, version, fetched_at, html, content_hash, title)

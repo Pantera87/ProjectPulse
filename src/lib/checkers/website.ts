@@ -26,8 +26,6 @@ import {
   higherPriority,
 } from "../models";
 import { notify } from "../notifiers";
-import { checkFeedUrl } from "./rss";
-import { discoverWebsiteFeed } from "../feed";
 
 export interface CheckResult {
   ok: boolean;
@@ -57,7 +55,7 @@ export async function checkWebsite(
 
   const page = parseHtml(html);
   // Goal backfill — runs on EVERY successful fetch (including the
-  // unchanged-page and feed fast paths below), so a goal the user cleared is
+  // unchanged-page fast path below), so a goal the user cleared is
   // restored on the next check. (Category/subcategory backfill happens in
   // check.ts after the check — missing levels only, never overwritten.)
   if (!source.goal) {
@@ -89,44 +87,6 @@ export async function checkWebsite(
   // them all, in which case the next check silently re-stores a fresh
   // baseline copy (no change update is raised for it).
   const rebaseline = !firstCheck && maxSnapshotVersion(d, source.id) === 0;
-
-  // --- Fast path: auto-discovered RSS/Atom feed. Once the baseline exists,
-  // the feed is checked instead of re-scraping the page every cycle; the
-  // page hash is preserved so a fallback scrape (feed died) can still
-  // compare against it.
-  if (!firstCheck && state.feed_url) {
-    // Persist state first — checkFeedUrl re-reads the row and would
-    // otherwise overwrite it with the stale state.
-    touchSource(d, source.id, { state_json: JSON.stringify(state) });
-    const result = await checkFeedUrl(d, source, state.feed_url, {
-      skipPageHash: true,
-      skipSnapshot: true,
-    });
-    if (result.ok) return result;
-    // Feed unreachable/broken: count the failure, drop it after 3 in a row
-    // (re-arming discovery), and fall through to a full page check.
-    state.feed_fails = (state.feed_fails ?? 0) + 1;
-    if (state.feed_fails >= 3) {
-      state.feed_url = undefined;
-      state.feed_fails = 0;
-      state.feed_discovery_done = false;
-    }
-  }
-
-  // --- Feed discovery (runs once per source; also backfills existing
-  // sources on their next check; re-armed when a feed dies).
-  if (!firstCheck && !state.feed_discovery_done) {
-    try {
-      const feedUrl = await discoverWebsiteFeed(source.url);
-      state.feed_discovery_done = true;
-      if (feedUrl) {
-        state.feed_url = feedUrl;
-        state.feed_fails = 0;
-      }
-    } catch {
-      // leave discovery open — retried on the next check
-    }
-  }
 
   if (!firstCheck && !rebaseline && newHash === source.last_content_hash) {
     touchSource(d, source.id, {

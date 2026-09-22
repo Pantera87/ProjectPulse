@@ -70,17 +70,6 @@ export default function SourceCard({
         ? `/feeds/${source.id}`
         : `/websites/${source.id}`;
 
-  // Websites whose checks run through a discovered RSS/Atom feed get a badge.
-  const viaFeed = (() => {
-    if (source.type !== "website" || !source.state_json) return null;
-    try {
-      const st = JSON.parse(source.state_json) as { feed_url?: unknown };
-      return typeof st.feed_url === "string" ? st.feed_url : null;
-    } catch {
-      return null;
-    }
-  })();
-
   if (mode === "minimal") {
     return (
       <div className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-white/5">
@@ -147,14 +136,6 @@ export default function SourceCard({
               title="Muted — new updates are hidden"
             >
               <Glyph name="bell-off" className="h-3.5 w-3.5" />
-            </span>
-          )}
-          {viaFeed && (
-            <span
-              className="shrink-0 text-fuchsia-300/80"
-              title={`Checked via feed: ${viaFeed}`}
-            >
-              <Glyph name="rss" className="h-3 w-3" />
             </span>
           )}
           <span
@@ -268,15 +249,6 @@ export default function SourceCard({
               <Glyph name={TYPE_ICON[source.type] ?? "globe"} className="mr-1 h-3 w-3" />
               {source.type}
             </span>
-            {viaFeed && (
-              <span
-                className="badge border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-300"
-                title={`Checked via feed: ${viaFeed}`}
-              >
-                <Glyph name="rss" className="mr-1 h-3 w-3" />
-                via feed
-              </span>
-            )}
             {source.category && (
               <span
                 className="badge"

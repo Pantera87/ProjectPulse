@@ -151,6 +151,15 @@ async function ensureCategoryGithub(
   const existing = existingCategories(d);
   const ai = getAI();
 
+  // PRE-AI PASS (the big CPU saver): the keyword matcher over the repo's
+  // own signals — its TOPICS first (the densest, curated signal), then
+  // topics + about. A confident match persists the category and skips the
+  // AI ENTIRELY (zero model calls); a miss falls through to the AI cascade
+  // below. Pure string matching — no network, no tokens.
+  const prepass =
+    (t1 ? heuristicCategory(t1) : null) ??
+    (t2 && t2 !== t1 ? heuristicCategory(t2) : null);
+
   const persist = (
     category: string,
     subcategory: string | null,
@@ -226,8 +235,12 @@ async function ensureCategoryGithub(
   };
 
   // A keyword-guessed category is not very accurate — re-classify and
-  // replace the guess with the AI's answer.
+  // replace the guess with the AI's answer. UNLESS the topics pre-pass
+  // still confirms the SAME word: topics are the repo's own curated
+  // keywords, so a confirmed guess keeps it — re-classifying would only
+  // burn an AI call to arrive at the same category.
   if (row.category && row.category_source === "heuristic") {
+    if (prepass && prepass.toLowerCase() === row.category.toLowerCase()) return row.category;
     const r = await aiClassify();
     if (r)
       return persist(
@@ -245,6 +258,9 @@ async function ensureCategoryGithub(
   if (row.category && row.subcategory) return row.category;
 
   if (!row.category) {
+    // Topics pre-pass: a confident match persists and skips the AI
+    // entirely — the repo's own curated keywords outrank the model.
+    if (prepass) return persist(prepass, null, "heuristic");
     const r = await aiClassify();
     if (r) return persist(r.category, r.subcategory, "ai", r.icon);
 

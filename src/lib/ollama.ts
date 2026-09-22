@@ -392,10 +392,16 @@ export { DEFAULT_OLLAMA_MODEL } from "./ai-status";
 export const CATALOG: CatalogModel[] = [
   { name: "llama3.2:1b", family: "Llama 3.2", params: "1B", q4GB: 0.8, ctx: "128k", accuracy: "low", blurb: "Basic accuracy; lightest general-purpose model, very long context." },
   { name: "qwen3.5:0.8b", family: "Qwen 3.5", params: "0.8B", q4GB: 1.0, ctx: "256k", accuracy: "low", blurb: "Basic accuracy; fast on almost any hardware, excellent for quick short-text summarization." },
+  { name: "qwen2.5:1.5b", family: "Qwen 2.5", params: "1.5B", q4GB: 1.0, ctx: "32k", accuracy: "low", blurb: "Basic accuracy; the lightest Qwen 2.5 build — non-thinking, very fast on almost any hardware." },
+
   { name: "qwen3.5:2b", family: "Qwen 3.5", params: "2B", q4GB: 2.7, ctx: "256k", accuracy: "low", blurb: "Basic accuracy; small and fast, with a very long context window." },
+  { name: "qwen2.5:3b", family: "Qwen 2.5", params: "3B", q4GB: 1.9, ctx: "32k", accuracy: "low", blurb: "Basic accuracy; small and quick, a step up from the 1.5B build." },
+
   { name: "phi4-mini", family: "Phi-4-mini", params: "3.8B", q4GB: 2.5, ctx: "128k", accuracy: "mid", blurb: "Moderately accurate; punches above its weight on reasoning and summarization." },
   { name: "qwen3.5:4b", family: "Qwen 3.5", params: "4B", q4GB: 3.4, ctx: "256k", accuracy: "mid", blurb: "Default. Best quality-to-size balance for CPU — a thinking model with a very long context window." },
   { name: "llama3.1:8b", family: "Llama 3.1", params: "8B", q4GB: 4.9, ctx: "128k", accuracy: "high", blurb: "Very accurate; strong all-rounder with a long context window." },
+  { name: "qwen2.5:7b", family: "Qwen 2.5", params: "7B", q4GB: 5.2, ctx: "32k", accuracy: "high", blurb: "Very accurate; the strongest Qwen 2.5 build — non-thinking, so it answers faster on CPU than the Qwen 3.5 models of similar size." },
+
   { name: "qwen3.5:9b", family: "Qwen 3.5", params: "9B", q4GB: 6.6, ctx: "256k", accuracy: "high", blurb: "Very accurate; high-quality thinking model with a very long context window." },
   { name: "gemma4:12b", family: "Gemma 4", params: "12B", q4GB: 7.6, ctx: "256k", accuracy: "high", blurb: "Very accurate; strong multilingual model with a long context window." },
   { name: "gemma4:26b", family: "Gemma 4", params: "26B", q4GB: 19, ctx: "256k", accuracy: "power", blurb: "Power. MoE with ~3.8B active parameters — top quality here, but needs ~20 GB free RAM." },
@@ -428,4 +434,56 @@ export function hardwareHint(model: CatalogModel): { label: string; tone: "good"
     label: `tight on this hardware (~${need.toFixed(1)} GB needed, ${ram.toFixed(0)} GB RAM) — a smaller model or GPU is recommended`,
     tone: "bad",
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Stale-URL self-heal                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Probe budget per endpoint while resolving a replacement address. */
+const HEAL_PROBE_TIMEOUT_MS = 2_500;
+/** How long to remember "no candidate answered" before probing again. */
+const HEAL_FAIL_TTL_MS = 60_000;
+
+let healFlight: { preferred: string; p: Promise<string | null> } | null = null;
+let healFail: { preferred: string; at: number } | null = null;
+
+/**
+ * Resolve a working Ollama address. Starting from the currently preferred
+ * URL, returns the first of the known endpoints — preferred, env default
+ * (OLLAMA_URL), the bundled compose service, local loopback — that answers
+ * a cheap 2.5-second /api/version probe; null when none answer.
+ *
+ * Zero cost in steady state: callers only invoke this AFTER the preferred
+ * endpoint has already failed (a failed AI call, an unreachable status
+ * snapshot), and a fully-failed attempt is remembered for 60 s (the same
+ * cadence as the snapshot cache) — at most ~3 tiny probes per minute
+ * (instant ECONNREFUSEDs plus one answered request), never more. No new
+ * intervals, no new pollers. Concurrent failures share one probe run
+ * (single-flight).
+ */
+export async function resolveOllamaUrl(preferred: string): Promise<string | null> {
+  const want = preferred.replace(/\/+$/, "");
+  if (!want) return null;
+  if (healFail && healFail.preferred === want && Date.now() - healFail.at < HEAL_FAIL_TTL_MS)
+    return null;
+  if (healFlight && healFlight.preferred === want) return healFlight.p;
+  const candidates = [want, defaultOllamaUrl(), "http://ollama:11434", "http://127.0.0.1:11434"]
+    .map((u) => u.replace(/\/+$/, ""))
+    .filter((u, i, arr) => u !== "" && arr.indexOf(u) === i);
+  const wrapped = (async () => {
+    for (const url of candidates) {
+      const json = await jget(url, "/api/version", HEAL_PROBE_TIMEOUT_MS);
+      if (json?.version) {
+        healFail = null;
+        return url;
+      }
+    }
+    healFail = { preferred: want, at: Date.now() };
+    return null;
+  })().finally(() => {
+    if (healFlight && healFlight.preferred === want) healFlight = null;
+  });
+  healFlight = { preferred: want, p: wrapped };
+  return wrapped;
 }

@@ -25,9 +25,15 @@ export async function summarizeProjectForSource(
   source: SourceRow
 ): Promise<string | null> {
   const ai = getAI();
-  if (!ai.enabled) return source.project_summary;
+  if (!ai.enabled) {
+    fillNotesOnce(d, source);
+    return source.project_summary;
+  }
   const size = summarySizeFor(d, source);
-  if (source.project_summary) return source.project_summary;
+  if (source.project_summary) {
+    fillNotesOnce(d, source);
+    return source.project_summary;
+  }
   const text = await gatherProjectContext(source);
   if (!text) return null;
   // The full content is also handed to the provider as a RAG document
@@ -39,6 +45,10 @@ export async function summarizeProjectForSource(
   if (!summary) return null;
   const stored = truncate(summary, summaryCharCap(size));
   touchSource(d, source.id, { project_summary: stored });
+  // NOTES (one-time): the AI summary also lands in the Notes field — but
+  // ONLY when Notes is still empty, so anything the user wrote there is
+  // never overwritten.
+  if (!(source.notes ?? "").trim()) touchSource(d, source.id, { notes: stored });
   // Fresh summary text is the best input for the category classifier —
   // complete any missing level (or upgrade a keyword guess) while we already
   // have the context (best-effort; AI/user values are never touched).
@@ -50,6 +60,16 @@ export async function summarizeProjectForSource(
     }
   }
   return stored;
+}
+
+/**
+ * Fill the Notes field with the stored summary when (and only when) Notes
+ * is still empty — user-written notes are never touched. Free in steady
+ * state: once Notes is non-empty this is a no-op.
+ */
+function fillNotesOnce(d: Database.Database, source: SourceRow): void {
+  if (source.project_summary && !(source.notes ?? "").trim())
+    touchSource(d, source.id, { notes: source.project_summary });
 }
 
 /**
