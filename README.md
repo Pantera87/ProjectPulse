@@ -5,39 +5,23 @@
 <h1 align="center">ProjectPulse</h1>
 
 <p align="center">
-  A self-hosted tracker for software projects: snapshot and watch project websites,<br/>
+  A self-hosted tracker for projects: snapshot and watch project websites,<br/>
   follow GitHub releases and milestones, and monitor RSS/Atom feeds — with<br/>
   priority keyword rules and optional local AI.
 </p>
 
 <p align="center">
-  <a href="https://nextjs.org">
-    <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16" />
-  </a>
-  <a href="https://react.dev">
-    <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
-  </a>
-  <a href="https://www.typescriptlang.org">
-    <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5" />
-  </a>
-  <a href="https://sqlite.org">
-    <img src="https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
-  </a>
-  <a href="https://www.docker.com">
-    <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker ready" />
-  </a>
+  <img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker ready" />
 </p>
 
 <p align="center">
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-9be15d?style=for-the-badge" alt="MIT License" />
-  </a>
-  <a href="https://hub.docker.com/r/pantera87/projectpulse">
-    <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub: pantera87/projectpulse" />
-  </a>
-  <a href="https://github.com/Pantera87/ProjectPulse/stargazers">
-    <img src="https://img.shields.io/github/stars/Pantera87/ProjectPulse?style=for-the-badge" alt="GitHub stars" />
-  </a>
+  <img src="https://img.shields.io/badge/License-MIT-9be15d?style=for-the-badge" alt="MIT License" />
+  <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub: pantera87/projectpulse" />
+  <img src="https://img.shields.io/github/stars/Pantera87/ProjectPulse?style=for-the-badge" alt="GitHub stars" />
 </p>
 
 <p align="center">
