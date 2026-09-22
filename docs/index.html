@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectPulse — Self-hosted Project Tracker &amp; Changelog Monitor</title>
+  <meta name="description" content="ProjectPulse is a free, self-hosted project tracker and changelog monitor. Snapshot websites, follow GitHub releases and milestones, watch RSS/Atom feeds — with priority keyword rules and optional local AI (Ollama) summaries. One Docker command." />
+  <meta name="keywords" content="self-hosted, project tracker, changelog monitor, website change monitor, github releases, release tracking, rss reader, atom, changelog tracker, local ai, ollama, docker, homelab, selfhosted" />
+  <meta name="author" content="Pantera87" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://pantera87.github.io/ProjectPulse/" />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ProjectPulse" />
+  <meta property="og:title" content="ProjectPulse — Self-hosted Project Tracker &amp; Changelog Monitor" />
+  <meta property="og:description" content="Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama. One Docker command, fully self-hosted." />
+  <meta property="og:url" content="https://pantera87.github.io/ProjectPulse/" />
+  <meta property="og:image" content="https://pantera87.github.io/ProjectPulse/assets/og-image.png" />
+  <meta property="og:image:alt" content="ProjectPulse dashboard with project cards and activity sparklines" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ProjectPulse — Self-hosted Project Tracker &amp; Changelog Monitor" />
+  <meta name="twitter:description" content="Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama. One Docker command." />
+  <meta name="twitter:image" content="https://pantera87.github.io/ProjectPulse/assets/og-image.png" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="hero">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <img src="assets/logowithbg.png" alt="ProjectPulse logo" width="34" height="34" />
+        <span>ProjectPulse</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#screens">Screenshots</a>
+        <a href="#install">Install</a>
+        <a class="btn btn-ghost" href="https://github.com/Pantera87/ProjectPulse">Source</a>
+        <a class="btn" href="#install">Get started</a>
+      </div>
+    </nav>
+
+    <div id="top" class="hero-body">
+      <img class="hero-logo" src="assets/logowithbg.png" alt="" aria-hidden="true" width="96" height="96" />
+      <h1>Your projects, <span class="grad">on autopilot</span>.</h1>
+      <p class="lede">
+        A free, <strong>self-hosted project tracker and changelog monitor</strong> —
+        snapshots websites, follows <strong>GitHub releases and milestones</strong>,
+        watches <strong>RSS/Atom feeds</strong>, flags what matters with
+        <strong>priority keyword rules</strong>, and summarizes what happened with
+        <strong>local AI</strong> (Ollama). No cloud, no API bills, your machine.
+      </p>
+      <div class="cta">
+        <a class="btn btn-lg" href="#install">Run it with Docker</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse" rel="noopener">View on GitHub</a>
+        <a class="btn btn-ghost btn-lg" href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">Docker Hub</a>
+      </div>
+      <div class="badges">
+        <a href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">
+          <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker image: pantera87/projectpulse" />
+        </a>
+        <a href="https://github.com/Pantera87/ProjectPulse/blob/main/LICENSE" rel="noopener">
+          <img src="https://img.shields.io/badge/License-MIT-9be15d?style=flat-square" alt="MIT License" />
+        </a>
+        <a href="https://github.com/Pantera87/ProjectPulse" rel="noopener">
+          <img src="https://img.shields.io/github/stars/Pantera87/ProjectPulse?style=flat-square" alt="GitHub stars" />
+        </a>
+        <a href="https://nextjs.org" rel="noopener">
+          <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white" alt="Built with Next.js 16" />
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="features" class="section">
+      <h2>Everything you watch, one priority-sorted feed</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Website snapshots</h3>
+          <p>Capture project pages for offline reading. Scheduled checks detect changes — every change becomes a snapshot version plus a diff in your updates feed. Feeds are discovered automatically when a site publishes one.</p>
+        </div>
+        <div class="card">
+          <h3>GitHub tracking</h3>
+          <p>New releases, README changes and commits per repo — plus milestones and issue-label watching. Major version bumps and stable releases are escalated automatically; no keywords needed.</p>
+        </div>
+        <div class="card">
+          <h3>RSS &amp; Atom feeds</h3>
+          <p>Feeds are first-class sources — often the most reliable way to track a project's changelog. New entries land in the same feed, with the same rules.</p>
+        </div>
+        <div class="card">
+          <h3>Priority keyword rules</h3>
+          <p>Word-boundary matching with negation and priorities: flag anything mentioning <em>kernel, linux</em> as <em>critical</em>. With AI on, a semantic pass catches related text that never uses the exact words.</p>
+        </div>
+        <div class="card">
+          <h3>Local AI (optional)</h3>
+          <p>Change summaries, importance classification, goal extraction and category assignment — via local Ollama (bundled in Docker), OpenAI-compatible, Anthropic or MCP. Fully functional without any AI.</p>
+        </div>
+        <div class="card">
+          <h3>Dashboard &amp; search</h3>
+          <p>Projects grouped by AI-assigned category, activity sparklines, unread counters, digest windows (1d/7d/30d), full-text search over everything, JSON backup/restore.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screens" class="section">
+      <h2>Screenshots</h2>
+      <div class="shots">
+        <figure><img src="assets/dashboard.png" alt="ProjectPulse dashboard with project cards, activity sparklines and needs-attention strip" loading="lazy" /><figcaption>Dashboard</figcaption></figure>
+        <figure><img src="assets/updates.png" alt="Updates feed with priority-sorted updates and AI summaries" loading="lazy" /><figcaption>Updates feed</figcaption></figure>
+        <figure><img src="assets/website-snapshot.png" alt="Offline website snapshot rendered in a sandboxed iframe with version history" loading="lazy" /><figcaption>Website snapshot</figcaption></figure>
+        <figure><img src="assets/github-repo.png" alt="GitHub tracking: releases, README diffs, milestones per repo" loading="lazy" /><figcaption>GitHub tracking</figcaption></figure>
+        <figure><img src="assets/keyword-rules.png" alt="Keyword rules with word boundaries, negation and priorities" loading="lazy" /><figcaption>Keyword rules</figcaption></figure>
+        <figure><img src="assets/settings-ai.png" alt="AI model manager: Ollama model catalog with one-click download" loading="lazy" /><figcaption>AI model manager</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="install" class="section">
+      <h2>Run it in 30 seconds</h2>
+      <p class="muted">Any Docker host — x86-64 or arm64. AI (local Ollama) comes bundled; the default model downloads automatically on first boot. All your data stays on your machine.</p>
+      <pre class="code"><code># Docker Compose (bundled Ollama + one-shot model pull)
+git clone https://github.com/Pantera87/ProjectPulse
+cd ProjectPulse &amp;&amp; docker compose up -d
+# open http://localhost:4701
+
+# …or just the app (bring your own Ollama / use a remote provider)
+docker run -d --name projectpulse -p 4701:4701 -v pp_data:/data \
+  pantera87/projectpulse:latest</code></pre>
+      <p class="muted">
+        Then add your first project: a URL, <code>owner/repo</code> or a feed.
+        Set <code>AUTH_PASSWORD</code> to enable a login screen,
+        <code>WEBHOOK_URL</code> to forward updates to ntfy/Pushover, or leave
+        AI off entirely — the app is fully functional without it.
+        <a href="https://github.com/Pantera87/ProjectPulse#configuration">Full configuration →</a>
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Built in the open</h2>
+      <p>
+        ProjectPulse is <a href="https://github.com/Pantera87/ProjectPulse/blob/main/LICENSE" rel="noopener">MIT-licensed</a>
+        open source, built with Next.js, React and SQLite. Found a bug or want a
+        feature? <a href="https://github.com/Pantera87/ProjectPulse/issues" rel="noopener">Open an issue</a>
+        or <a href="https://github.com/Pantera87/ProjectPulse/pulls" rel="noopener">send a pull request</a>.
+      </p>
+      <div class="cta">
+        <a class="btn btn-lg" href="https://github.com/Pantera87/ProjectPulse" rel="noopener">Star on GitHub</a>
+        <a class="btn btn-ghost btn-lg" href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">Docker Hub</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>ProjectPulse — self-hosted project tracker &amp; changelog monitor. © 2026 Pantera87. MIT License.</p>
+  </footer>
+</body>
+</html>

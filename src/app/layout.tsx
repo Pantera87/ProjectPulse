@@ -23,8 +23,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ProjectPulse",
-  description: "Track project websites, GitHub repos and feeds for updates",
+  title: {
+    default: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
+    template: "%s — ProjectPulse",
+  },
+  description:
+    "Self-hosted project tracker and changelog monitor: snapshot websites, follow GitHub releases and milestones, watch RSS/Atom feeds — with priority keyword rules and optional local AI (Ollama) summaries.",
+  keywords: [
+    "self-hosted",
+    "project tracker",
+    "changelog monitor",
+    "website change monitor",
+    "github releases",
+    "rss",
+    "local ai",
+    "ollama",
+    "docker",
+  ],
+  applicationName: "ProjectPulse",
+  icons: { icon: "/logo.png" },
+  openGraph: {
+    type: "website",
+    siteName: "ProjectPulse",
+    title: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
+    description:
+      "Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama.",
+    images: [{ url: "/og-image.png", alt: "ProjectPulse dashboard" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
+    description:
+      "Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama.",
+    images: ["/og-image.png"],
+  },
 };
 
 function Nav() {

@@ -28,6 +28,22 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-9be15d?style=for-the-badge" alt="MIT License" />
+  </a>
+  <a href="https://hub.docker.com/r/pantera87/projectpulse">
+    <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub: pantera87/projectpulse" />
+  </a>
+  <a href="https://github.com/Pantera87/ProjectPulse/stargazers">
+    <img src="https://img.shields.io/github/stars/Pantera87/ProjectPulse?style=for-the-badge" alt="GitHub stars" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://pantera87.github.io/ProjectPulse">Landing page</a>
+</p>
+
 <div align="center">
   <hr/>
   <p>
@@ -193,7 +209,20 @@ Every source type gets a two-level classification, auto-assigned:
 
 ## Getting started
 
-### Docker
+### Docker Hub (pre-built image)
+
+```bash
+docker run -d --name projectpulse -p 4701:4701 -v pp_data:/data \
+  pantera87/projectpulse:latest
+# open http://localhost:4701
+```
+
+The image is published to [Docker Hub](https://hub.docker.com/r/pantera87/projectpulse)
+on every release. No Ollama bundled here — point the app at your own
+(`OLLAMA_URL`) or pick a remote provider in Settings, or use the compose setup
+below which includes one.
+
+### Docker Compose (with bundled Ollama)
 
 ```bash
 docker compose up -d --build
@@ -374,4 +403,10 @@ npm run icons:fetch  # refresh the bundled category glyph set (offline once gene
 - `src/middleware.ts` — optional password auth gate
 - API routes under `src/app/api/` mirror the pages; UI is Next.js App Router
   with server components reading SQLite directly.
+
+## License
+
+[MIT](LICENSE) — free to use, modify and distribute, with or without
+modification, for any purpose, with attribution.
+
 
