@@ -185,6 +185,14 @@ abstract class BaseAI implements AIProvider {
    */
   protected lastError: string | null = null;
 
+  /**
+   * Set by a provider INSIDE complete() when a null reply is NOT an engine
+   * failure (e.g. "model not downloaded yet" — a UI state with its own
+   * badge and action, not a broken engine). trackedComplete() then skips
+   * the health-registry recording for that one call.
+   */
+  protected skipHealth = false;
+
   failureInfo(): string | null {
     return this.lastError;
   }
@@ -213,6 +221,13 @@ abstract class BaseAI implements AIProvider {
    */
   protected async trackedComplete(prompt: string, opts?: CompleteOpts): Promise<string | null> {
     const out = await this.complete(prompt, opts);
+    if (this.skipHealth) {
+      // complete() flagged a non-failure null (e.g. model not downloaded):
+      // surface the reason to failureInfo() without polluting the health
+      // registry with phantom failures.
+      this.skipHealth = false;
+      return out;
+    }
     recordAIResult(
       out !== null,
       out === null ? (this.lastError ?? `${this.kind} provider returned no response`) : undefined
@@ -611,12 +626,21 @@ class OllamaProvider extends BaseAI {
   private url: string;
   private model: string;
   private keepAlive: string;
+  /**
+   * Qwen3/DeepSeek are "thinking" models: with thinking on they spend the
+   * whole token budget on internal reasoning (a 128-token ping comes back
+   * empty). Their chat templates support the `/no_think` soft switch — same
+   * convention as OpenAICompatibleProvider. (Only for those families —
+   * other models never see it.)
+   */
+  private noThink: boolean;
 
   constructor(url: string, model: string, keepAlive = "5") {
     super();
     this.url = url.replace(/\/+$/, "");
     this.model = model;
     this.keepAlive = keepAlive;
+    this.noThink = /qwen3|deepseek/i.test(model);
   }
 
   /** Ollama keep_alive duration: "N" minutes, or "never" → keep loaded. */
@@ -639,14 +663,25 @@ class OllamaProvider extends BaseAI {
   }
 
   protected async complete(prompt: string, opts: CompleteOpts = {}): Promise<string | null> {
+    this.lastError = null;
     try {
+      // Thinking models: the /no_think soft switch keeps internal reasoning
+      // from eating the token budget (see the noThink field above).
+      if (this.noThink) prompt = `${prompt} /no_think`;
       const state = await ollamaModelState(this.url, this.model);
       if (state === "missing") {
-        // The single auto-download path: AI was requested but the model is
-        // not on the machine yet. Start a background pull; this call returns
-        // null and the UI shows the "model must be downloaded / downloading"
-        // message via the pull registry.
-        startPull(this.url, this.model);
+        // Auto-download is reserved for the DEFAULT model: user-picked
+        // models download only via the explicit Download button
+        // (Settings → AI). Either way "not downloaded yet" is a UI state,
+        // not an engine failure — skipHealth keeps the health registry
+        // clean (no phantom "AI (errors)" after deleting a model).
+        const isDefault =
+          normalizeOllamaModel(this.model) === normalizeOllamaModel(DEFAULT_OLLAMA_MODEL);
+        if (isDefault) startPull(this.url, this.model);
+        this.skipHealth = true;
+        this.lastError = isDefault
+          ? `Model ${this.model} is not downloaded yet — the download just started automatically (progress: Settings → AI).`
+          : `Model ${this.model} is not downloaded and will NOT download automatically (only the default model, ${DEFAULT_OLLAMA_MODEL}, does) — press Download for it in Settings → AI.`;
         return null;
       }
       const docs = (opts.docs ?? []).filter((d) => d.content.trim().length > 0).slice(0, 8);
@@ -675,14 +710,24 @@ class OllamaProvider extends BaseAI {
         }),
         signal: AbortSignal.timeout(180_000),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        let body = "";
+        try {
+          body = (await res.text()).trim().slice(0, 300);
+        } catch {
+          // body unreadable — the status code alone is still useful
+        }
+        this.lastError = `Ollama returned HTTP ${res.status}${body ? `: ${body}` : ""} (model ${this.model})`;
+        return null;
+      }
       const json = (await res.json()) as { response?: string };
       // Strip inline thinking blocks: some Ollama versions return a
       // thinking model's reasoning (Qwen3, …) inside the response instead
       // of a separate reasoning_content field.
       const out = stripThinkingBlocks(json.response ?? "");
       return out.length > 0 ? out : null;
-    } catch {
+    } catch (e) {
+      this.lastError = describeFetchError(e, `${this.url}/api/generate`);
       return null;
     }
   }

@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db";
 import { aiState, readAIConfig } from "@/lib/ai";
-import { CATALOG, hardwareHint } from "@/lib/ollama";
+import { CATALOG, hardwareHint, DEFAULT_OLLAMA_MODEL } from "@/lib/ollama";
 import { readChannels, recentLog } from "@/lib/notifiers";
 import RestoreForm from "@/components/restore-form";
 import AISettings from "@/components/ai-settings";
@@ -21,7 +21,11 @@ export default async function SettingsPage() {
     .get() as { sources: number; snapshots: number; updates: number };
   const ai = await aiState();
   const cfg = readAIConfig();
-  const catalog = CATALOG.map((m) => ({ ...m, hint: hardwareHint(m) }));
+  const catalog = CATALOG.map((m) => ({
+    ...m,
+    hint: hardwareHint(m),
+    isDefault: m.name === DEFAULT_OLLAMA_MODEL,
+  }));
   const channels = readChannels(d);
   const notifyLog = recentLog(d, 20);
 

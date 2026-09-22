@@ -5,6 +5,23 @@
  * client components can use it directly.
  */
 
+/**
+ * The default Ollama model: pre-pulled by the bundled compose stack and the
+ * ONLY model that auto-downloads when AI is requested without it. Defined
+ * HERE (client-safe) and re-exported by src/lib/ollama.ts so existing
+ * server-side imports keep working.
+ */
+export const DEFAULT_OLLAMA_MODEL = "qwen3.5:4b";
+
+/** Case- and tag-insensitive compare against the default model (same rules
+ *  as normalizeOllamaModel in src/lib/ollama.ts, inlined for the client). */
+export function isDefaultOllamaModel(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const n = name.trim().toLowerCase();
+  const m = n.endsWith(":latest") ? n.slice(0, -":latest".length) : n;
+  return m === DEFAULT_OLLAMA_MODEL.trim().toLowerCase();
+}
+
 export interface AiStatusOllama {
   reachable: boolean;
   version: string | null;
@@ -93,7 +110,7 @@ export function deriveAiStatus(s: AiStatus | null): AiStatusDisplay {
   // Enabled
   if (s.provider === "ollama") {
     const o = s.ollama;
-    const model = s.model ?? "qwen3.5:4b";
+    const model = s.model ?? DEFAULT_OLLAMA_MODEL;
     const pull = o?.pulls?.[model];
     if (pull && pull.status === "downloading")
       return {
@@ -115,7 +132,9 @@ export function deriveAiStatus(s: AiStatus | null): AiStatusDisplay {
       return {
         dot: "bg-amber-400",
         label: "AI (download)",
-        title: `Model ${model} must be downloaded. It will be fetched automatically on first AI use — or download it now in Settings → AI.`,
+        title: isDefaultOllamaModel(model)
+          ? `Model ${model} (the default) must be downloaded — it downloads automatically on the first AI use (~3.4 GB), or download it now in Settings → AI.`
+          : `Model ${model} must be downloaded. It will NOT download automatically (only the default model, ${DEFAULT_OLLAMA_MODEL}, does) — press Download for it in Settings → AI.`,
       };
     // /api/show probe: the server answers but the model's files can no longer
     // be resolved (deleted or corrupted after install) — real calls will fail.
@@ -135,12 +154,15 @@ export function deriveAiStatus(s: AiStatus | null): AiStatusDisplay {
       return {
         dot: "bg-emerald-400",
         label: "AI loaded",
-        title: `AI active — ${model} is loaded in memory (Ollama).`,
+        title: `AI ready — ${model} is loaded in memory (Ollama).`,
       };
+    // Reachable + installed + healthy, but the model is NOT in memory
+    // (Ollama auto-unloads it after the keep-alive window): blue "standby".
+    // It loads automatically on the next AI call.
     return {
-      dot: "bg-emerald-400",
-      label: "AI",
-      title: `AI active — Ollama is reachable and ${model} is installed (loaded into memory on first use).`,
+      dot: "bg-sky-400",
+      label: "AI (standby)",
+      title: `Ollama is reachable and ${model} is installed, but the model is not in memory (RAM freed). It loads automatically on the next AI call — unload timing is configurable in Settings → AI.`,
     };
   }
   // Remote providers (OpenAI-compatible, Anthropic, MCP): green only when the

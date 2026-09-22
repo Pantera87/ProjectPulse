@@ -7,6 +7,7 @@ services:
       - "4701:4701"
     volumes:
       - projectpulse_data:/data          # SQLite DB + snapshots — survives container upgrades
+      - ollama_logs:/logs:ro            # bundled Ollama server log (read-only) for Settings → AI
     environment:
       # IANA timezone (e.g. Europe/Athens). Controls the scheduler, log
       # timestamps, and the times shown in the UI. Change it and restart
@@ -59,8 +60,13 @@ services:
       - "11434:11434"        # host access (ollama CLI, manual pulls); safe to remove
     environment:
       - OLLAMA_HOST=0.0.0.0:11434   # listen beyond loopback (needed for host access)
+    # Tee the server output into /logs/ollama.log so the app can display it
+    # (Settings → AI → "Ollama server log"). The file sits on the ollama_logs
+    # volume, read-only-mounted into the app container.
+    command: ["sh", "-c", "ollama serve 2>&1 | tee -a /logs/ollama.log"]
     volumes:
       - ollama_data:/root/.ollama
+      - ollama_logs:/logs
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       # 60 s cadence — the 10 s default kept waking the Ollama server on an
@@ -90,3 +96,4 @@ services:
 volumes:
   projectpulse_data:
   ollama_data:
+  ollama_logs:

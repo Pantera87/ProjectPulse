@@ -200,6 +200,57 @@ export async function ollamaDeleteModel(
 }
 
 /**
+ * Unload a model from Ollama's MEMORY (frees RAM) WITHOUT deleting it from
+ * disk. Ollama has no dedicated unload endpoint: a generate call with
+ * keep_alive 0 tells the server to release the model right away. No-op when
+ * the model is not currently loaded (unloaded: false).
+ */
+export async function ollamaUnload(
+  url: string,
+  name: string
+): Promise<{ ok: boolean; unloaded: boolean; error?: string }> {
+  const loaded = await ollamaLoaded(url);
+  if (loaded === null)
+    return {
+      ok: false,
+      unloaded: false,
+      error: `Cannot check loaded models — ${base(url)} did not answer /api/ps (server offline or an old Ollama without it).`,
+    };
+  const key = normalizeOllamaModel(name);
+  if (!loaded.some((m) => normalizeOllamaModel(m) === key))
+    return { ok: true, unloaded: false };
+  try {
+    const res = await fetch(`${base(url)}/api/generate`, {
+      method: "POST",
+      headers: { "user-agent": UA, "content-type": "application/json" },
+      // keep_alive 0 = release after this call; num_predict 1 keeps the
+      // empty prompt from generating anything meaningful.
+      body: JSON.stringify({
+        model: name,
+        prompt: "",
+        keep_alive: 0,
+        stream: false,
+        options: { num_predict: 1 },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok)
+      return { ok: false, unloaded: false, error: `Ollama returned ${res.status} when unloading ${name}` };
+    res.body?.cancel().catch(() => {});
+    return { ok: true, unloaded: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      unloaded: false,
+      error: /fetch failed|ECONNREFUSED|ETIMEDOUT|aborted|timeout/i.test(msg)
+        ? `Ollama server not reachable at ${base(url)} — is Ollama running?`
+        : msg,
+    };
+  }
+}
+
+/**
  * Start (or return an in-flight) background download of `name`. The pull
  * survives the HTTP request that started it; progress is exposed via
  * getPullJobs() for the UI.
@@ -271,6 +322,48 @@ export function startPull(url: string, name: string): PullJob {
 }
 
 /* ------------------------------------------------------------------ */
+/* Server log (bundled Docker service)                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tail of the bundled Ollama server's log. docker-compose.yml tees
+ * `ollama serve` into /logs/ollama.log on a volume shared with the app, so
+ * the Settings → AI terminal panel can display it. Returns lines: null with
+ * an explanatory note when the file does not exist — e.g. a standalone
+ * Ollama install, whose logs live on that machine, not here.
+ */
+export function readOllamaLogs(
+  maxLines = 400
+): { lines: string[] | null; note: string | null; sizeKB: number } {
+  const file = process.env.OLLAMA_LOG_FILE?.trim() || "/logs/ollama.log";
+  try {
+    const st = fs.statSync(file);
+    // Cap the read at the last 512 KB — the log can grow on a busy server.
+    const start = Math.max(0, st.size - 512 * 1024);
+    const buf = Buffer.alloc(st.size - start);
+    const fd = fs.openSync(file, "r");
+    try {
+      fs.readSync(fd, buf, 0, buf.length, start);
+    } finally {
+      fs.closeSync(fd);
+    }
+    let text = buf.toString("utf8");
+    if (start > 0) {
+      const nl = text.indexOf("\n"); // drop the (partial) first line
+      if (nl >= 0) text = text.slice(nl + 1);
+    }
+    const lines = text.split("\n").filter((l) => l.length > 0).slice(-maxLines);
+    return { lines, note: null, sizeKB: Math.round(st.size / 1024) };
+  } catch {
+    return {
+      lines: null,
+      sizeKB: 0,
+      note: `Server log file not found (expected at ${file}). It is written by the bundled Docker Ollama service (docker-compose.yml tees \`ollama serve\` there); with a standalone Ollama install the server log lives on that machine, not here.`,
+    };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Model catalog + hardware hints                                      */
 /* ------------------------------------------------------------------ */
 
@@ -288,8 +381,10 @@ export interface CatalogModel {
 
 /** The model used everywhere (defaults, pre-pull, UI hints) unless the user
  *  chose another one in Settings. Plain tags are Ollama's standard Q4_K_M
- *  builds — e.g. qwen3.5:4b already IS the Q4_K_M quantization. */
-export const DEFAULT_OLLAMA_MODEL = "qwen3.5:4b";
+ *  builds — e.g. qwen3.5:4b already IS the Q4_K_M quantization.
+ *  Defined in ai-status.ts (client-safe) and re-exported here so existing
+ *  server-side imports keep working. */
+export { DEFAULT_OLLAMA_MODEL } from "./ai-status";
 
 export const CATALOG: CatalogModel[] = [
   { name: "llama3.2:1b", family: "Llama 3.2", params: "1B", q4GB: 0.8, ctx: "128k", accuracy: "low", blurb: "Basic accuracy; lightest general-purpose model, very long context." },
