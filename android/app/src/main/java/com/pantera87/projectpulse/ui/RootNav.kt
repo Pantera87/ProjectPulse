@@ -5,8 +5,9 @@ package com.pantera87.projectpulse.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -28,6 +29,7 @@ import com.pantera87.projectpulse.App
 private const val DASHBOARD = "dashboard"
 private const val UPDATES = "updates"
 private const val SOURCES = "sources"
+private const val SETTINGS = "settings"
 private const val CONNECT = "connect"
 private const val SEARCH = "search"
 private const val SOURCE_DETAIL = "source/{sourceId}"
@@ -58,14 +60,20 @@ fun RootNav() {
                     NavigationBarItem(
                         selected = currentRoute == UPDATES,
                         onClick = { navigate(nav, UPDATES) },
-                        icon = { Icon(Icons.Default.List, "Updates") },
+                        icon = { Icon(Icons.AutoMirrored.Filled.List, "Updates") },
                         label = { Text("Updates") },
                     )
                     NavigationBarItem(
                         selected = currentRoute == SOURCES,
                         onClick = { navigate(nav, SOURCES) },
-                        icon = { Icon(Icons.Default.Settings, "Sources") },
+                        icon = { Icon(Icons.Outlined.RssFeed, "Sources") },
                         label = { Text("Sources") },
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == SETTINGS,
+                        onClick = { navigate(nav, SETTINGS) },
+                        icon = { Icon(Icons.Default.Settings, "Settings") },
+                        label = { Text("Settings") },
                     )
                 }
             }
@@ -90,6 +98,9 @@ fun RootNav() {
             composable(SOURCES) {
                 if (configured) SourcesScreen(onOpenSource = { id -> nav.navigate("source/$id") })
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+            }
+            composable(SETTINGS) {
+                SettingsScreen(onOpenConnect = { nav.navigate(CONNECT) })
             }
             composable(CONNECT) {
                 ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })

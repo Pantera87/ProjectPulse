@@ -37,22 +37,26 @@ import com.pantera87.projectpulse.data.Source
 @Composable
 fun SourcesScreen(onOpenSource: (Int) -> Unit) {
     val app = App.instance
+    var refreshing by remember { mutableStateOf(false) }
     var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         loading = true
         error = null
         when (val r = app.api.sources()) {
-            is ApiResult.Ok -> { sources = r.value; loading = false }
+            is ApiResult.Ok -> { sources = r.value; loading = false; refreshing = false }
             is ApiResult.Error -> {
                 if (r.needsAuth) {
+                    refreshing = false
                     app.prefs.markConfigured(false)
                     return@LaunchedEffect
                 }
                 error = r.message
                 loading = false
+                refreshing = false
             }
         }
     }
@@ -60,22 +64,29 @@ fun SourcesScreen(onOpenSource: (Int) -> Unit) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Sources") }) },
     ) { padding ->
-        when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(error!!, color = MaterialTheme.colorScheme.error)
-            }
-            sources.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No sources yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            else -> LazyColumn(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(12.dp),
-            ) {
+        PullToRefresh(
+            refreshing = refreshing,
+            onRefresh = {
+                refreshing = true
+                refreshKey++
+            },
+            modifier = Modifier.fillMaxSize().padding(padding),
+        ) {
+            when {
+                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                }
+                sources.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No sources yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else -> LazyColumn(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                ) {
                 items(sources, key = { it.id }) { s ->
                     Surface(
                         modifier = Modifier
@@ -113,6 +124,7 @@ fun SourcesScreen(onOpenSource: (Int) -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 }

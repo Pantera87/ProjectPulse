@@ -33,11 +33,17 @@ class ServerPrefs(context: Context) {
     private val _password = MutableStateFlow(secret.getString(KEY_PASSWORD, "") ?: "")
     private val _authEnabled = MutableStateFlow(plain.getBoolean(KEY_AUTH, false))
     private val _configured = MutableStateFlow(plain.getBoolean(KEY_CONFIGURED, false))
+    private val _notifEnabled = MutableStateFlow(plain.getBoolean(KEY_NOTIF_ENABLED, true))
+    private val _notifIntervalMin = MutableStateFlow(plain.getInt(KEY_NOTIF_INTERVAL, 15))
+    private val _lastSeenId = MutableStateFlow(plain.getInt(KEY_LAST_SEEN_ID, 0))
 
     val url: StateFlow<String> = _url.asStateFlow()
     val password: StateFlow<String> = _password.asStateFlow()
     val authEnabled: StateFlow<Boolean> = _authEnabled.asStateFlow()
     val configured: StateFlow<Boolean> = _configured.asStateFlow()
+    val notificationsEnabled: StateFlow<Boolean> = _notifEnabled.asStateFlow()
+    val notifIntervalMin: StateFlow<Int> = _notifIntervalMin.asStateFlow()
+    val lastSeenUpdateId: StateFlow<Int> = _lastSeenId.asStateFlow()
 
     fun saveUrl(value: String) {
         _url.value = value
@@ -65,11 +71,30 @@ class ServerPrefs(context: Context) {
         savePassword("")
     }
 
+    fun setNotificationsEnabled(value: Boolean) {
+        _notifEnabled.value = value
+        plain.edit().putBoolean(KEY_NOTIF_ENABLED, value).apply()
+    }
+
+    fun setNotifIntervalMin(value: Int) {
+        _notifIntervalMin.value = value
+        plain.edit().putInt(KEY_NOTIF_INTERVAL, value).apply()
+    }
+
+    /** Highest update id this device has notified about; 0 = first run. */
+    fun setLastSeenUpdateId(value: Int) {
+        _lastSeenId.value = value
+        plain.edit().putInt(KEY_LAST_SEEN_ID, value).apply()
+    }
+
     companion object {
         private const val KEY_URL = "server_url"
         private const val KEY_PASSWORD = "server_password"
         private const val KEY_AUTH = "server_auth_enabled"
         private const val KEY_CONFIGURED = "configured"
+        private const val KEY_NOTIF_ENABLED = "notif_enabled"
+        private const val KEY_NOTIF_INTERVAL = "notif_interval_min"
+        private const val KEY_LAST_SEEN_ID = "last_seen_update_id"
     }
 }
 

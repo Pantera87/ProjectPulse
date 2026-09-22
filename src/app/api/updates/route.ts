@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
  *   ?unreadOnly=1
  *   ?window=7d          → digest mode: only last N days (1d/7d/30d)
  *   ?limit=50
+ *   ?offset=50          → skip the first N matches (stable page cursor)
  */
 export function GET(req: Request) {
   const d = getDb();
@@ -43,6 +44,7 @@ export function GET(req: Request) {
   }
 
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 100) || 100, 500);
+  const offset = Math.min(Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0), 10_000);
   const rows = d
     .prepare(
       `SELECT u.*, s.name AS source_name, s.url AS source_url, s.type AS source_type
@@ -50,10 +52,10 @@ export function GET(req: Request) {
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
        ORDER BY
          CASE u.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
-         u.created_at DESC
-       LIMIT ?`
+         u.created_at DESC, u.id DESC
+       LIMIT ? OFFSET ?`
     )
-    .all(...vals, limit);
+    .all(...vals, limit, offset);
   return NextResponse.json({ updates: rows });
 }
 

@@ -4,6 +4,8 @@
     <!-- Talks to the self-hosted ProjectPulse server (LAN http or https). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Runtime-permissioned on Android 13+ (targetSdk 35). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".App"

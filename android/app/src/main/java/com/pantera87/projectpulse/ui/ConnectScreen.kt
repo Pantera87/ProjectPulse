@@ -79,6 +79,7 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                     if (!h.value.auth) {
                         prefs.savePassword("")
                         prefs.markConfigured(true)
+                        app.startBackgroundSync()
                         busy = false
                         onSuccess()
                         return@launch
@@ -94,6 +95,7 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                         is ApiResult.Ok -> {
                             prefs.savePassword(pw)
                             prefs.markConfigured(true)
+                            app.startBackgroundSync()
                             busy = false
                             onSuccess()
                         }

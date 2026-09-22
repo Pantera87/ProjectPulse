@@ -58,24 +58,31 @@ private data class SourceRow(
 @Composable
 fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
     val app = App.instance
+    var refreshing by remember { mutableStateOf(false) }
+    var refreshKey by remember { mutableStateOf(0) }
     var dash by remember { mutableStateOf<Dashboard?>(null) }
     var sourceRows by remember { mutableStateOf<List<SourceRow>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
+    // Re-keyed on pull-to-refresh: restarting the effect cancels the pending
+    // poll delay and fetches immediately.
+    LaunchedEffect(refreshKey) {
         while (true) {
             val d = app.api.dashboard()
             when (d) {
                 is ApiResult.Error -> {
                     if (d.needsAuth) {
+                        refreshing = false
                         app.prefs.markConfigured(false)
                         return@LaunchedEffect
                     }
                     error = d.message
+                    refreshing = false
                 }
                 is ApiResult.Ok -> {
                     dash = d.value
                     error = null
+                    refreshing = false
                     // Join source names for the source cards.
                     val s = app.api.sources()
                     val names: Map<Int, Source> =
@@ -119,12 +126,19 @@ fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+        PullToRefresh(
+            refreshing = refreshing,
+            onRefresh = {
+                refreshing = true
+                refreshKey++
+            },
+            modifier = Modifier.fillMaxSize().padding(padding),
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            ) {
             when {
                 data == null && error == null -> Box(
                     modifier = Modifier.fillMaxSize(),
@@ -163,6 +177,7 @@ fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 }

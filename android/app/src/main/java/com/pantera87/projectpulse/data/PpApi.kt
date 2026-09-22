@@ -100,6 +100,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         unreadOnly: Boolean = false,
         window: String? = null,
         limit: Int = 100,
+        offset: Int = 0,
     ): ApiResult<UpdatesPage> {
         val sb = StringBuilder()
         fun put(k: String, v: String) {
@@ -110,6 +111,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         if (unreadOnly) put("unreadOnly", "1")
         window?.let { put("window", it) }
         put("limit", limit.toString())
+        if (offset > 0) put("offset", offset.toString())
         return getJson("/api/updates$sb", UpdatesPage.serializer())
     }
 
