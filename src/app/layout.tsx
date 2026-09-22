@@ -23,6 +23,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Canonical base for resolving relative metadata URLs (OG/Twitter images).
+  // The app runs on user-defined domains, so anchor the social image on the
+  // GitHub Pages landing page, which serves the same image.
+  metadataBase: new URL("https://pantera87.github.io/ProjectPulse/"),
   title: {
     default: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
     template: "%s — ProjectPulse",
@@ -48,14 +52,14 @@ export const metadata: Metadata = {
     title: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
     description:
       "Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama.",
-    images: [{ url: "/og-image.png", alt: "ProjectPulse dashboard" }],
+    images: [{ url: "/assets/og-image.png", alt: "ProjectPulse dashboard" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "ProjectPulse — Self-hosted Project Tracker & Changelog Monitor",
     description:
       "Snapshot websites, follow GitHub releases and RSS feeds, keyword rules with priorities, AI summaries via local Ollama.",
-    images: ["/og-image.png"],
+    images: ["/assets/og-image.png"],
   },
 };
 

@@ -335,13 +335,16 @@ export function startPull(url: string, name: string): PullJob {
 export function readOllamaLogs(
   maxLines = 400
 ): { lines: string[] | null; note: string | null; sizeKB: number } {
+  // The log path is dynamic (env-configurable), so the fs calls are marked
+  // with turbopackIgnore — without it, Turbopack traces the whole project
+  // into the standalone bundle (build warning) for no runtime benefit.
   const file = process.env.OLLAMA_LOG_FILE?.trim() || "/logs/ollama.log";
   try {
-    const st = fs.statSync(file);
+    const st = fs.statSync(/*turbopackIgnore: true*/ file);
     // Cap the read at the last 512 KB — the log can grow on a busy server.
     const start = Math.max(0, st.size - 512 * 1024);
     const buf = Buffer.alloc(st.size - start);
-    const fd = fs.openSync(file, "r");
+    const fd = fs.openSync(/*turbopackIgnore: true*/ file, "r");
     try {
       fs.readSync(fd, buf, 0, buf.length, start);
     } finally {
