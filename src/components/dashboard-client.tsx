@@ -9,6 +9,7 @@ import RefreshAll from "./refresh-all";
 import Time from "./time";
 import SourceCard from "./source-card";
 import CategoryIcon from "./category-icon";
+import { repoDisplayName } from "@/lib/format";
 import { Glyph, KIND_ICON } from "./icons";
 import EmptyPulse from "./empty-pulse";
 
@@ -312,7 +313,7 @@ export default function DashboardClient({
                     ? "border-rose-400/40 bg-rose-500/10"
                     : "border-amber-400/40 bg-amber-400/10"
                 }`}
-                title={`${u.title} (${u.source_name ?? u.source_type})`}
+                title={`${u.title} (${repoDisplayName(u.source_type, u.source_name) ?? u.source_type})`}
               >
                 <span
                   className={`h-1.5 w-1.5 shrink-0 rounded-full ${
@@ -577,7 +578,9 @@ export default function DashboardClient({
                         name={TYPE_GLYPH[u.source_type] ?? "box"}
                         className="h-3 w-3 shrink-0"
                       />
-                      <span className="truncate">{u.source_name}</span>
+                      <span className="truncate">
+                        {repoDisplayName(u.source_type, u.source_name)}
+                      </span>
                       <span className="shrink-0">·</span>
                       <Time iso={u.created_at} />
                     </span>
@@ -588,7 +591,7 @@ export default function DashboardClient({
                       target="_blank"
                       rel="noreferrer"
                       className="shrink-0 rounded px-1 text-indigo-300 hover:underline"
-                      title={`Open ${u.source_name ?? "source"} ↗`}
+                      title={`Open ${repoDisplayName(u.source_type, u.source_name) ?? "source"} ↗`}
                     >
                       ↗
                     </a>

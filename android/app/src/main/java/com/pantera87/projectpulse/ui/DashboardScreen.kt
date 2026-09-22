@@ -18,8 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -52,7 +56,7 @@ private data class SourceRow(
 )
 
 @Composable
-fun DashboardScreen(onOpenUpdates: () -> Unit) {
+fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
     val app = App.instance
     var dash by remember { mutableStateOf<Dashboard?>(null) }
     var sourceRows by remember { mutableStateOf<List<SourceRow>>(emptyList()) }
@@ -100,6 +104,9 @@ fun DashboardScreen(onOpenUpdates: () -> Unit) {
             TopAppBar(
                 title = { Text("ProjectPulse") },
                 actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(Icons.Default.Search, "Search")
+                    }
                     if (data != null && data.counts.total > 0) {
                         Text(
                             "${data.counts.total} unread",

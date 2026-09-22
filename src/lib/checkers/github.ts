@@ -195,7 +195,7 @@ export async function checkGithub(
         touchSource(d, source.id, {
           goal: truncate(m.description, 500),
           goal_source: "auto", // the repo description — not AI-generated
-          name: source.name || m.full_name,
+          name: source.name || repo, // repo-only ("ProjectPulse"), not "owner/ProjectPulse"
         });
     } catch {
       // best-effort — the full check below retries
@@ -229,7 +229,7 @@ export async function checkGithub(
     const meta = await github.repo(owner, repo);
     if (meta.archived)
       touchSource(d, source.id, {
-        name: `${source.name || meta.full_name} [archived]`,
+        name: `${source.name || repo} [archived]`,
       });
 
     // --- Project logo (repo avatar) ---

@@ -2,6 +2,7 @@
 
 package com.pantera87.projectpulse.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +35,7 @@ import com.pantera87.projectpulse.data.Source
 
 
 @Composable
-fun SourcesScreen() {
+fun SourcesScreen(onOpenSource: (Int) -> Unit) {
     val app = App.instance
     var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -79,6 +80,7 @@ fun SourcesScreen() {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable { onOpenSource(s.id) }
                             .padding(vertical = 4.dp),
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,

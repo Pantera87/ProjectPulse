@@ -92,11 +92,11 @@ function Nav() {
             src="/logo.png"
             alt=""
             aria-hidden="true"
-            width={32}
-            height={32}
-            className="h-8 w-8 shrink-0"
+            width={48}
+            height={48}
+            className="h-12 w-12 shrink-0 drop-shadow-[0_0_10px_rgba(56,189,248,0.45)]"
           />
-          <span className="grad-text text-lg font-semibold leading-none">
+          <span className="grad-text text-3xl font-semibold leading-none">
             ProjectPulse
           </span>
         </Link>

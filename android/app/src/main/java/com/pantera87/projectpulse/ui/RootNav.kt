@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -27,6 +29,9 @@ private const val DASHBOARD = "dashboard"
 private const val UPDATES = "updates"
 private const val SOURCES = "sources"
 private const val CONNECT = "connect"
+private const val SEARCH = "search"
+private const val SOURCE_DETAIL = "source/{sourceId}"
+private const val SNAPSHOT = "snapshot/{sourceId}/{version}"
 
 /**
  * Routes between screens. Until the app is "configured" (a server that
@@ -72,19 +77,47 @@ fun RootNav() {
             modifier = Modifier.padding(padding),
         ) {
             composable(DASHBOARD) {
-                if (configured) DashboardScreen(onOpenUpdates = { nav.navigate(UPDATES) })
+                if (configured) DashboardScreen(
+                    onOpenUpdates = { nav.navigate(UPDATES) },
+                    onOpenSearch = { nav.navigate(SEARCH) },
+                )
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
             composable(UPDATES) {
-                if (configured) UpdatesScreen()
+                if (configured) UpdatesScreen(onOpenSearch = { nav.navigate(SEARCH) })
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
             composable(SOURCES) {
-                if (configured) SourcesScreen()
+                if (configured) SourcesScreen(onOpenSource = { id -> nav.navigate("source/$id") })
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
             composable(CONNECT) {
                 ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+            }
+            composable(SEARCH) {
+                SearchScreen(onBack = { nav.popBackStack() })
+            }
+            composable(
+                SOURCE_DETAIL,
+                arguments = listOf(navArgument("sourceId") { type = NavType.IntType }),
+            ) { entry ->
+                val id = entry.arguments?.getInt("sourceId") ?: return@composable
+                SourceDetailScreen(
+                    sourceId = id,
+                    onOpenSnapshot = { v -> nav.navigate("snapshot/$id/$v") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(
+                SNAPSHOT,
+                arguments = listOf(
+                    navArgument("sourceId") { type = NavType.IntType },
+                    navArgument("version") { type = NavType.IntType },
+                ),
+            ) { entry ->
+                val id = entry.arguments?.getInt("sourceId") ?: return@composable
+                val v = entry.arguments?.getInt("version") ?: return@composable
+                SnapshotScreen(sourceId = id, version = v, onBack = { nav.popBackStack() })
             }
         }
     }
@@ -100,5 +133,3 @@ private fun navigate(
         restoreState = true
     }
 }
-
-

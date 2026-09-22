@@ -29,6 +29,9 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        // A null where a non-null-with-default is declared (e.g. a NULL title
+        // column) falls back to the default instead of throwing.
+        coerceInputValues = true
     }
 
     private val base = baseUrl.trimEnd('/')
@@ -52,7 +55,11 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
             healthClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return@use ApiResult.Error("Server responded ${resp.code}")
                 val body = resp.body?.string() ?: return@use ApiResult.Error("Empty response")
-                ApiResult.Ok(json.decodeFromString(body))
+                try {
+                    ApiResult.Ok(json.decodeFromString(body))
+                } catch (e: Exception) {
+                    ApiResult.Error("Unexpected health response — update the app?")
+                }
             }
         } catch (e: IOException) {
             ApiResult.Error("Cannot reach server — check the URL and that the server is running")
@@ -132,6 +139,16 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     suspend fun snapshotHtml(sourceId: Int, version: Int): ApiResult<String> =
         getRaw("/api/sources/$sourceId/snapshots?version=$version")
 
+    /** GET /api/sources/:id — source row + its snapshot versions. */
+    suspend fun sourceDetail(id: Int): ApiResult<SourceDetail> =
+        getJson("/api/sources/$id", SourceDetail.serializer())
+
+    /** GET /api/search — FTS5 over updates + substring over project fields. */
+    suspend fun search(query: String): ApiResult<SearchPage> {
+        val q = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+        return getJson("/api/search?q=$q", SearchPage.serializer())
+    }
+
     private suspend fun <T> getJson(
         path: String,
         deserializer: kotlinx.serialization.DeserializationStrategy<T>,
@@ -207,4 +224,3 @@ private data class LoginBody(val password: String)
 
 @kotlinx.serialization.Serializable
 private data class MarkBody(val ids: List<Int>, val read: Boolean)
-

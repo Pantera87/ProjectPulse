@@ -10,9 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,12 +38,13 @@ import com.pantera87.projectpulse.data.Update
 private val FILTERS = listOf("all", "critical", "high", "normal", "unreadOnly")
 
 @Composable
-fun UpdatesScreen() {
+fun UpdatesScreen(onOpenSearch: () -> Unit) {
     val app = App.instance
     var updates by remember { mutableStateOf<List<Update>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var filter by remember { mutableStateOf("all") }
+    var selected by remember { mutableStateOf<Update?>(null) }
 
     LaunchedEffect(filter) {
         loading = true
@@ -62,7 +67,16 @@ fun UpdatesScreen() {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Updates") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Updates") },
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(Icons.Default.Search, "Search")
+                    }
+                },
+            )
+        },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -85,9 +99,24 @@ fun UpdatesScreen() {
                     Text("No updates", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> LazyColumn(Modifier.fillMaxWidth()) {
-                    items(updates, key = { it.id }) { u -> UpdateRow(u) {} }
+                    items(updates, key = { it.id }) { u -> UpdateRow(u) { selected = u } }
                 }
             }
         }
+    }
+    selected?.let { u ->
+        UpdateDetailSheet(
+            update = u,
+            onDismiss = { selected = null },
+            onReadStateChanged = { read ->
+                val stamp = if (read) java.time.Instant.now().toString() else null
+                selected = u.copy(read_at = stamp)
+                updates = updates.map { if (it.id == u.id) it.copy(read_at = stamp) else it }
+            },
+            onDeleteConfirmed = {
+                updates = updates.filter { it.id != u.id }
+                selected = null
+            },
+        )
     }
 }

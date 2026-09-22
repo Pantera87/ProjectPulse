@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { parseGithubRef } from "./github";
 
 export type SourceType = "website" | "github" | "rss";
 export type Priority = "critical" | "high" | "normal";
@@ -247,6 +248,23 @@ function migrate(d: Database.Database) {
       for (const r of rows) ins.run(r.id, r.title, r.summary);
     })();
     setSetting(d, "fts_update_backfill_v1", "1");
+  }
+  // One-time backfill (v1.1.0): GitHub sources were auto-named with the API's
+  // "owner/repo" full name; the UI now shows the repo name only. Rewrite the
+  // name when it is exactly the auto-filled full name derived from the URL —
+  // user-set names (anything else) are never touched.
+  if (getSetting(d, "github_repo_name_backfill_v1") !== "1") {
+    const rows = d
+      .prepare(`SELECT id, url, name FROM sources WHERE type = 'github'`)
+      .all() as { id: number; url: string; name: string | null }[];
+    for (const r of rows) {
+      if (!r.name) continue;
+      const ref = parseGithubRef(r.url);
+      if (ref && r.name === `${ref[0]}/${ref[1]}`) {
+        d.prepare(`UPDATE sources SET name = ? WHERE id = ?`).run(ref[1], r.id);
+      }
+    }
+    setSetting(d, "github_repo_name_backfill_v1", "1");
   }
 }
 
