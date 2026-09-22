@@ -1,0 +1,16 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Per-device SDK location
+local.properties
+
+# Keystore
+*.keystore
+*.jks
