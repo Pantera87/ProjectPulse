@@ -17,10 +17,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,7 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.data.ApiResult
@@ -78,16 +80,28 @@ fun SnapshotScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Snapshot v$version" + (sourceName?.let { "  ·  $it" } ?: "")) },
+                title = {
+                    Text(
+                        "Snapshot v$version" + (sourceName?.let { "  ·  $it" } ?: ""),
+                        color = Palette.Foreground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            "Back",
+                            tint = Palette.GhostText,
+                        )
                     }
                 },
                 actions = {
-                    sourceUrl?.let { url ->
+                    sourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
                         IconButton(
                             onClick = {
                                 runCatching {
@@ -96,16 +110,19 @@ fun SnapshotScreen(
                                     )
                                 }
                             },
-                        ) { Icon(Icons.Default.OpenInBrowser, "Open source in browser") }
+                        ) { Icon(Icons.Default.OpenInBrowser, "Open source in browser", tint = Palette.GhostText) }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors().copy(
+                    containerColor = Color.Transparent,
+                ),
             )
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             when {
-                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
-                html == null -> CircularProgressIndicator()
+                error != null -> Text(error!!, color = Palette.Error)
+                html == null -> CircularProgressIndicator(color = Palette.BrandViolet)
                 else -> {
                     val h = html!!
                     AndroidView(

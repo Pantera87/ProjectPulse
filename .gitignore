@@ -48,3 +48,10 @@ next-env.d.ts
 *.db-shm
 server.log
 server.err.log
+
+# Android debug artifacts (UI-dump screenshots, helper scripts, UI dumps)
+/android/*.png
+/android/*.jpg
+/android/*.jpeg
+/android/*.py
+/android/ui.xml

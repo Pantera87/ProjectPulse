@@ -2,20 +2,24 @@
 
 package com.pantera87.projectpulse.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,9 +30,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,8 +41,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.data.ApiResult
 import com.pantera87.projectpulse.data.Dashboard
@@ -56,17 +70,22 @@ private data class SourceRow(
 )
 
 @Composable
-fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
+fun DashboardScreen(
+    refreshPulse: Int = 0,
+    onOpenUpdates: () -> Unit,
+    onOpenSearch: () -> Unit,
+) {
     val app = App.instance
     var refreshing by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableStateOf(0) }
     var dash by remember { mutableStateOf<Dashboard?>(null) }
     var sourceRows by remember { mutableStateOf<List<SourceRow>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    val uiMode = rememberUiMode()
 
-    // Re-keyed on pull-to-refresh: restarting the effect cancels the pending
-    // poll delay and fetches immediately.
-    LaunchedEffect(refreshKey) {
+    // Re-keyed on pull-to-refresh (and same-tab re-taps): restarting the
+    // effect cancels the pending poll delay and fetches immediately.
+    LaunchedEffect(refreshKey, refreshPulse) {
         while (true) {
             val d = app.api.dashboard()
             when (d) {
@@ -107,19 +126,36 @@ fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
     val data = dash
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("ProjectPulse") },
+                title = {
+                    GradText(
+                        "ProjectPulse",
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.02f).sp,
+                        ),
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors().copy(
+                    containerColor = Color.Transparent,
+                ),
                 actions = {
                     IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, "Search")
+                        Icon(
+                            Icons.Default.Search,
+                            "Search",
+                            tint = Palette.GhostText,
+                        )
                     }
                     if (data != null && data.counts.total > 0) {
                         Text(
                             "${data.counts.total} unread",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 16.dp),
+                            fontSize = 12.sp,
+                            color = Palette.TextSecondary,
+                            modifier = Modifier.padding(end = 12.dp),
                         )
                     }
                 },
@@ -134,10 +170,19 @@ fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
+            AdaptiveContent(uiMode, maxWidth = 720.dp) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 4.dp,
+                        // The tablet nav rail replaces the floating pill: no
+                        // bottom clearance needed.
+                        bottom = if (uiMode.isTablet) 16.dp else FLOATING_BAR_BOTTOM_PADDING,
+                    ),
             ) {
             when {
                 data == null && error == null -> Box(
@@ -152,43 +197,78 @@ fun DashboardScreen(onOpenUpdates: () -> Unit, onOpenSearch: () -> Unit) {
 
                 else -> {
                     data?.let { d ->
-                        if (d.counts.total > 0) UnreadSummary(d.counts.critical, d.counts.high, d.counts.normal)
+                        var item = 0
+                        if (d.counts.total > 0) {
+                            Box(Modifier.rise(0)) {
+                                UnreadSummary(d.counts.critical, d.counts.high, d.counts.normal)
+                            }
+                        }
                         if (d.attention.isNotEmpty()) {
                             SectionTitle("Needs attention")
-                            d.attention.take(5).forEach { u ->
-                                UpdateRow(u) { onOpenUpdates() }
+                            val attention = d.attention.take(5)
+                            if (uiMode.isTablet) {
+                                TwoColumnList(attention) { _, u ->
+                                    UpdateRow(u) { onOpenUpdates() }
+                                }
+                            } else {
+                                attention.forEach { u ->
+                                    UpdateRow(u, modifier = Modifier.rise(item++)) { onOpenUpdates() }
+                                }
                             }
                         }
                         SectionTitle("Latest")
-                        d.latest.take(10).forEach { u ->
-                            UpdateRow(u) { onOpenUpdates() }
+                        val latest = d.latest.take(10)
+                        if (uiMode.isTablet) {
+                            TwoColumnList(latest) { _, u ->
+                                UpdateRow(u) { onOpenUpdates() }
+                            }
+                        } else {
+                            latest.forEach { u ->
+                                UpdateRow(u, modifier = Modifier.rise(item++)) { onOpenUpdates() }
+                            }
                         }
                         if (sourceRows.isNotEmpty()) {
                             SectionTitle("Sources")
-                            sourceRows.forEach { row ->
-                                SourceCard(
-                                    name = row.name,
-                                    latestTitle = row.latestTitle,
-                                    latestTime = row.latestTime,
-                                    activity = row.activity,
-                                )
+                            if (uiMode.isTablet) {
+                                TwoColumnList(sourceRows) { _, row ->
+                                    SourceCard(
+                                        name = row.name,
+                                        latestTitle = row.latestTitle,
+                                        latestTime = row.latestTime,
+                                        activity = row.activity,
+                                    )
+                                }
+                            } else {
+                                sourceRows.forEach { row ->
+                                    SourceCard(
+                                        name = row.name,
+                                        latestTitle = row.latestTitle,
+                                        latestTime = row.latestTime,
+                                        activity = row.activity,
+                                        index = item++,
+                                    )
+                                }
                             }
                         }
                     }
                 }
+            }
             }
         }
         }
     }
 }
 
+/** Web `.section-title`: 12px, 600, letter-spacing 1.2, uppercase, #94a3b8. */
 @Composable
 private fun SectionTitle(text: String) {
     Text(
-        text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 20.dp, bottom = 8.dp, start = 4.dp),
+        text.uppercase(),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.2.sp,
+        color = Palette.TextSecondary,
+        modifier = Modifier.padding(top = 22.dp, bottom = 10.dp, start = 4.dp),
     )
 }
 
@@ -197,26 +277,39 @@ private fun UnreadSummary(critical: Int, high: Int, normal: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (critical > 0) UnreadChip("CRIT $critical", 0xFFFF5C7A)
-        if (high > 0) UnreadChip("HIGH $high", 0xFFFF9E64)
-        if (normal > 0) UnreadChip("$normal", 0xFF818CF8)
+        if (critical > 0) StatChip("CRIT $critical", Palette.Critical)
+        if (high > 0) StatChip("HIGH $high", Palette.High)
+        if (normal > 0) StatChip("$normal", Palette.BrandBlue)
     }
 }
 
+/** Web `.stat` chip: 16% tint fill + 30% tint border, tinted label. */
 @Composable
-private fun UnreadChip(label: String, color: Long) {
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = androidx.compose.ui.graphics.Color(color).copy(alpha = 0.18f),
+private fun StatChip(label: String, tint: Color) {
+    Box(
+        modifier = Modifier
+            .background(color = tint.copy(alpha = 0.16f), shape = CircleShape)
+            .drawBehind {
+                val stroke = 1.dp.toPx()
+                drawRoundRect(
+                    color = tint.copy(alpha = 0.3f),
+                    topLeft = Offset(stroke / 2f, stroke / 2f),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(size.height / 2f),
+                    style = Stroke(width = stroke),
+                )
+            },
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.labelMedium,
-            color = androidx.compose.ui.graphics.Color(color),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = tint,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
         )
     }
 }
@@ -228,46 +321,79 @@ fun priorityColor(p: String): androidx.compose.ui.graphics.Color = when (p) {
 }
 
 @Composable
-fun UpdateRow(update: Update, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
+fun UpdateRow(
+    update: Update,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    GlassCard(
+        onClick = onClick,
+        radius = 12.dp,
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 4.dp)
+            .then(
+                if (update.read_at != null) {
+                    Modifier.graphicsLayer { alpha = 0.6f }
+                } else Modifier,
+            ),
     ) {
-        Box(
-            modifier = Modifier
-                .padding(end = 12.dp)
-                .size(8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                drawCircle(color = priorityColor(update.priority), radius = size.minDimension / 2)
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PriorityDot(priority = update.priority)
+                Text(
+                    update.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Palette.Foreground,
+                    modifier = Modifier.weight(1f),
+                )
+                if (update.priority == "critical" || update.priority == "high") {
+                    Spacer(Modifier.width(8.dp))
+                    PriorityBadge(update.priority)
+                }
             }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                update.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyLarge,
-            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     formatTime(update.created_at),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    color = Palette.TextTertiary,
                 )
                 update.source_name?.let {
                     Text(
                         "  ·  $it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        color = Palette.TextTertiary,
                     )
+                }
+                if (update.kind.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    KindBadge(update.kind)
                 }
             }
         }
+    }
+}
+
+/** Web `.pri-dot`: solid dot with a soft glow ring. */
+@Composable
+private fun PriorityDot(priority: String, modifier: Modifier = Modifier) {
+    val c = priorityColor(priority)
+    Box(
+        modifier = modifier
+            .padding(end = 10.dp)
+            .size(16.dp)
+            .drawBehind {
+                drawCircle(color = c.copy(alpha = 0.25f), radius = size.minDimension / 2f)
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color = c, shape = CircleShape),
+        )
     }
 }
 
@@ -277,13 +403,15 @@ private fun SourceCard(
     latestTitle: String,
     latestTime: String,
     activity: List<Int>?,
+    index: Int = 0,
 ) {
-    Surface(
+    GlassCard(
+        radius = 12.dp,
+        tile = true,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+            .padding(vertical = 4.dp)
+            .rise(index),
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -292,7 +420,8 @@ private fun SourceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
+                    color = Palette.Foreground,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
                 Sparkline(values = activity)
             }
@@ -301,13 +430,13 @@ private fun SourceCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.TextSecondary,
                 modifier = Modifier.padding(top = 6.dp),
             )
             Text(
                 latestTime,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.TextTertiary,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -328,7 +457,7 @@ private fun Sparkline(values: List<Int>?) {
         points.forEachIndexed { i, v ->
             val h = (v.toFloat() / peak * size.height).coerceAtLeast(1f)
             drawRect(
-                color = priorityColor("normal").copy(alpha = 0.7f),
+                color = Palette.BrandViolet.copy(alpha = 0.55f),
                 topLeft = androidx.compose.ui.geometry.Offset(i * barW, size.height - h),
                 size = androidx.compose.ui.geometry.Size(barW * 0.7f, h),
             )

@@ -76,12 +76,12 @@ fun PullToRefresh(
             }
         },
     ) {
-        // Content first (below), opaque so it hides the indicator except the
-        // sliver revealed by its translationY.
+        // Content first (below). Left transparent: the aurora backdrop from
+        // RootNav shows through, and the spinner is clipped to the gap above
+        // the content's translated top edge, so it never overlaps it.
         Box(
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .graphicsLayer { translationY = contentOffset },
         ) {
             content()

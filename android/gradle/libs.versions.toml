@@ -26,6 +26,9 @@ androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
+# Managed by the Compose BOM (same release as material3). Alias avoids the
+# reserved 'class' token, hence no -class suffix.
+androidx-compose-material3-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }

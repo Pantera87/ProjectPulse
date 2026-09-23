@@ -23,8 +23,27 @@ android {
         release {
             // No Play Store: APKs are sideloaded. Sign with the debug key by
             // default so `assembleRelease` works out of the box.
-            isMinifyEnabled = false
+            //
+            // R8 optimization (Play "optimized DEX code" requirement, Feb 2027):
+            // enables code shrinking, optimization, obfuscation and resource
+            // shrinking. See:
+            //   https://developer.android.com/topic/performance/app-optimization/enable-app-optimization
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+    // One APK per CPU architecture (e.g. app-release-arm64-v8a.apk).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false
         }
     }
     compileOptions {
@@ -50,6 +69,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.window.size)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)

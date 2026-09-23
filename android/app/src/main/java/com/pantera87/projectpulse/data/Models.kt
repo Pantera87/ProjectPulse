@@ -102,8 +102,11 @@ data class Source(
     val category: String? = null,
     val subcategory: String? = null,
     val notes: String? = null,
+    /** Relative path of the stored repo logo (github sources); null when absent. */
+    val logo: String? = null,
     val watch_enabled: Int? = 1,
     val check_interval_hours: Int? = 6,
+    val rules_json: String? = null,
     val unread: Int = 0,
 ) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: url
@@ -133,3 +136,54 @@ data class SourceDetail(
     val source: Source,
     val snapshots: List<Snapshot> = emptyList(),
 )
+
+/** POST /api/sources/:id/check — result of running the checker now. */
+@Serializable
+data class CheckResult(
+    val ok: Boolean = false,
+    val changed: Boolean = false,
+    val updatesCreated: Int = 0,
+    val error: String? = null,
+)
+
+/** POST /api/sources/check-all — start (or report an in-flight) run. */
+@Serializable
+data class CheckAllStarted(
+    val started: Boolean? = null,
+    val running: Boolean? = null,
+    val count: Int? = null,
+    val type: String? = null,
+)
+
+/** GET /api/sources/check-all?run=0 — live progress of a running check-all. */
+@Serializable
+data class CheckAllProgress(
+    val running: Boolean? = null,
+    val checked: Int = 0,
+    val failed: Int = 0,
+    val total: Int = 0,
+    val type: String? = null,
+)
+
+/**
+ * One row of a source's `rules_json` array — the web editor's `WatchRule`
+ * shape: `type` (include/exclude), the `keywords` that flag an update, the
+ * `sources` fields they're searched in, plus optional `priority`/`labels`/
+ * `negate`. Stored as a JSON string column, not a table.
+ */
+@Serializable
+data class WatchRule(
+    val id: String? = null,
+    val type: String = "include",
+    val priority: String? = null,
+    val keywords: List<String> = emptyList(),
+    val sources: List<String> = emptyList(),
+    val negate: List<String> = emptyList(),
+    val labels: List<String> = emptyList(),
+) {
+    /** True when every list is empty/blank — such a rule flags nothing. */
+    val isBlank: Boolean
+        get() = keywords.all { it.isBlank() } &&
+            negate.all { it.isBlank() } &&
+            labels.all { it.isBlank() }
+}

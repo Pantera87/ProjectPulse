@@ -3,25 +3,33 @@
 package com.pantera87.projectpulse.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,7 +52,10 @@ private val FILTERS = listOf("all", "critical", "high", "normal", "unreadOnly")
 private const val PAGE_SIZE = 50
 
 @Composable
-fun UpdatesScreen(onOpenSearch: () -> Unit) {
+fun UpdatesScreen(
+    refreshPulse: Int = 0,
+    onOpenSearch: () -> Unit,
+) {
     val app = App.instance
     val scope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(false) }
@@ -56,13 +67,14 @@ fun UpdatesScreen(onOpenSearch: () -> Unit) {
     var filter by remember { mutableStateOf("all") }
     var refreshKey by remember { mutableStateOf(0) }
     var selected by remember { mutableStateOf<Update?>(null) }
+    val uiMode = rememberUiMode()
 
     fun filterArgs(): Pair<String?, Boolean> {
         val p = if (filter == "all" || filter == "unreadOnly") null else filter
         return p to (filter == "unreadOnly")
     }
 
-    LaunchedEffect(filter, refreshKey) {
+    LaunchedEffect(filter, refreshKey, refreshPulse) {
         loading = true
         error = null
         val (p, uo) = filterArgs()
@@ -114,12 +126,28 @@ fun UpdatesScreen(onOpenSearch: () -> Unit) {
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Updates") },
+                title = {
+                    GradText(
+                        "Updates",
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors().copy(
+                    containerColor = Color.Transparent,
+                ),
                 actions = {
                     IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, "Search")
+                        Icon(
+                            Icons.Default.Search,
+                            "Search",
+                            tint = Palette.GhostText,
+                        )
                     }
                 },
             )
@@ -133,13 +161,15 @@ fun UpdatesScreen(onOpenSearch: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
+            AdaptiveContent(uiMode, maxWidth = 880.dp) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                     FILTERS.forEach { f ->
-                        FilterChip(
-                            selected = filter == f,
+                        GlassChip(
+                            text = if (f == "unreadOnly") "Unread" else f.replaceFirstChar { it.uppercase() },
+                            active = filter == f,
                             onClick = { filter = f },
-                            label = { Text(if (f == "unreadOnly") "Unread" else f.replaceFirstChar { it.uppercase() }) },
+                            modifier = Modifier.padding(horizontal = 3.dp),
                         )
                     }
                 }
@@ -148,32 +178,83 @@ fun UpdatesScreen(onOpenSearch: () -> Unit) {
                         CircularProgressIndicator()
                     }
                     error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(error!!, color = MaterialTheme.colorScheme.error)
+                        Text(error!!, color = Palette.Error)
                     }
                     updates.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No updates", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No updates", color = Palette.TextTertiary)
                     }
-                    else -> LazyColumn(Modifier.fillMaxWidth()) {
-                        itemsIndexed(updates, key = { _, u -> u.id }) { index, u ->
-                            UpdateRow(u) { selected = u }
-                            if (index >= updates.size - 8 && hasMore && !loadingMore) {
-                                loadMore()
+                    else -> if (uiMode.isTablet) {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            updates.forEachIndexed { index, u ->
+                                item(
+                                    key = "u${u.id}",
+                                    span = { GridItemSpan(1) },
+                                ) {
+                                    UpdateRow(
+                                        u,
+                                        modifier = Modifier.rise(index),
+                                    ) { selected = u }
+                                    if (index >= updates.size - 8 && hasMore && !loadingMore) {
+                                        loadMore()
+                                    }
+                                }
+                            }
+                            if (loadingMore) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(Modifier.size(24.dp))
+                                    }
+                                }
+                            }
+                            item(span = { GridItemSpan(2) }) {
+                                Box(Modifier.height(16.dp))
                             }
                         }
-                        if (loadingMore) {
-                            item {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator(Modifier.size(24.dp))
+                    } else {
+                        LazyColumn(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                        ) {
+                            itemsIndexed(updates, key = { _, u -> u.id }) { index, u ->
+                                UpdateRow(
+                                    u,
+                                    modifier = Modifier.rise(index),
+                                ) { selected = u }
+                                if (index >= updates.size - 8 && hasMore && !loadingMore) {
+                                    loadMore()
                                 }
+                            }
+                            if (loadingMore) {
+                                item {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CircularProgressIndicator(Modifier.size(24.dp))
+                                    }
+                                }
+                            }
+                            item {
+                                Box(Modifier.height(FLOATING_BAR_BOTTOM_PADDING))
                             }
                         }
                     }
                 }
+            }
             }
         }
     }

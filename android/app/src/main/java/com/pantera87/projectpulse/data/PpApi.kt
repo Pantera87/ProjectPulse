@@ -3,6 +3,9 @@ package com.pantera87.projectpulse.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import java.io.IOException
 import okhttp3.MediaType.Companion.toMediaType
@@ -40,6 +43,14 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         .cookieJar(jar)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    // A single "Check now" fetches + screenshots one page and can outlast the
+    // 30 s read timeout, so the check call gets its own, longer window.
+    private val checkClient = OkHttpClient.Builder()
+        .cookieJar(jar)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
         .build()
 
     // No cookie jar: /api/health is exempt from auth and must stay clean.
@@ -130,6 +141,45 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         }
     }
 
+    /** POST /api/sources — creates a source and returns its new id. */
+    suspend fun addSource(
+        type: String,
+        url: String,
+        name: String = "",
+        checkIntervalHours: Int = 6,
+    ): ApiResult<Int> = withContext(Dispatchers.IO) {
+        val body = CreateSourceBody(
+            type = type,
+            url = url.trim(),
+            name = name.trim(),
+            check_interval_hours = checkIntervalHours,
+        )
+        val req = Request.Builder()
+            .url("$base/api/sources")
+            .post(json.encodeToString(body).toRequestBody(JSON))
+            .build()
+        try {
+            client.newCall(req).execute().use { resp ->
+                val respBody = resp.body?.string().orEmpty()
+                if (resp.code in 300..399 && resp.header("Location").orEmpty().contains("/login")) {
+                    return@use ApiResult.Error("Session expired", needsAuth = true)
+                }
+                val created = try {
+                    json.decodeFromJsonElement(CreatedSource.serializer(), json.parseToJsonElement(respBody))
+                } catch (e: Exception) {
+                    null
+                }
+                if (resp.code == 201 && created?.id != null) {
+                    ApiResult.Ok(created.id)
+                } else {
+                    ApiResult.Error(created?.error ?: "Server error (${resp.code})")
+                }
+            }
+        } catch (e: IOException) {
+            ApiResult.Error("Network error — is the server reachable?")
+        }
+    }
+
     suspend fun markRead(ids: List<Int>, read: Boolean = true): ApiResult<Unit> {
         val payload = json.encodeToString(MarkBody(ids, read))
         return post("/api/updates", payload)
@@ -144,6 +194,116 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     /** GET /api/sources/:id — source row + its snapshot versions. */
     suspend fun sourceDetail(id: Int): ApiResult<SourceDetail> =
         getJson("/api/sources/$id", SourceDetail.serializer())
+
+    /** POST /api/sources/:id/check — run the checker for this source now. */
+    suspend fun checkSource(id: Int): ApiResult<CheckResult> = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url("$base/api/sources/$id/check")
+            .post("{}".toRequestBody(JSON))
+            .build()
+        try {
+            checkClient.newCall(req).execute().use { resp ->
+                if (resp.code in 300..399 && resp.header("Location").orEmpty().contains("/login")) {
+                    return@use ApiResult.Error("Session expired", needsAuth = true)
+                }
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) return@use ApiResult.Error("Server error (${resp.code})")
+                try {
+                    ApiResult.Ok(
+                        json.decodeFromJsonElement(CheckResult.serializer(), json.parseToJsonElement(body))
+                    )
+                } catch (e: Exception) {
+                    ApiResult.Error("Unexpected response from server")
+                }
+            }
+        } catch (e: IOException) {
+            ApiResult.Error("Network error — is the server reachable?")
+        }
+    }
+
+    /** POST /api/sources/check-all — start a background "check all" run. */
+    suspend fun checkAll(): ApiResult<CheckAllStarted> = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url("$base/api/sources/check-all")
+            .post("{}".toRequestBody(JSON))
+            .build()
+        try {
+            client.newCall(req).execute().use { resp ->
+                if (resp.code in 300..399 && resp.header("Location").orEmpty().contains("/login")) {
+                    return@use ApiResult.Error("Session expired", needsAuth = true)
+                }
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) return@use ApiResult.Error("Server error (${resp.code})")
+                try {
+                    ApiResult.Ok(
+                        json.decodeFromJsonElement(CheckAllStarted.serializer(), json.parseToJsonElement(body))
+                    )
+                } catch (e: Exception) {
+                    ApiResult.Error("Unexpected response from server")
+                }
+            }
+        } catch (e: IOException) {
+            ApiResult.Error("Network error — is the server reachable?")
+        }
+    }
+
+    /** GET /api/sources/check-all?run=0 — live progress of a running check-all. */
+    suspend fun checkAllProgress(): ApiResult<CheckAllProgress> =
+        getJson("/api/sources/check-all?run=0", CheckAllProgress.serializer())
+
+    /** DELETE /api/sources/:id — remove the source and its snapshots. */
+    suspend fun deleteSource(id: Int): ApiResult<Unit> = delete("/api/sources/$id")
+
+    /** PATCH /api/sources/:id with a partial JSON body. */
+    suspend fun patchSource(id: Int, body: String): ApiResult<Unit> =
+        patch("/api/sources/$id", body)
+
+    /**
+     * Mark every update for a source as read. The server has no bulk source_id
+     * endpoint, so fetch the unread ids and POST them (the web UI does the same
+     * two-step in mark-all.tsx).
+     */
+    suspend fun markAllReadForSource(sourceId: Int): ApiResult<Unit> {
+        when (
+            val r = getJson("/api/updates?source_id=$sourceId&unreadOnly=1&limit=500", UpdatesPage.serializer())
+        ) {
+            is ApiResult.Error -> return r
+            is ApiResult.Ok -> {
+                val ids = r.value.updates.map { it.id }
+                if (ids.isEmpty()) return ApiResult.Ok(Unit)
+                return markRead(ids, true)
+            }
+        }
+    }
+
+    /** Persist the editor's rule list as the source's rules_json (PATCH). */
+    suspend fun saveRules(id: Int, type: String, rules: List<WatchRule>): ApiResult<Unit> {
+        val cleaned = rules.map { r ->
+            val srcs = r.sources.filter { it.isNotBlank() }
+            r.copy(
+                keywords = r.keywords.filter { it.isNotBlank() },
+                labels = r.labels.filter { it.isNotBlank() },
+                negate = r.negate.filter { it.isNotBlank() },
+                sources = srcs.ifEmpty { defaultSourcesFor(type) },
+            )
+        }.filter { !it.isBlank }
+        val arr = buildJsonArray {
+            cleaned.forEach { r ->
+                add(
+                    buildJsonObject {
+                        put("type", JsonPrimitive(r.type))
+                        r.priority?.takeIf { it.isNotBlank() }?.let { put("priority", JsonPrimitive(it)) }
+                        put("keywords", buildJsonArray { r.keywords.forEach { add(JsonPrimitive(it)) } })
+                        put("sources", buildJsonArray { r.sources.forEach { add(JsonPrimitive(it)) } })
+                        put("negate", buildJsonArray { r.negate.forEach { add(JsonPrimitive(it)) } })
+                        put("labels", buildJsonArray { r.labels.forEach { add(JsonPrimitive(it)) } })
+                    },
+                )
+            }
+        }
+        val body = buildJsonObject { put("rules_json", JsonPrimitive(arr.toString())) }
+        return patch("/api/sources/$id", body.toString())
+    }
 
     /** GET /api/search — FTS5 over updates + substring over project fields. */
     suspend fun search(query: String): ApiResult<SearchPage> {
@@ -216,6 +376,48 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         }
     }
 
+    /** PATCH a partial JSON body (archive flag, rules_json, …). */
+    private suspend fun patch(path: String, payload: String): ApiResult<Unit> =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url(base + path)
+                .patch(payload.toRequestBody(JSON))
+                .build()
+            try {
+                client.newCall(req).execute().use { resp ->
+                    if (resp.code in 300..399 && resp.header("Location").orEmpty().contains("/login")) {
+                        return@use ApiResult.Error("Session expired", needsAuth = true)
+                    }
+                    if (resp.isSuccessful) ApiResult.Ok(Unit) else ApiResult.Error("Server error (${resp.code})")
+                }
+            } catch (e: IOException) {
+                ApiResult.Error("Network error")
+            }
+        }
+
+    /** Which snapshot fields a rule's keywords are searched in, by source type. */
+    private fun defaultSourcesFor(type: String): List<String> = when (type) {
+        "github" -> listOf("releases", "readme", "commits")
+        "rss" -> listOf("feed")
+        else -> listOf("content")
+    }
+
+    /**
+     * GET /api/sources/:id/logo → the stored project logo (GitHub repo
+     * avatar) as PNG bytes, or null when the source has none or the file is
+     * missing. Uses the authenticated client so the session cookie is sent.
+     */
+    suspend fun logo(sourceId: Int): ByteArray? = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url("$base/api/sources/$sourceId/logo").build()
+        try {
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.bytes() else null
+            }
+        } catch (e: IOException) {
+            null
+        }
+    }
+
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
     }
@@ -226,3 +428,17 @@ private data class LoginBody(val password: String)
 
 @kotlinx.serialization.Serializable
 private data class MarkBody(val ids: List<Int>, val read: Boolean)
+
+@kotlinx.serialization.Serializable
+private data class CreateSourceBody(
+    val type: String,
+    val url: String,
+    val name: String,
+    val check_interval_hours: Int,
+)
+
+@kotlinx.serialization.Serializable
+private data class CreatedSource(
+    val id: Int? = null,
+    val error: String? = null,
+)

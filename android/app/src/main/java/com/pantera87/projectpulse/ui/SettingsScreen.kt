@@ -12,34 +12,42 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.pantera87.projectpulse.BuildConfig
+import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
+import com.pantera87.projectpulse.BuildConfig
 import com.pantera87.projectpulse.notif.Notifier
 import com.pantera87.projectpulse.notif.SyncScheduler
 
 private val INTERVALS = listOf(15 to "15 min", 30 to "30 min", 60 to "1 h", 240 to "4 h")
 
 /**
- * App-level settings: connection status + re-connect, and the background
- * notification poll (interval + immediate check).
+ * App-level settings: connection status + reconnect, and the background
+ * notification polling (interval + immediate check).
+ *
+ * Sections are `.glass-strong` panels over the aurora backdrop, headed by
+ * web-style `.section-title` labels.
  */
 @Composable
 fun SettingsScreen(onOpenConnect: () -> Unit) {
@@ -52,122 +60,167 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
     val intervalMin by prefs.notifIntervalMin.collectAsState()
     var canPost by remember { mutableStateOf(Notifier.canNotify(context)) }
     var checkedNow by remember { mutableStateOf(false) }
+    val uiMode = rememberUiMode()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Settings") }) },
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = {
+                    GradText(
+                        "Settings",
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors().copy(
+                    containerColor = Color.Transparent,
+                ),
+            )
+        },
     ) { padding ->
+        AdaptiveContent(uiMode, maxWidth = 560.dp) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(start = 12.dp, top = 4.dp, end = 12.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                "Connection",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                url.ifBlank { "No server set" },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Button(onClick = onOpenConnect, modifier = Modifier.fillMaxWidth()) {
-                Text(if (configured) "Reconnect" else "Connect")
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Notifications",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Row {
-                Column(Modifier.weight(1f)) {
-                    Text("Notify about new updates")
+            SectionLabel("Connection", modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+            GlassPanel(strong = true) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Text(
-                        "Checks the server in the background for unread updates.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        url.ifBlank { "No server set" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Palette.Foreground,
+                    )
+                    GlassButton(
+                        text = if (configured) "Reconnect" else "Connect",
+                        onClick = onOpenConnect,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Switch(
-                    checked = notifEnabled,
-                    onCheckedChange = { v ->
-                        prefs.setNotificationsEnabled(v)
-                        if (v) {
-                            SyncScheduler.schedule(app, intervalMin.toLong())
-                        } else {
-                            SyncScheduler.cancel(app)
-                        }
-                    },
-                )
             }
-            if (notifEnabled) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    INTERVALS.forEach { (min, label) ->
-                        FilterChip(
-                            selected = intervalMin == min,
-                            onClick = {
-                                if (intervalMin != min) {
-                                    prefs.setNotifIntervalMin(min)
-                                    SyncScheduler.schedule(app, min.toLong())
-                                }
+            SectionLabel(
+                "Notifications",
+                modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+            )
+            GlassPanel(strong = true) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Notify about new updates",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Palette.Foreground,
+                            )
+                            Text(
+                                "Checks the server in the background for unread updates.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Palette.TextSecondary,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        Switch(
+                            checked = notifEnabled,
+                            onCheckedChange = { v ->
+                                prefs.setNotificationsEnabled(v)
+                                if (v) SyncScheduler.schedule(app, intervalMin.toLong())
+                                else SyncScheduler.cancel(app)
                             },
-                            label = { Text(label) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Palette.BrandViolet,
+                                uncheckedThumbColor = Color(0xB3FFFFFF),
+                                uncheckedTrackColor = Color(0x26FFFFFF),
+                                uncheckedBorderColor = Color(0x26FFFFFF),
+                            ),
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
+                    if (notifEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            INTERVALS.forEach { (min, label) ->
+                                GlassChip(
+                                    text = label,
+                                    active = intervalMin == min,
+                                    onClick = {
+                                        if (intervalMin != min) {
+                                            prefs.setNotifIntervalMin(min)
+                                            SyncScheduler.schedule(app, min.toLong())
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        if (!canPost) {
+                            Text(
+                                "Notifications are disabled in the system settings — " +
+                                    "enable them for ProjectPulse in Settings → Apps.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Palette.Error,
+                            )
+                        }
+                        GlassButton(
+                            text = "Check now",
+                            onClick = {
+                                SyncScheduler.runOnce(app)
+                                checkedNow = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (checkedNow) {
+                            Text(
+                                "A background check was queued. A notification appears " +
+                                    "if there are unread updates.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Palette.TextSecondary,
+                            )
+                        }
+                    }
                 }
-                if (!canPost) {
-                    Text(
-                        "Notifications are disabled in the system settings — " +
-                            "enable them for ProjectPulse in Settings → Apps.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                Button(
-                    onClick = {
-                        SyncScheduler.runOnce(app)
-                        checkedNow = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
+            }
+
+            SectionLabel("About", modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+            GlassPanel(strong = true) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("Check now")
-                }
-                if (checkedNow) {
                     Text(
-                        "A background check was queued. A notification appears " +
-                            "if there are unread updates.",
+                        "ProjectPulse companion · v${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Palette.Foreground,
+                    )
+                    Text(
+                        "Your updates stay on your server. This app stores the URL, " +
+                            "an encrypted password and a local cache of recent updates.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Palette.TextSecondary,
                     )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(8.dp))
-
+            // Footer: app version
             Text(
-                "About",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                "ProjectPulse companion · v${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "Your updates stay on your server. This app stores the URL, " +
-                    "an encrypted password and a local cache of recent updates.",
+                "v${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.TextTertiary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
             )
+        }
         }
     }
 }
-            }
