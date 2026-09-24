@@ -28,7 +28,7 @@ export default function TopBar({ unread, critical }: { unread: number; critical:
   const label = section?.label ?? "Dashboard";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--background)]/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--background)]/45 backdrop-blur-xl">
       <div className="app-shell mx-auto flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         {/* Mobile-only logo + horizontal nav (sidebar is lg+ only). */}
         <div className="flex w-full items-center gap-2 lg:hidden">

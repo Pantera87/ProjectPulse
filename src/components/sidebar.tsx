@@ -12,7 +12,7 @@ import NavLinks from "./nav-links";
  */
 export default function Sidebar({ unread, critical }: { unread: number; critical: number }) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-5 border-r border-white/10 bg-[var(--background)]/60 px-4 py-5 backdrop-blur-xl lg:flex">
+    <aside className="sidenav sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-5 border-r border-white/10 bg-[var(--background)]/60 px-4 py-5 backdrop-blur-xl lg:flex">
       <Link
         href="/"
         className="flex items-center gap-2.5 px-1"

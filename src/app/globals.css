@@ -136,11 +136,9 @@
     var(--vision-bg);
   background-attachment: fixed;
 }
-/* Sidebar + top bar: the utilities set background-color, so a higher-
-   specificity background shorthand here wins. */
-:root[data-theme="vision"] aside {
-  background: var(--vision-card);
-}
+/* Sidebar: the .sidenav rule below carries the liquid-glass surface for the
+   vision theme (the utilities on the aside set background-color, so the
+   higher-specificity .sidenav shorthand wins). */
 /* The sidenav is liquid glass: a thin white-tinted gradient over the page
    glow (which shows through the backdrop blur) with a specular top edge
    and a faint inner glow — transparent, not a dark card. */
@@ -164,16 +162,16 @@
      top edge — lighter than the flat dark bar it used to be. */
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.11) 0%,
-    rgba(255, 255, 255, 0.04) 55%,
-    rgba(255, 255, 255, 0.01) 100%
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.06) 55%,
+    rgba(255, 255, 255, 0.03) 100%
   );
   border-bottom-color: rgba(255, 255, 255, 0.14);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 8px 28px -14px rgba(2, 6, 23, 0.6);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(22px) saturate(1.8);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8);
 }
 :root[data-theme="vision"] .aurora::before {
   display: none;
@@ -183,6 +181,43 @@
   border-color: rgba(0, 117, 255, 0.35);
   box-shadow: none;
   color: #fff;
+}
+
+/* Top bar (pulse): the vision override above is more specific, so this base
+   carries the same liquid-glass treatment for the pulse theme — a thin
+   white-tinted gradient over the page glow with a specular top edge, so the
+   glow reads through the bar instead of the flat dark strip it used to be. */
+:root header {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.05) 55%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 28px -14px rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+}
+
+/* Sidebar (pulse): frosted liquid glass, matching the top bar — a thin
+   white-tinted gradient over the page glow with a specular inner top edge,
+   so the background glow blurs through instead of reading as a dark card. */
+.sidenav {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.03) 45%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 20px -8px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
 }
 
 /* Inset stat boxes inside dashboard cards (hero, gauge cards). In vision
