@@ -1,6 +1,7 @@
 import { getDb, type SourceRow } from "@/lib/db";
 import { isMuted } from "@/lib/check";
 import { categoryIconMap } from "@/lib/category-icons";
+import { getDashboardAggregates } from "@/lib/dashboard-aggregates";
 import DashboardClient from "@/components/dashboard-client";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,9 @@ export default function DashboardPage() {
     (activityBySource[r.source_id] ??= [0, 0, 0, 0, 0, 0, 0])[idx] = r.c;
   }
 
+  // Hero card / gauges / 7-day chart aggregates (shared with the API route).
+  const aggregates = getDashboardAggregates(d);
+
 
   return (
     <DashboardClient
@@ -132,6 +136,7 @@ export default function DashboardPage() {
       initialLatestBySource={Object.fromEntries(latestBySource)}
       initialActivity={activityBySource}
       initialAttention={attention}
+      initialAggregates={aggregates}
       categoryIcons={categoryIconMap(d)}
       sources={sources}
     />

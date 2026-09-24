@@ -36,6 +36,7 @@ class ServerPrefs(context: Context) {
     private val _notifEnabled = MutableStateFlow(plain.getBoolean(KEY_NOTIF_ENABLED, true))
     private val _notifIntervalMin = MutableStateFlow(plain.getInt(KEY_NOTIF_INTERVAL, 15))
     private val _lastSeenId = MutableStateFlow(plain.getInt(KEY_LAST_SEEN_ID, 0))
+    private val _theme = MutableStateFlow(plain.getString(KEY_THEME, "aurora") ?: "aurora")
 
     val url: StateFlow<String> = _url.asStateFlow()
     val password: StateFlow<String> = _password.asStateFlow()
@@ -44,6 +45,7 @@ class ServerPrefs(context: Context) {
     val notificationsEnabled: StateFlow<Boolean> = _notifEnabled.asStateFlow()
     val notifIntervalMin: StateFlow<Int> = _notifIntervalMin.asStateFlow()
     val lastSeenUpdateId: StateFlow<Int> = _lastSeenId.asStateFlow()
+    val theme: StateFlow<String> = _theme.asStateFlow()
 
     fun saveUrl(value: String) {
         _url.value = value
@@ -81,6 +83,12 @@ class ServerPrefs(context: Context) {
         plain.edit().putInt(KEY_NOTIF_INTERVAL, value).apply()
     }
 
+    /** The app's visual theme id ("aurora" / "pulse"), matching the web's `pp-theme`. */
+    fun setTheme(id: String) {
+        _theme.value = id
+        plain.edit().putString(KEY_THEME, id).apply()
+    }
+
     /** Highest update id this device has notified about; 0 = first run. */
     fun setLastSeenUpdateId(value: Int) {
         _lastSeenId.value = value
@@ -95,6 +103,7 @@ class ServerPrefs(context: Context) {
         private const val KEY_NOTIF_ENABLED = "notif_enabled"
         private const val KEY_NOTIF_INTERVAL = "notif_interval_min"
         private const val KEY_LAST_SEEN_ID = "last_seen_update_id"
+        private const val KEY_THEME = "pp_theme"
     }
 }
 

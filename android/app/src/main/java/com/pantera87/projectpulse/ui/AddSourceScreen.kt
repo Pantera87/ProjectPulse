@@ -111,7 +111,7 @@ fun AddSourceScreen(onCreated: (Int) -> Unit, onBack: () -> Unit) {
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Palette.TextSecondary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = LocalPpTokens.current.TextSecondary)
                     }
                 },
                 title = {
@@ -194,7 +194,7 @@ fun AddSourceScreen(onCreated: (Int) -> Unit, onBack: () -> Unit) {
                     Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = Palette.BrandViolet)
+                    CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
                 }
             } else {
                 GlassButton(
@@ -206,7 +206,7 @@ fun AddSourceScreen(onCreated: (Int) -> Unit, onBack: () -> Unit) {
             error?.let {
                 Text(
                     it,
-                    color = Palette.Error,
+                    color = LocalPpTokens.current.Error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -226,10 +226,10 @@ private fun TypeOption(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Palette.BrandGradient else SolidColor(Palette.FieldFill))
+            .background(if (selected) LocalPpTokens.current.BrandBrush else SolidColor(LocalPpTokens.current.FieldFill))
             .border(
                 width = 1.dp,
-                color = if (selected) Color.Transparent else Palette.GlassBorder,
+                color = if (selected) Color.Transparent else LocalPpTokens.current.GlassBorder,
                 shape = RoundedCornerShape(12.dp),
             )
             .clickable(onClick = onClick)
@@ -240,7 +240,7 @@ private fun TypeOption(
             label,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) Color.White else Palette.TextSecondary,
+            color = if (selected) Color.White else LocalPpTokens.current.TextSecondary,
         )
     }
 }
@@ -256,10 +256,10 @@ private fun IntervalOption(
         modifier = Modifier
             .padding(horizontal = 4.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Palette.BrandGradient else SolidColor(Palette.FieldFill))
+            .background(if (selected) LocalPpTokens.current.BrandBrush else SolidColor(LocalPpTokens.current.FieldFill))
             .border(
                 width = 1.dp,
-                color = if (selected) Color.Transparent else Palette.GlassBorder,
+                color = if (selected) Color.Transparent else LocalPpTokens.current.GlassBorder,
                 shape = RoundedCornerShape(10.dp),
             )
             .clickable(onClick = onClick)
@@ -270,7 +270,7 @@ private fun IntervalOption(
             label,
             fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) Color.White else Palette.TextSecondary,
+            color = if (selected) Color.White else LocalPpTokens.current.TextSecondary,
         )
     }
 }

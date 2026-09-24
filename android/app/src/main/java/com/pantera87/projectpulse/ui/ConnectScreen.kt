@@ -140,13 +140,13 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     leadingIcon = {
-                        Icon(Icons.Default.Lock, null, tint = Palette.TextSecondary)
+                        Icon(Icons.Default.Lock, null, tint = LocalPpTokens.current.TextSecondary)
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (busy) {
-                CircularProgressIndicator(color = Palette.BrandViolet)
+                CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
             } else {
                 GlassButton(
                     text = "Connect",
@@ -157,7 +157,7 @@ fun ConnectScreen(onSuccess: () -> Unit) {
             error?.let {
                 Text(
                     it,
-                    color = Palette.Error,
+                    color = LocalPpTokens.current.Error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -166,7 +166,7 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                     "password is kept in Android's encrypted storage; the " +
                     "session cookie is held in memory and re-created on launch.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextSecondary,
+                color = LocalPpTokens.current.TextSecondary,
             )
         }
         }

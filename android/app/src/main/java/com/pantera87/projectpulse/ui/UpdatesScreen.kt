@@ -146,7 +146,7 @@ fun UpdatesScreen(
                         Icon(
                             Icons.Default.Search,
                             "Search",
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     }
                 },
@@ -178,10 +178,10 @@ fun UpdatesScreen(
                         CircularProgressIndicator()
                     }
                     error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(error!!, color = Palette.Error)
+                        Text(error!!, color = LocalPpTokens.current.Error)
                     }
                     updates.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No updates", color = Palette.TextTertiary)
+                        Text("No updates", color = LocalPpTokens.current.TextTertiary)
                     }
                     else -> if (uiMode.isTablet) {
                         LazyVerticalGrid(

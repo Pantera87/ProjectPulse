@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.collectAsState
+import com.pantera87.projectpulse.ui.PpTheme
 import com.pantera87.projectpulse.ui.ProjectPulseTheme
 import com.pantera87.projectpulse.ui.RootNav
 
@@ -25,7 +27,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ProjectPulseTheme {
+            val themeId by App.instance.prefs.theme.collectAsState()
+            ProjectPulseTheme(theme = PpTheme.fromId(themeId)) {
                 // Ask once at launch (Android 13+); the settings screen also
                 // explains what to do if the answer was "don't allow".
                 var asked by remember { mutableStateOf(false) }

@@ -81,11 +81,11 @@ export default function CategoryIcon({
   /** AI-picked glyph name for this category (validated against GLYPHS). */
   icon?: string | null;
 }) {
-  const { glyph, gradient } = iconForCategory(category);
+  const { glyph } = iconForCategory(category);
   const name = icon && GLYPHS[icon] ? icon : glyph;
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center bg-gradient-to-br text-white shadow-md ${gradient} ${
+      className={`inline-flex shrink-0 items-center justify-center glyph-tile text-white shadow-md ${
         size === "sm" ? "h-5 w-5 rounded-md" : "h-7 w-7 rounded-lg"
       }`}
       aria-hidden="true"

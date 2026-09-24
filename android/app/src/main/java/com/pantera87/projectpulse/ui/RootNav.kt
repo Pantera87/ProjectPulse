@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -274,6 +275,7 @@ private fun TabItem(
     icon: @Composable (Color) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val t = LocalPpTokens.current
     Column(
         // Fill the whole weighted slot so the entire pill is tappable — a
         // 64dp hit area left dead zones that swallowed tab taps.
@@ -282,14 +284,18 @@ private fun TabItem(
             .drawBehind {
                 if (active) {
                     drawRoundRect(
-                        brush = Palette.BrandGradient,
+                        brush = t.BrandBrush,
                         size = Size(52.dp.toPx(), 30.dp.toPx()),
                         topLeft = Offset((size.width - 52.dp.toPx()) / 2f, 0f),
                         cornerRadius = CornerRadius(15.dp.toPx()),
                     )
                 }
             }
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -298,12 +304,12 @@ private fun TabItem(
                 .height(30.dp),
             contentAlignment = Alignment.Center,
         ) {
-            icon(if (active) Color.White else Palette.TextTertiary)
+            icon(if (active) Color.White else LocalPpTokens.current.TextTertiary)
         }
         Text(
             label,
             fontSize = 10.sp,
-            color = if (active) Palette.Foreground else Palette.TextTertiary,
+            color = if (active) LocalPpTokens.current.Foreground else LocalPpTokens.current.TextTertiary,
             modifier = Modifier.padding(top = 4.dp),
         )
     }

@@ -226,11 +226,11 @@ fun SourcesScreen(
                         Icon(
                             Icons.Filled.Refresh,
                             "Check all",
-                            tint = if (checkingAll) Palette.Link else Palette.TextSecondary,
+                            tint = if (checkingAll) LocalPpTokens.current.Link else LocalPpTokens.current.TextSecondary,
                         )
                     }
                     IconButton(onClick = onAdd) {
-                        Icon(Icons.Filled.Add, "Add source", tint = Palette.TextSecondary)
+                        Icon(Icons.Filled.Add, "Add source", tint = LocalPpTokens.current.TextSecondary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors().copy(
@@ -253,10 +253,10 @@ fun SourcesScreen(
                     CircularProgressIndicator()
                 }
                 error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(error!!, color = Palette.Error)
+                    Text(error!!, color = LocalPpTokens.current.Error)
                 }
                 sources.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No sources yet", color = Palette.TextTertiary)
+                    Text("No sources yet", color = LocalPpTokens.current.TextTertiary)
                 }
                 else -> if (uiMode.isTablet) {
                     LazyVerticalGrid(
@@ -272,7 +272,7 @@ fun SourcesScreen(
                                     checkAllMsg!!,
                                     modifier = Modifier.padding(bottom = 8.dp),
                                     fontSize = 12.sp,
-                                    color = Palette.Link,
+                                    color = LocalPpTokens.current.Link,
                                 )
                             }
                         }
@@ -314,7 +314,7 @@ fun SourcesScreen(
                                     checkAllMsg!!,
                                     modifier = Modifier.padding(bottom = 8.dp),
                                     fontSize = 12.sp,
-                                    color = Palette.Link,
+                                    color = LocalPpTokens.current.Link,
                                 )
                             }
                         }
@@ -378,14 +378,14 @@ fun SourcesScreen(
                             "Manage source",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Palette.Foreground,
+                            color = LocalPpTokens.current.Foreground,
                         )
                         Text(
                             src.displayName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 13.sp,
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                         )
                         val archived = src.watch_enabled == 0
                         GhostButton(
@@ -404,7 +404,7 @@ fun SourcesScreen(
                             Text(
                                 "Working...",
                                 fontSize = 12.sp,
-                                color = Palette.TextSecondary,
+                                color = LocalPpTokens.current.TextSecondary,
                             )
                         }
                 }
@@ -466,7 +466,7 @@ private fun SectionHeader(text: String) {
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.2.sp,
-        color = Palette.TextSecondary,
+        color = LocalPpTokens.current.TextSecondary,
         modifier = Modifier.padding(top = 18.dp, bottom = 8.dp, start = 4.dp),
     )
 }
@@ -499,7 +499,7 @@ private fun SourceRowCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Palette.Foreground,
+                    color = LocalPpTokens.current.Foreground,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
                 if (s.unread > 0) {
@@ -508,7 +508,7 @@ private fun SourceRowCard(
                         Text(
                             "${s.unread} new",
                             fontSize = 12.sp,
-                            color = Palette.Link,
+                            color = LocalPpTokens.current.Link,
                             modifier = Modifier.padding(start = 6.dp),
                         )
                     }
@@ -516,7 +516,7 @@ private fun SourceRowCard(
                 Icon(
                     Icons.Filled.MoreVert,
                     contentDescription = "Manage source",
-                    tint = Palette.TextTertiary,
+                    tint = LocalPpTokens.current.TextTertiary,
                     modifier = Modifier
                         .size(24.dp)
                         .padding(6.dp)
@@ -528,7 +528,7 @@ private fun SourceRowCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontSize = 12.sp,
-                color = Palette.TextSecondary,
+                color = LocalPpTokens.current.TextSecondary,
             )
         }
     }

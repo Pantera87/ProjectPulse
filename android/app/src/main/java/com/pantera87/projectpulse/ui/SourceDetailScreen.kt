@@ -185,7 +185,7 @@ fun SourceDetailScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             "Back",
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     }
                 },
@@ -196,7 +196,7 @@ fun SourceDetailScreen(
                             fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold,
                         ),
-                        color = Palette.Foreground,
+                        color = LocalPpTokens.current.Foreground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -209,10 +209,10 @@ fun SourceDetailScreen(
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Palette.BrandViolet)
+                CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
             }
             error != null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(error!!, color = Palette.Error)
+                Text(error!!, color = LocalPpTokens.current.Error)
             }
             else -> {
                 val d = detail!!
@@ -251,21 +251,21 @@ fun SourceDetailScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Palette.Link,
+                                color = LocalPpTokens.current.Link,
                                 modifier = Modifier.clickable { openUrl(d.source.url) },
                             )
                             d.source.goal?.takeIf { it.isNotBlank() }?.let {
                                 Text(
                                     it,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Palette.Foreground,
+                                    color = LocalPpTokens.current.Foreground,
                                 )
                             }
                             d.source.notes?.takeIf { it.isNotBlank() }?.let {
                                 Text(
                                     it,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Palette.TextSecondary,
+                                    color = LocalPpTokens.current.TextSecondary,
                                 )
                             }
                         }
@@ -291,9 +291,9 @@ fun SourceDetailScreen(
                             modifier = Modifier.padding(top = 8.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = when {
-                                checkFailed -> Palette.Error
-                                checkCount > 0 -> Palette.Link
-                                else -> Palette.TextSecondary
+                                checkFailed -> LocalPpTokens.current.Error
+                                checkCount > 0 -> LocalPpTokens.current.Link
+                                else -> LocalPpTokens.current.TextSecondary
                             },
                         )
                     }
@@ -305,7 +305,7 @@ fun SourceDetailScreen(
                         Text(
                             "No snapshots stored yet",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                         )
                     }
                     d.snapshots.forEach { snap ->
@@ -324,7 +324,7 @@ fun SourceDetailScreen(
                                 Text(
                                     "v${snap.version}",
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = Palette.Foreground,
+                                    color = LocalPpTokens.current.Foreground,
                                     modifier = Modifier.weight(1f),
                                 )
                                 if (snap.archived == true) {
@@ -338,7 +338,7 @@ fun SourceDetailScreen(
                                         .filter { it.isNotBlank() }
                                         .joinToString("  ·  "),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Palette.TextSecondary,
+                                    color = LocalPpTokens.current.TextSecondary,
                                 )
                             }
                         }
@@ -357,7 +357,7 @@ fun SourceDetailScreen(
                                 if (markingAll) "Marking…" else "Mark all read",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (markingAll) Palette.TextSecondary else Palette.Link,
+                                color = if (markingAll) LocalPpTokens.current.TextSecondary else LocalPpTokens.current.Link,
                                 modifier = Modifier
                                     .clickable(enabled = !markingAll) { markAllRead() }
                                     .padding(vertical = 4.dp, horizontal = 2.dp),
@@ -369,14 +369,14 @@ fun SourceDetailScreen(
                             msg,
                             modifier = Modifier.padding(bottom = 4.dp),
                             fontSize = 12.sp,
-                            color = Palette.Link,
+                            color = LocalPpTokens.current.Link,
                         )
                     }
                     if (updates.isEmpty()) {
                         Text(
                             "No updates yet",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                         )
                     }
                     updates.forEach { u ->

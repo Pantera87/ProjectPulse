@@ -190,20 +190,20 @@ fun UpdateDetailSheet(
                     Text(
                         formatTime(update.created_at),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Palette.TextSecondary,
+                        color = LocalPpTokens.current.TextSecondary,
                     )
                 }
                 Text(
                     update.title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = Palette.Foreground,
+                    color = LocalPpTokens.current.Foreground,
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 update.source_name?.takeIf { it.isNotBlank() }?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Palette.TextSecondary,
+                        color = LocalPpTokens.current.TextSecondary,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
@@ -211,7 +211,7 @@ fun UpdateDetailSheet(
                     Text(
                         it,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Palette.Foreground,
+                        color = LocalPpTokens.current.Foreground,
                         modifier = Modifier.padding(top = 12.dp),
                     )
                 }
@@ -230,7 +230,7 @@ fun UpdateDetailSheet(
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                             modifier = Modifier.padding(10.dp),
                         )
                     }
@@ -238,7 +238,7 @@ fun UpdateDetailSheet(
                 error?.let {
                     Text(
                         it,
-                        color = Palette.Error,
+                        color = LocalPpTokens.current.Error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
@@ -286,7 +286,7 @@ fun UpdateDetailSheet(
                     onClick = { confirmDelete = true },
                     modifier = Modifier.padding(top = 4.dp),
                 ) {
-                    Text("Delete", color = Palette.Error)
+                    Text("Delete", color = LocalPpTokens.current.Error)
                 }
                 }
             }
@@ -395,12 +395,12 @@ fun UpdateDetailSheet(
                     Text(
                         "Delete update",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Palette.Foreground,
+                        color = LocalPpTokens.current.Foreground,
                     )
                     Text(
                         "Update will be permanently deleted from the server.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Palette.TextSecondary,
+                        color = LocalPpTokens.current.TextSecondary,
                     )
                     Row(
                         Modifier.fillMaxWidth(),

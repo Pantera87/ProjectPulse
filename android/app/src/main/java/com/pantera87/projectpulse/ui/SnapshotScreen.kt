@@ -86,7 +86,7 @@ fun SnapshotScreen(
                 title = {
                     Text(
                         "Snapshot v$version" + (sourceName?.let { "  ·  $it" } ?: ""),
-                        color = Palette.Foreground,
+                        color = LocalPpTokens.current.Foreground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -96,7 +96,7 @@ fun SnapshotScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             "Back",
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     }
                 },
@@ -110,7 +110,7 @@ fun SnapshotScreen(
                                     )
                                 }
                             },
-                        ) { Icon(Icons.Default.OpenInBrowser, "Open source in browser", tint = Palette.GhostText) }
+                        ) { Icon(Icons.Default.OpenInBrowser, "Open source in browser", tint = LocalPpTokens.current.GhostText) }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors().copy(
@@ -121,8 +121,8 @@ fun SnapshotScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             when {
-                error != null -> Text(error!!, color = Palette.Error)
-                html == null -> CircularProgressIndicator(color = Palette.BrandViolet)
+                error != null -> Text(error!!, color = LocalPpTokens.current.Error)
+                html == null -> CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
                 else -> {
                     val h = html!!
                     AndroidView(

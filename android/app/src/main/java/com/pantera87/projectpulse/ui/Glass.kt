@@ -49,12 +49,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.composed
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,10 +64,11 @@ import kotlinx.coroutines.delay
 /**
  * Liquid-glass components ported from the web app's CSS (`.glass`,
  * `.glass-strong`, `.glass-tile`, `.btn-primary`, `.btn-ghost`, `.chip`,
- * `.badge`).
+ * `.badge`). Every theme-sensitive value comes from [LocalPpTokens], so the
+ * active/pulse themes switch live.
  *
  * Compose has no backdrop blur, but the glass sits on the static,
- * pre-softened aurora, so translucency + border + inset highlight reproduces
+ * pre-softened backdrop, so translucency + border + inset highlight reproduces
  * the web look without a blur filter.
  */
 
@@ -75,43 +76,64 @@ import kotlinx.coroutines.delay
  * Translucent glass fill + 1px border + inset top highlight.
  *
  * @param strong `.glass-strong` (deeper base, larger radius default).
- * @param tile `.glass-tile` (adds the violet radial glow at the top).
+ * @param radius explicit override; defaults to the theme's card/strong radius.
+ * @param tile `.glass-tile` (adds the radial glow at the top).
  */
 fun Modifier.glass(
     strong: Boolean = false,
-    radius: Dp = if (strong) 20.dp else 16.dp,
+    radius: Dp? = null,
     tile: Boolean = false,
-): Modifier {
-    val shape = RoundedCornerShape(radius)
-    return this
+): Modifier = composed {
+    val t = LocalPpTokens.current
+    val r = radius ?: if (strong) t.StrongRadius else t.CardRadius
+    val shape = RoundedCornerShape(r)
+    val cr = CornerRadius(with(LocalDensity.current) { r.toPx() })
+    this
         .shadow(
             elevation = if (strong) 8.dp else 4.dp,
             shape = shape,
-            ambientColor = Color(0x26020414),
-            spotColor = Color(0x26020414),
+            ambientColor = t.GlassStrongShadow,
+            spotColor = t.GlassStrongShadow,
         )
-        .background(color = if (strong) Palette.GlassDeepBase else Color.Transparent, shape = shape)
-        .background(brush = if (strong) Palette.GlassStrongFill else Palette.GlassFill, shape = shape)
         .drawBehind {
+            if (strong) {
+                drawRoundRect(color = t.GlassDeepBase, size = size, cornerRadius = cr)
+            }
+            t.CardGradient?.let {
+                drawRoundRect(brush = it.brush(size), size = size, cornerRadius = cr)
+            } ?: run {
+                drawRoundRect(
+                    brush = if (strong) t.GlassStrongFill else t.GlassFill,
+                    size = size,
+                    cornerRadius = cr,
+                )
+            }
             val stroke = 1.dp.toPx()
             drawRoundRect(
-                color = Palette.GlassBorder,
+                color = t.GlassBorder,
                 topLeft = Offset(stroke / 2f, stroke / 2f),
                 size = Size(size.width - stroke, size.height - stroke),
-                cornerRadius = CornerRadius(radius.toPx()),
+                cornerRadius = cr,
                 style = Stroke(width = stroke),
             )
-            drawLine(
-                color = Palette.GlassHighlight,
-                start = Offset(radius.toPx(), stroke / 2f),
-                end = Offset(size.width - radius.toPx(), stroke / 2f),
-                strokeWidth = stroke,
-            )
+            if (t.GlassHighlight.alpha > 0f) {
+                drawLine(
+                    color = t.GlassHighlight,
+                    start = Offset(r.toPx(), stroke / 2f),
+                    end = Offset(size.width - r.toPx(), stroke / 2f),
+                    strokeWidth = stroke,
+                )
+            }
             if (tile) {
-                // .glass-tile::before — violet glow, ellipse 120% 90% at 50% -20%.
+                // .glass-tile::before — glow, ellipse 120% 90% at 50% -20%.
                 drawRect(
                     Brush.radialGradient(
-                        listOf(Color(0x24A855F7), Color.Transparent),
+                        listOf(
+                            t.TileGlowColor.copy(
+                                alpha = t.TileGlowColor.alpha * t.TileGlowOpacity,
+                            ),
+                            Color.Transparent,
+                        ),
                         center = Offset(size.width / 2f, -0.2f * size.height),
                         radius = 0.9f * size.width / 0.6f,
                     ),
@@ -122,20 +144,24 @@ fun Modifier.glass(
 
 /**
  * Interactive glass card. Pressed state mirrors the web `.glass-hover`:
- * border shifts to violet and a soft indigo halo appears.
+ * border shifts to the theme accent and a soft halo appears.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     strong: Boolean = false,
-    radius: Dp = if (strong) 20.dp else 16.dp,
+    radius: Dp? = null,
     tile: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val t = LocalPpTokens.current
+    val r = radius ?: if (strong) t.StrongRadius else t.CardRadius
     val interaction = remember { MutableInteractionSource() }
     val pressed = interaction.collectIsPressedAsState().value
-    val shape = RoundedCornerShape(radius)
+    val shape = RoundedCornerShape(r)
+    val cr = CornerRadius(with(LocalDensity.current) { r.toPx() })
+    val halo = t.GlowAccent
     Box(
         modifier = modifier
             .then(
@@ -150,41 +176,58 @@ fun GlassCard(
             .shadow(
                 elevation = if (strong) 8.dp else 4.dp,
                 shape = shape,
-                ambientColor = Color(0x26020414),
-                spotColor = Color(0x26020414),
+                ambientColor = t.GlassStrongShadow,
+                spotColor = t.GlassStrongShadow,
             )
             .then(
                 if (pressed) {
-                    // .glass-hover halo: 0 0 26px -4px rgba(99,102,241,.35)
+                    // .glass-hover halo
                     Modifier.shadow(
                         elevation = 14.dp,
                         shape = shape,
-                        ambientColor = Palette.GlowAccent,
-                        spotColor = Palette.GlowAccent,
+                        ambientColor = halo,
+                        spotColor = halo,
                     )
                 } else Modifier,
             )
-            .background(color = if (strong) Palette.GlassDeepBase else Color.Transparent, shape = shape)
-            .background(brush = if (strong) Palette.GlassStrongFill else Palette.GlassFill, shape = shape)
             .drawBehind {
+                if (strong) {
+                    drawRoundRect(color = t.GlassDeepBase, size = size, cornerRadius = cr)
+                }
+                t.CardGradient?.let {
+                    drawRoundRect(brush = it.brush(size), size = size, cornerRadius = cr)
+                } ?: run {
+                    drawRoundRect(
+                        brush = if (strong) t.GlassStrongFill else t.GlassFill,
+                        size = size,
+                        cornerRadius = cr,
+                    )
+                }
                 val stroke = 1.dp.toPx()
                 drawRoundRect(
-                    color = if (pressed) Palette.GlassBorderPressed else Palette.GlassBorder,
+                    color = if (pressed) t.GlassBorderPressed else t.GlassBorder,
                     topLeft = Offset(stroke / 2f, stroke / 2f),
                     size = Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = CornerRadius(radius.toPx()),
+                    cornerRadius = cr,
                     style = Stroke(width = stroke),
                 )
-                drawLine(
-                    color = Palette.GlassHighlight,
-                    start = Offset(radius.toPx(), stroke / 2f),
-                    end = Offset(size.width - radius.toPx(), stroke / 2f),
-                    strokeWidth = stroke,
-                )
+                if (t.GlassHighlight.alpha > 0f) {
+                    drawLine(
+                        color = t.GlassHighlight,
+                        start = Offset(r.toPx(), stroke / 2f),
+                        end = Offset(size.width - r.toPx(), stroke / 2f),
+                        strokeWidth = stroke,
+                    )
+                }
                 if (tile) {
                     drawRect(
                         Brush.radialGradient(
-                            listOf(Color(0x24A855F7), Color.Transparent),
+                            listOf(
+                                t.TileGlowColor.copy(
+                                    alpha = t.TileGlowColor.alpha * t.TileGlowOpacity,
+                                ),
+                                Color.Transparent,
+                            ),
                             center = Offset(size.width / 2f, -0.2f * size.height),
                             radius = 0.9f * size.width / 0.6f,
                         ),
@@ -199,7 +242,7 @@ fun GlassCard(
 // Buttons
 // --------------------------------------------------------------------------
 
-/** `.btn-primary`: 135° blue → violet → purple, white .28 border, indigo glow. */
+/** `.btn-primary`: 135° 5-stop brand ramp, white .28 border, accent glow. */
 @Composable
 fun GlassButton(
     text: String,
@@ -208,6 +251,7 @@ fun GlassButton(
     enabled: Boolean = true,
     icon: (@Composable RowScope.() -> Unit)? = null,
 ) {
+    val t = LocalPpTokens.current
     val interaction = remember { MutableInteractionSource() }
     val pressed = interaction.collectIsPressedAsState().value
     val shape = RoundedCornerShape(10.4.dp)
@@ -216,10 +260,10 @@ fun GlassButton(
             .shadow(
                 elevation = 8.dp,
                 shape = shape,
-                ambientColor = Palette.GlowIndigo,
-                spotColor = Palette.GlowIndigo,
+                ambientColor = t.GlowIndigo,
+                spotColor = t.GlowIndigo,
             )
-            .background(brush = Palette.BrandGradient, shape = shape)
+            .background(brush = t.BrandBrush, shape = shape)
             .drawBehind {
                 val stroke = 1.dp.toPx()
                 drawRoundRect(
@@ -274,6 +318,7 @@ fun GhostButton(
     enabled: Boolean = true,
     icon: (@Composable RowScope.() -> Unit)? = null,
 ) {
+    val t = LocalPpTokens.current
     val interaction = remember { MutableInteractionSource() }
     val pressed = interaction.collectIsPressedAsState().value
     val shape = RoundedCornerShape(10.4.dp)
@@ -315,7 +360,7 @@ fun GhostButton(
         }
         Text(
             text,
-            color = if (pressed) Color.White else Palette.GhostText,
+            color = if (pressed) Color.White else t.GhostText,
             fontWeight = FontWeight.Medium,
             fontSize = 14.sp,
         )
@@ -326,15 +371,16 @@ fun GhostButton(
 // Fields & chips
 // --------------------------------------------------------------------------
 
-/** `.input-glass`: deep-navy fill, white .12 border; violet border + ring when focused. */
-fun Modifier.glassField(focused: Boolean = false): Modifier {
+/** `.input-glass`: deep-navy fill, theme border; focus border + ring. */
+fun Modifier.glassField(focused: Boolean = false): Modifier = composed {
+    val t = LocalPpTokens.current
     val shape = RoundedCornerShape(10.4.dp)
-    return this
-        .background(color = Palette.FieldFill, shape = shape)
+    this
+        .background(color = t.FieldFill, shape = shape)
         .drawBehind {
             val stroke = 1.dp.toPx()
             drawRoundRect(
-                color = if (focused) Palette.FocusBorder else Palette.GlassBorder,
+                color = if (focused) t.FocusBorder else t.GlassBorder,
                 topLeft = Offset(stroke / 2f, stroke / 2f),
                 size = Size(size.width - stroke, size.height - stroke),
                 cornerRadius = CornerRadius(10.4.dp.toPx()),
@@ -344,7 +390,7 @@ fun Modifier.glassField(focused: Boolean = false): Modifier {
                 val ring = 3.dp
                 val ringPx = ring.toPx()
                 drawRoundRect(
-                    color = Palette.FocusRing,
+                    color = t.FocusRing,
                     topLeft = Offset(ringPx, ringPx),
                     size = Size(size.width - ringPx * 2f, size.height - ringPx * 2f),
                     cornerRadius = CornerRadius((10.4.dp - ring).toPx()),
@@ -362,40 +408,50 @@ fun GlassChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val t = LocalPpTokens.current
     val interaction = remember { MutableInteractionSource() }
     val pressed = interaction.collectIsPressedAsState().value
     val shape = RoundedCornerShape(8.dp)
+    val cr = CornerRadius(with(LocalDensity.current) { 8.dp.toPx() })
+    val halo = t.ChipActiveHalo
     Box(
         modifier = modifier
             .then(
-                if (active) {
+                if (active && halo != null) {
                     Modifier.shadow(
                         elevation = 8.dp,
                         shape = shape,
-                        ambientColor = Palette.GlowAccent,
-                        spotColor = Palette.GlowAccent,
+                        ambientColor = halo,
+                        spotColor = halo,
                     )
                 } else Modifier,
             )
             .background(
-                brush = when {
-                    active -> Palette.BrandGradient
-                    pressed -> SolidColor(Color(0x1AFFFFFF))
-                    else -> SolidColor(Color(0x0AFFFFFF))
+                color = when {
+                    active -> Color.Transparent
+                    pressed -> Color(0x1AFFFFFF)
+                    else -> Color(0x0AFFFFFF)
                 },
                 shape = shape,
             )
             .drawBehind {
+                if (active) {
+                    t.ChipActive?.let {
+                        drawRoundRect(brush = it.brush(size), size = size, cornerRadius = cr)
+                    } ?: run {
+                        drawRoundRect(brush = t.BrandBrush, size = size, cornerRadius = cr)
+                    }
+                }
                 val stroke = 1.dp.toPx()
                 drawRoundRect(
                     color = when {
-                        active -> Color(0x59FFFFFF)
+                        active -> t.ChipActiveBorder
                         pressed -> Color(0x40FFFFFF)
                         else -> Color(0x1FFFFFFF)
                     },
                     topLeft = Offset(stroke / 2f, stroke / 2f),
                     size = Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = CornerRadius(8.dp.toPx()),
+                    cornerRadius = cr,
                     style = Stroke(width = stroke),
                 )
             }
@@ -410,7 +466,7 @@ fun GlassChip(
     ) {
         Text(
             text,
-            color = if (active) Color.White else Palette.MutedLabel,
+            color = if (active) Color.White else t.MutedLabel,
             fontSize = 12.sp,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         )
@@ -424,16 +480,17 @@ fun GlassChip(
 /** Uppercase pill, colored per priority (web `PRIORITY_BADGE`). */
 @Composable
 fun PriorityBadge(priority: String, modifier: Modifier = Modifier) {
+    val t = LocalPpTokens.current
     val (border, bg, text) = when (priority.lowercase()) {
         "critical" -> Triple(
-            Palette.CriticalBadgeBorder,
-            Palette.CriticalBadgeBg,
-            Palette.CriticalBadgeText,
+            t.CriticalBadgeBorder,
+            t.CriticalBadgeBg,
+            t.CriticalBadgeText,
         )
 
-        "high" -> Triple(Palette.HighBadgeBorder, Palette.HighBadgeBg, Palette.HighBadgeText)
+        "high" -> Triple(t.HighBadgeBorder, t.HighBadgeBg, t.HighBadgeText)
 
-        else -> Triple(Palette.NormalBadgeBorder, Palette.NormalBadgeBg, Palette.NormalBadgeText)
+        else -> Triple(t.NormalBadgeBorder, t.NormalBadgeBg, t.NormalBadgeText)
     }
     BadgePill(modifier = modifier, border = border, fill = bg) {
         Text(
@@ -449,10 +506,11 @@ fun PriorityBadge(priority: String, modifier: Modifier = Modifier) {
 /** `.badge`: kind/source pill (white .06 fill, white .14 border, #aab4e0 text). */
 @Composable
 fun KindBadge(text: String, modifier: Modifier = Modifier) {
+    val t = LocalPpTokens.current
     BadgePill(modifier = modifier, border = Color(0x24FFFFFF), fill = Color(0x0FFFFFFF)) {
         Text(
             text = text.uppercase(),
-            color = Palette.MutedLabel,
+            color = t.MutedLabel,
             fontSize = 10.sp,
             letterSpacing = 0.5.sp,
         )
@@ -494,8 +552,8 @@ private fun BadgePill(
  * `.grad-text`: brand-gradient headline text.
  *
  * Compose's TextStyle only takes a solid color, so the gradient is faked with
- * per-character spans interpolated across the three `.grad-text` stops
- * (#60a5fa → #a78bfa 55% → #e879f9).
+ * per-character spans across the 5-stop ramp (A, oklab(A,B), B, oklab(B,C), C)
+ * — the same stops the web paints, so the hue interpolates evenly.
  */
 @Composable
 fun GradText(
@@ -503,17 +561,24 @@ fun GradText(
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
 ) {
-    val stops = listOf(Color(0xFF60A5FA), Color(0xFFA78BFA), Color(0xFFE879F9))
-    val spanned: AnnotatedString = remember(text) {
+    val t = LocalPpTokens.current
+    val stops = remember(t) {
+        listOf(
+            t.GradA,
+            oklabMix(t.GradA, t.GradB, 0.5f),
+            t.GradB,
+            oklabMix(t.GradB, t.GradC, 0.5f),
+            t.GradC,
+        )
+    }
+    val spanned: AnnotatedString = remember(text, t) {
         val builder = AnnotatedString.Builder()
         val n = text.length.coerceAtLeast(1)
         for (i in text.indices) {
-            val t = if (n == 1) 0f else i.toFloat() / (n - 1)
-            val c = if (t <= 0.55f) {
-                lerpColor(stops[0], stops[1], t / 0.55f)
-            } else {
-                lerpColor(stops[1], stops[2], (t - 0.55f) / 0.45f)
-            }
+            val u = if (n == 1) 0f else i.toFloat() / (n - 1)
+            val seg = (u * 4f).coerceIn(0f, 3f)
+            val idx = seg.toInt()
+            val c = lerpColor(stops[idx], stops[idx + 1], seg - idx)
             builder.pushStyle(SpanStyle(color = c))
             builder.append(text[i])
             builder.pop()
@@ -534,15 +599,17 @@ private fun lerpColor(a: Color, b: Color, f: Float): Color {
     )
 }
 
-/** Pulsing violet dot (web `.empty-dot` / `.count-flash` energy). */
+/** Pulsing brand-violet dot (web `.empty-dot` / `.count-flash` energy). */
 @Composable
 fun PulseDot(
     modifier: Modifier = Modifier,
-    color: Color = Palette.BrandViolet,
+    color: Color? = null,
     size: Dp = 12.dp,
 ) {
+    val t = LocalPpTokens.current
+    val c = color ?: t.BrandViolet
     val transition = rememberInfiniteTransition(label = "pulse")
-    val t by transition.animateFloat(
+    val a by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -551,7 +618,7 @@ fun PulseDot(
         ),
         label = "pulse",
     )
-    Box(modifier = modifier.size(size).background(color = color.copy(alpha = 0.9f - 0.55f * t), shape = CircleShape))
+    Box(modifier = modifier.size(size).background(color = c.copy(alpha = 0.9f - 0.55f * a), shape = CircleShape))
 }
 
 /**
@@ -589,13 +656,14 @@ fun GlassPanel(
 /** Web `.section-title`: 12px, 600, letter-spacing 1.2, uppercase, #94a3b8. */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    val t = LocalPpTokens.current
     Text(
         text.uppercase(),
         modifier = modifier,
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.2.sp,
-        color = Palette.TextSecondary,
+        color = t.TextSecondary,
     )
 }
 
@@ -610,8 +678,8 @@ fun GlassGrabber(modifier: Modifier = Modifier) {
 }
 
 /**
- * `.input-glass` text field: deep-navy fill with a 1px white .12 border;
- * violet border + soft ring when focused. The Material field is painted
+ * `.input-glass` text field: deep-navy fill with a 1px theme border;
+ * focus border + soft ring in the theme accent. The Material field is painted
  * transparent over [glassField] so the glass fill stays visible.
  */
 @Composable
@@ -628,13 +696,14 @@ fun GlassTextField(
     trailingIcon: (@Composable () -> Unit)? = null,
     onImeAction: ((ImeAction) -> Unit)? = null,
 ) {
+    val t = LocalPpTokens.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Box(modifier = modifier.glassField(focused)) {
         TextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { placeholder?.let { Text(it, color = Palette.Placeholder) } },
+            placeholder = { placeholder?.let { Text(it, color = t.Placeholder) } },
             singleLine = singleLine,
             maxLines = maxLines,
             keyboardOptions = keyboardOptions,
@@ -657,17 +726,17 @@ fun GlassTextField(
                 errorContainerColor = Color.Transparent,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Palette.BrandViolet,
-                focusedTextColor = Palette.Foreground,
-                unfocusedTextColor = Palette.Foreground,
-                disabledTextColor = Palette.Foreground,
-                errorTextColor = Palette.Foreground,
-                focusedLabelColor = Palette.BrandViolet,
-                unfocusedLabelColor = Palette.TextSecondary,
-                focusedLeadingIconColor = Palette.TextSecondary,
-                unfocusedLeadingIconColor = Palette.TextSecondary,
-                focusedTrailingIconColor = Palette.TextSecondary,
-                unfocusedTrailingIconColor = Palette.TextSecondary,
+                cursorColor = t.BrandViolet,
+                focusedTextColor = t.Foreground,
+                unfocusedTextColor = t.Foreground,
+                disabledTextColor = t.Foreground,
+                errorTextColor = t.Foreground,
+                focusedLabelColor = t.BrandViolet,
+                unfocusedLabelColor = t.TextSecondary,
+                focusedLeadingIconColor = t.TextSecondary,
+                unfocusedLeadingIconColor = t.TextSecondary,
+                focusedTrailingIconColor = t.TextSecondary,
+                unfocusedTrailingIconColor = t.TextSecondary,
             ),
         )
     }

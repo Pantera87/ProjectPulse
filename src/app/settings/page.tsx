@@ -6,6 +6,7 @@ import RestoreForm from "@/components/restore-form";
 import AISettings from "@/components/ai-settings";
 import NotifySettings from "@/components/notify-settings";
 import SnapshotSettings from "@/components/snapshot-settings";
+import ThemeSettings from "@/components/theme-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,16 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Settings</h1>
+
+      <section className="glass space-y-3 p-4">
+        <h2 className="font-semibold">Theme</h2>
+        <p className="text-sm text-slate-400">
+          “Vision” is the reference theme (blue‑dominant, Inter). “Pulse” keeps the
+          original look (violet, Geist). The choice is stored in this browser and
+          applied before the page paints.
+        </p>
+        <ThemeSettings />
+      </section>
 
       <section className="glass space-y-2 p-4">
         <h2 className="font-semibold">Data</h2>

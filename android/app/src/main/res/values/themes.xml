@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Base activity theme; actual colors come from the Compose Material3 theme. -->
-    <!-- windowBackground matches the aurora base (#060814) to avoid a light flash. -->
+    <!-- windowBackground matches the aurora base (#020515) to avoid a light flash. -->
     <style name="Theme.ProjectPulse" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#FF060814</item>
+        <item name="android:windowBackground">#FF020515</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>

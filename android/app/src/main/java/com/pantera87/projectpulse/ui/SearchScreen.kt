@@ -93,7 +93,7 @@ fun SearchScreen(onBack: () -> Unit) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             "Back",
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     }
                 },
@@ -110,7 +110,7 @@ fun SearchScreen(onBack: () -> Unit) {
                                 keyboardType = KeyboardType.Text,
                             ),
                             leadingIcon = {
-                                Icon(Icons.Default.Search, null, tint = Palette.TextSecondary)
+                                Icon(Icons.Default.Search, null, tint = LocalPpTokens.current.TextSecondary)
                             },
                             trailingIcon = {
                                 if (query.isNotEmpty()) {
@@ -118,7 +118,7 @@ fun SearchScreen(onBack: () -> Unit) {
                                         Icon(
                                             Icons.Default.Clear,
                                             "Clear",
-                                            tint = Palette.TextSecondary,
+                                            tint = LocalPpTokens.current.TextSecondary,
                                         )
                                     }
                                 }
@@ -135,17 +135,17 @@ fun SearchScreen(onBack: () -> Unit) {
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Palette.BrandViolet)
+                    CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
                 }
                 error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(error!!, color = Palette.Error)
+                    Text(error!!, color = LocalPpTokens.current.Error)
                 }
                 results == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         PulseDot()
                         Text(
                             "Type at least 2 characters to search",
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                             modifier = Modifier.padding(top = 12.dp),
                         )
                     }
@@ -158,7 +158,7 @@ fun SearchScreen(onBack: () -> Unit) {
                                 PulseDot()
                                 Text(
                                     "No results for “${query.trim()}”",
-                                    color = Palette.TextSecondary,
+                                    color = LocalPpTokens.current.TextSecondary,
                                     modifier = Modifier.padding(top = 12.dp),
                                 )
                             }
@@ -231,7 +231,7 @@ private fun SourceResultCard(s: Source) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Palette.Foreground,
+                    color = LocalPpTokens.current.Foreground,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
                 KindBadge(s.type)
@@ -242,7 +242,7 @@ private fun SourceResultCard(s: Source) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Palette.TextSecondary,
+                    color = LocalPpTokens.current.TextSecondary,
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }

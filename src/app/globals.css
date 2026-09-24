@@ -7,15 +7,203 @@
   --brand-blue: #4f8cff;
   --brand-violet: #8b5cf6;
   --brand-purple: #c084fc;
+  --brand-emerald: #10b981;
+  --brand-indigo: #6366f1;
+  --sky: #38bdf8;
 
-  --glass-bg: linear-gradient(
-    150deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.02) 55%,
-    rgba(139, 92, 246, 0.06) 100%
+  /* Parameterized so the "vision" theme can re-tint every glass/glow
+     surface. The values below are the original "pulse" palette, kept
+     verbatim as the default. */
+  --card-border: rgba(255, 255, 255, 0.12);
+  --glass-tint: rgba(139, 92, 246, 0.06);
+  --glass-strong-tint: rgba(139, 92, 246, 0.05);
+  --glass-strong-bg: rgba(8, 12, 32, 0.35);
+  --glass-hover-border: rgba(139, 92, 246, 0.45);
+  --glass-hover-glow: rgba(99, 102, 241, 0.35);
+  --tile-glow: rgba(139, 92, 246, 0.14);
+  --tile-glow-hover: rgba(139, 92, 246, 0.28);
+  --bg-glow-1: rgba(79, 140, 255, 0.16);
+  --bg-glow-2: rgba(139, 92, 246, 0.14);
+  --bg-glow-3: rgba(192, 132, 252, 0.1);
+  --aurora-1: rgba(79, 140, 255, 0.55);
+  --aurora-2: rgba(168, 85, 247, 0.5);
+  --aurora-3: rgba(232, 121, 249, 0.22);
+  --scrollbar: rgba(139, 92, 246, 0.4);
+  --scrollbar-thumb: rgba(139, 92, 246, 0.35);
+  --grad-a: #60a5fa;
+  --grad-b: #a78bfa;
+  --grad-c: #e879f9;
+  --accent-soft: #a78bfa;
+  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ---------- "vision" theme (the reference look) ----------
+   Blue-dominant dark navy, emerald positive accent, blue-tinted glass.
+   Applied via data-theme="vision" on <html> (see layout.tsx /
+   theme-toggle.tsx). Everything the pulse theme gets from the :root
+   defaults above is re-tinted here; no pulse value is modified. */
+:root[data-theme="vision"] {
+  --background: #030c1d;
+  --foreground: #f1f5f9;
+
+  --brand-blue: #0075ff;
+  --brand-violet: #4318ff;
+  --brand-purple: #9f7aea;
+  --brand-emerald: #01b574;
+  --brand-indigo: #4318ff;
+  --sky: #21d4fd;
+
+  --card-border: rgba(148, 163, 200, 0.16);
+  --glass-tint: rgba(6, 11, 40, 0.9);
+  --glass-strong-tint: rgba(10, 14, 35, 0.7);
+  --glass-strong-bg: rgba(6, 11, 40, 0.55);
+  --glass-hover-border: rgba(0, 117, 255, 0.45);
+  --glass-hover-glow: rgba(67, 24, 255, 0.35);
+  --tile-glow: rgba(0, 117, 255, 0.16);
+  --tile-glow-hover: rgba(0, 117, 255, 0.3);
+  --bg-glow-1: transparent;
+  --bg-glow-2: transparent;
+  --bg-glow-3: transparent;
+  --aurora-1: rgba(67, 24, 255, 0);
+  --aurora-2: rgba(0, 117, 255, 0);
+  --aurora-3: rgba(1, 181, 116, 0);
+  --scrollbar: rgba(0, 117, 255, 0.4);
+  --scrollbar-thumb: rgba(0, 117, 255, 0.35);
+  /* Aurora ramp (Apple-style aurora in the theme's cool palette):
+     blue → cyan → emerald, instead of the violet midpoint that read
+     muddy next to the navy surfaces. */
+  --grad-a: #4f8cff;
+  --grad-b: #21d4fd;
+  --grad-c: #34d399;
+  --accent-soft: #8f7bff;
+  --font-sans: var(--font-pjs), Arial, Helvetica, sans-serif;
+
+  /* Page background base for the vision theme; the layered glow on top is
+     painted in the body rule below. Lifted slightly off black so the glow
+     fades dissolve into it instead of dropping to a flat dark tone. */
+  --vision-bg: #04102a;
+  --vision-card: linear-gradient(
+    127.09deg,
+    rgba(6, 11, 40, 0.94) 19.41%,
+    rgba(10, 14, 35, 0.49) 76.65%
   );
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --vision-card-deep: linear-gradient(126.97deg, #060b28 28.26%, #0a0e23 91.2%);
+  --vision-menu: linear-gradient(126.97deg, #05153f 28.26%, #072561 91.2%);
+}
+
+/* ---------- "vision" theme: surfaces (exact gradients from the live
+   Vision UI dashboard) ----------
+   The page background is the theme's body background image (dark navy with
+   a soft blue glow); cards and the sidenav use translucent navy gradients
+   so the background shows through; the navbar is a near-transparent white
+   gradient. The shine sweep, dot grid and aurora blobs are dropped. */
+:root[data-theme="vision"] .glass {
+  background: var(--vision-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-radius: 14px;
+}
+:root[data-theme="vision"] .glass-strong {
+  background: var(--vision-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 10px 30px -22px rgba(2, 6, 23, 0.9);
+  border-radius: 18px;
+}
+:root[data-theme="vision"] .glass-shine::after {
+  display: none;
+}
+:root[data-theme="vision"] .glass-tile::before {
+  opacity: 0.45;
+}
+:root[data-theme="vision"] .aurora-blob {
+  opacity: 0;
+}
+/* The base body rule stacks radial glows over a flat color; vision re-stacks
+   its own layered glow (main blue bloom left-of-center, violet and blue
+   blooms along the bottom) over the navy base (higher specificity). Each
+   glow fades out over a long 85-92% tail and the base is lifted, so the
+   glows dissolve seamlessly into the surroundings with no visible dark
+   edge. */
+:root[data-theme="vision"] body {
+  background:
+    radial-gradient(38rem 30rem at 35% 50%, rgba(96, 148, 255, 0.4), transparent 88%),
+    radial-gradient(82rem 62rem at 36% 48%, rgba(62, 100, 235, 0.48), transparent 90%),
+    radial-gradient(58rem 46rem at 12% 96%, rgba(108, 76, 226, 0.36), transparent 88%),
+    radial-gradient(70rem 54rem at 66% 112%, rgba(45, 128, 240, 0.4), transparent 88%),
+    radial-gradient(64rem 50rem at 92% 32%, rgba(35, 92, 224, 0.28), transparent 90%),
+    var(--vision-bg);
+  background-attachment: fixed;
+}
+/* Sidebar + top bar: the utilities set background-color, so a higher-
+   specificity background shorthand here wins. */
+:root[data-theme="vision"] aside {
+  background: var(--vision-card);
+}
+/* The sidenav is liquid glass: a thin white-tinted gradient over the page
+   glow (which shows through the backdrop blur) with a specular top edge
+   and a faint inner glow — transparent, not a dark card. */
+:root[data-theme="vision"] .sidenav {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 45%,
+    rgba(6, 11, 40, 0.1) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 20px -8px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+}
+:root[data-theme="vision"] header {
+  /* Liquid glass, matching the sidenav: a thin white-tinted gradient over
+     the page glow (which shows through the backdrop blur) with a specular
+     top edge — lighter than the flat dark bar it used to be. */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.04) 55%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 28px -14px rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+}
+:root[data-theme="vision"] .aurora::before {
+  display: none;
+}
+:root[data-theme="vision"] .chip-active {
+  background: var(--vision-menu);
+  border-color: rgba(0, 117, 255, 0.35);
+  box-shadow: none;
+  color: #fff;
+}
+
+/* Inset stat boxes inside dashboard cards (hero, gauge cards). In vision
+   they use the theme's "cardContent" gradient, darker than the card. */
+.stat-box {
+  background: rgba(255, 255, 255, 0.05);
+}
+:root[data-theme="vision"] .stat-box {
+  background: var(--vision-card-deep);
+  border-color: rgba(148, 163, 200, 0.12);
+}
+
+/* Active sidebar nav item: vivid blue pill in pulse, the theme's "menu"
+   gradient in vision (the reference look). */
+.nav-item-active {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.9), rgba(99, 102, 241, 0.8));
+  box-shadow: 0 0 18px -4px rgba(59, 130, 246, 0.55);
+}
+:root[data-theme="vision"] .nav-item-active {
+  background: var(--vision-menu);
+  box-shadow: none;
 }
 
 @theme inline {
@@ -24,23 +212,29 @@
   --color-brand-blue: var(--brand-blue);
   --color-brand-violet: var(--brand-violet);
   --color-brand-purple: var(--brand-purple);
+  --color-brand-emerald: var(--brand-emerald);
+  --color-brand-indigo: var(--brand-indigo);
+  --color-sky-accent: var(--sky);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
   color-scheme: dark;
+  /* Base scale: nudges every rem-based size (text, spacing, icons, tiles)
+     up ~9% together without touching any component class. */
+  font-size: 17.5px;
 }
 
 body {
   background:
-    radial-gradient(60rem 40rem at 85% -10%, rgba(79, 140, 255, 0.16), transparent 60%),
-    radial-gradient(50rem 36rem at -10% 20%, rgba(139, 92, 246, 0.14), transparent 60%),
-    radial-gradient(44rem 34rem at 55% 115%, rgba(192, 132, 252, 0.1), transparent 60%),
+    radial-gradient(60rem 40rem at 85% -10%, var(--bg-glow-1), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 20%, var(--bg-glow-2), transparent 60%),
+    radial-gradient(44rem 34rem at 55% 115%, var(--bg-glow-3), transparent 60%),
     var(--background);
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 /* ---------- resolution-adaptive content shell ---------- */
@@ -55,13 +249,19 @@ body {
 /* ---------- liquid glass surfaces ---------- */
 
 .glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  background:
+    linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 55%,
+      var(--glass-tint) 100%
+    );
+  border: 1px solid var(--card-border);
   border-radius: 16px;
   backdrop-filter: blur(18px) saturate(1.5);
   -webkit-backdrop-filter: blur(18px) saturate(1.5);
   box-shadow:
-    var(--glass-highlight),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
     0 12px 32px -14px rgba(2, 4, 20, 0.9);
 }
 
@@ -72,11 +272,11 @@ body {
     transform 0.25s ease;
 }
 .glass-hover:hover {
-  border-color: rgba(139, 92, 246, 0.45);
+  border-color: var(--glass-hover-border);
   box-shadow:
-    var(--glass-highlight),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
     0 14px 36px -14px rgba(2, 4, 20, 0.9),
-    0 0 26px -4px rgba(99, 102, 241, 0.35);
+    0 0 26px -4px var(--glass-hover-glow);
   transform: translateY(-1px);
 }
 
@@ -87,15 +287,15 @@ body {
       150deg,
       rgba(255, 255, 255, 0.06) 0%,
       rgba(255, 255, 255, 0.015) 55%,
-      rgba(139, 92, 246, 0.05) 100%
+      var(--glass-strong-tint) 100%
     ),
-    rgba(8, 12, 32, 0.35);
-  border: 1px solid var(--glass-border);
+    var(--glass-strong-bg);
+  border: 1px solid var(--card-border);
   border-radius: 20px;
   backdrop-filter: blur(22px) saturate(1.4);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   box-shadow:
-    var(--glass-highlight),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
     0 16px 40px -16px rgba(2, 4, 20, 0.9);
 }
 
@@ -110,7 +310,7 @@ body {
   inset: 0;
   background: radial-gradient(
     120% 90% at 50% -20%,
-    rgba(139, 92, 246, 0.14),
+    var(--tile-glow),
     transparent 60%
   );
   pointer-events: none;
@@ -118,7 +318,7 @@ body {
 .glass-tile:hover::before {
   background: radial-gradient(
     120% 90% at 50% -20%,
-    rgba(139, 92, 246, 0.28),
+    var(--tile-glow-hover),
     transparent 65%
   );
 }
@@ -182,7 +382,14 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-violet) 55%, var(--brand-purple) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--grad-a) 0%,
+    color-mix(in oklab, var(--grad-a) 50%, var(--grad-b)) 25%,
+    var(--grad-b) 50%,
+    color-mix(in oklab, var(--grad-b) 50%, var(--grad-c)) 75%,
+    var(--grad-c) 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.28);
   color: #fff;
   border-radius: 0.65rem;
@@ -212,7 +419,7 @@ body {
   justify-content: center;
   gap: 0.375rem;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   color: #c7cef0;
   border-radius: 0.65rem;
   backdrop-filter: blur(10px);
@@ -293,7 +500,7 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   padding: 0.0625rem 0.5rem;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #aab4e0;
@@ -312,16 +519,69 @@ body {
   border-radius: 999px;
   border: 1px solid rgba(251, 113, 133, 0.45);
   background: rgba(244, 63, 94, 0.18);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
   color: #fecdd3;
 }
 
+/* ---------- section heading accent ----------
+   Theme-reactive icon tint for dashboard/section headings: violet in
+   pulse, blue in vision. */
+.section-accent {
+  color: var(--accent-soft);
+}
+
+/* ---------- glyph tiles ----------
+   Theme-aware gradient square behind <Glyph> icon tiles (KPI cards,
+   category/type icons): the brand gradient, so the fill follows the
+   active theme (blue→violet→fuchsia in pulse, blue→violet→cyan in vision).
+   Half-stops via color-mix (oklab) interpolate the hue smoothly so the
+   mid-point never reads as a hard band. */
+.glyph-tile {
+  background: linear-gradient(
+    135deg,
+    var(--grad-a) 0%,
+    color-mix(in oklab, var(--grad-a) 50%, var(--grad-b)) 25%,
+    var(--grad-b) 50%,
+    color-mix(in oklab, var(--grad-b) 50%, var(--grad-c)) 75%,
+    var(--grad-c) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* Thin vertical accent stripe (source cards): the same aurora ramp as
+   .glyph-tile, oriented top-to-bottom, so category accents follow the
+   active theme instead of fixed per-category hues. */
+.aurora-stripe {
+  background: linear-gradient(
+    180deg,
+    var(--grad-a) 0%,
+    color-mix(in oklab, var(--grad-a) 50%, var(--grad-b)) 25%,
+    var(--grad-b) 50%,
+    color-mix(in oklab, var(--grad-b) 50%, var(--grad-c)) 75%,
+    var(--grad-c) 100%
+  );
+}
+
+/* Icon-square fill shared by the dashboard KPI cards and the source type
+   icons (globe / github / rss): the theme's brand gradient, so every icon
+   tile on a page reads with the same fill. */
+.brand-tile {
+  background: linear-gradient(135deg, var(--brand-violet), var(--brand-purple));
+}
+
 /* ---------- gradient text ---------- */
 
 .grad-text {
-  background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 55%, #e879f9 100%);
+  background: linear-gradient(
+    90deg,
+    var(--grad-a) 0%,
+    color-mix(in oklab, var(--grad-a) 50%, var(--grad-b)) 25%,
+    var(--grad-b) 50%,
+    color-mix(in oklab, var(--grad-b) 50%, var(--grad-c)) 75%,
+    var(--grad-c) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -373,7 +633,7 @@ body {
   height: 46rem;
   top: -14rem;
   right: -10rem;
-  background: radial-gradient(circle at 35% 35%, rgba(79, 140, 255, 0.55), transparent 70%);
+  background: radial-gradient(circle at 35% 35%, var(--aurora-1), transparent 70%);
   animation: aurora-drift-1 26s ease-in-out infinite alternate;
 }
 .aurora-blob-2 {
@@ -381,7 +641,7 @@ body {
   height: 42rem;
   bottom: -16rem;
   left: -12rem;
-  background: radial-gradient(circle at 60% 40%, rgba(168, 85, 247, 0.5), transparent 70%);
+  background: radial-gradient(circle at 60% 40%, var(--aurora-2), transparent 70%);
   animation: aurora-drift-2 32s ease-in-out infinite alternate;
 }
 .aurora-blob-3 {
@@ -389,7 +649,7 @@ body {
   height: 30rem;
   top: 32%;
   left: 34%;
-  background: radial-gradient(circle, rgba(232, 121, 249, 0.22), transparent 70%);
+  background: radial-gradient(circle, var(--aurora-3), transparent 70%);
   animation: aurora-drift-3 38s ease-in-out infinite alternate;
 }
 @keyframes aurora-drift-1 {
@@ -421,7 +681,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(139, 92, 246, 0.4) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -431,7 +691,7 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.35);
+  background: var(--scrollbar-thumb);
   border-radius: 8px;
 }
 

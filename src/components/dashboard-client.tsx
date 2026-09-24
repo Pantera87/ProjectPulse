@@ -9,7 +9,12 @@ import RefreshAll from "./refresh-all";
 import Time from "./time";
 import SourceCard from "./source-card";
 import CategoryIcon from "./category-icon";
+import KpiCard from "./dashboard/kpi-card";
+import AreaChart from "./dashboard/area-chart";
+import BarChart, { VerticalBars } from "./dashboard/bar-chart";
+import { SatisfactionGauge, RingGauge } from "./dashboard/gauges";
 import { repoDisplayName } from "@/lib/format";
+import type { DashboardAggregates } from "@/lib/dashboard-aggregates";
 import { Glyph, KIND_ICON } from "./icons";
 import EmptyPulse from "./empty-pulse";
 
@@ -51,6 +56,7 @@ interface Props {
   initialLatestBySource: Record<number, LatestBySource>;
   initialActivity: Record<number, number[]>;
   initialAttention: LatestUpdate[];
+  initialAggregates: DashboardAggregates;
   /** AI-picked glyph per category (categories table) — optional, old UIs pass none. */
   categoryIcons?: Record<string, string>;
   sources: DashboardSource[];
@@ -64,18 +70,16 @@ const byName = (a: DashboardSource, b: DashboardSource) =>
   (a.name ?? a.url).localeCompare(b.name ?? b.url);
 const sumUnread = (items: DashboardSource[]) => items.reduce((n, s) => n + s.unread, 0);
 
-const TILE_STYLES: Record<string, string> = {
-  critical: "border-rose-500/40 bg-gradient-to-br from-rose-500/15 to-transparent",
-  high: "border-amber-400/40 bg-gradient-to-br from-amber-400/15 to-transparent",
-  normal: "bg-gradient-to-br from-white/10 to-transparent",
-  total: "border-violet-400/40 bg-gradient-to-br from-violet-500/15 to-transparent",
-};
-
-const TILE_GLYPH: Record<string, string> = {
-  critical: "alert",
-  high: "flame",
-  normal: "check",
-  total: "inbox",
+// Short weekday names for the 7-day activity chart (UTC, hydration-safe).
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const dayLabels = (): string[] => {
+  const out: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date();
+    dt.setUTCDate(dt.getUTCDate() - i);
+    out.push(WEEKDAYS[dt.getUTCDay()]);
+  }
+  return out;
 };
 
 const ROW_STYLES: Record<string, string> = {
@@ -118,6 +122,7 @@ export default function DashboardClient({
   initialLatestBySource,
   initialActivity,
   initialAttention,
+  initialAggregates,
   categoryIcons = {},
   sources,
 }: Props) {
@@ -131,6 +136,7 @@ export default function DashboardClient({
   );
   const [attention, setAttention] = useState<LatestUpdate[]>(initialAttention);
   const [activity, setActivity] = useState<Record<number, number[]>>(initialActivity);
+  const [aggregates, setAggregates] = useState<DashboardAggregates>(initialAggregates);
   const [sort, setSort] = useState<SortMode>("category");
   const [grouped, setGrouped] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
@@ -175,6 +181,7 @@ export default function DashboardClient({
         latestBySource: Record<number, LatestBySource>;
         activityBySource: Record<number, number[]>;
         attention: LatestUpdate[];
+        aggregates?: DashboardAggregates;
       };
       setCounts(j.counts);
       setCategoryUnread(j.categoryUnread);
@@ -182,6 +189,7 @@ export default function DashboardClient({
       setLatestBySource(j.latestBySource ?? {});
       setActivity(j.activityBySource ?? {});
       setAttention(j.attention ?? []);
+      if (j.aggregates) setAggregates(j.aggregates);
       if (j.counts.total !== prevTotal.current) setFlashKey((k) => k + 1);
       prevTotal.current = j.counts.total;
     } catch {
@@ -246,12 +254,24 @@ export default function DashboardClient({
     return rows;
   }, [catList, categories, filter, sort]);
 
-  const stats: [keyof Counts, string, number][] = [
-    ["critical", "Critical", counts.critical],
-    ["high", "High", counts.high],
-    ["normal", "Normal", counts.normal],
-    ["total", "Unread total", counts.total],
-  ];
+  // Widget-row derivations: unread-by-category bars (top 6) + gauge fractions.
+  const barItems = useMemo(
+    () =>
+      Object.entries(categoryUnread)
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([label, value]) => ({ label, value })),
+    [categoryUnread]
+  );
+  const labels = useMemo(() => dayLabels(), []);
+  const readFraction =
+    aggregates.totalUpdates > 0 ? aggregates.readUpdates / aggregates.totalUpdates : 0;
+  const weekFraction =
+    aggregates.sourcesTotal > 0
+      ? aggregates.sourcesUpdatedThisWeek / aggregates.sourcesTotal
+      : 0;
+  const weekDelta = aggregates.updatesThisWeek - aggregates.updatesPrevWeek;
 
   const compact = density === "compact" || density === "minimal";
   const gridCls = compact
@@ -263,28 +283,35 @@ export default function DashboardClient({
       <div className="min-w-0 space-y-6">
         {/* Unread counters */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {stats.map(([key, label, value], i) => (
-          <Link
-            key={key}
-            href={key === "total" ? "/updates" : `/updates?priority=${key}`}
-            className={`glass glass-hover glass-tile glass-shine rise p-3 ${TILE_STYLES[key]}`}
-            style={delay(i * 60)}
-          >
-            <div
-              key={key === "total" ? `flash-${flashKey}` : undefined}
-              className={`grad-text text-2xl font-semibold ${
-                key === "total" && flashKey > 0 ? "count-flash" : ""
-              }`}
-            >
-              {value}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
-              <Glyph name={TILE_GLYPH[key] ?? "star"} className="h-3.5 w-3.5" />
-              {label}
-            </div>
-          </Link>
-        ))}
-      </div>
+          <KpiCard
+            label="Unread total"
+            value={counts.total}
+            glyph="inbox"
+            href="/updates"
+            flashTick={flashKey}
+          />
+          <KpiCard
+            label="Critical"
+            value={counts.critical}
+            glyph="alert"
+            href="/updates?priority=critical"
+            delayMs={60}
+          />
+          <KpiCard
+            label="High"
+            value={counts.high}
+            glyph="flame"
+            href="/updates?priority=high"
+            delayMs={120}
+          />
+          <KpiCard
+            label="Normal"
+            value={counts.normal}
+            glyph="check"
+            href="/updates?priority=normal"
+            delayMs={180}
+          />
+        </div>
 
       {/* Unread critical/high updates — triage strip above the project grid */}
       {attention.length > 0 && (
@@ -341,11 +368,160 @@ export default function DashboardClient({
         </section>
       )}
 
+      {/* Widget row: welcome hero + read-rate gauge + weekly-activity ring */}
+      <div className="grid gap-3 xl:grid-cols-3">
+        <div className="glass-strong glass-shine rise relative overflow-hidden p-4" style={delay(220)}>
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(30rem 22rem at 88% 38%, rgba(59,130,246,0.5) 0%, rgba(99,102,241,0.22) 48%, transparent 72%), radial-gradient(20rem 16rem at 72% 92%, rgba(16,185,129,0.18) 0%, transparent 68%)",
+            }}
+            aria-hidden="true"
+          />
+          <div className="relative">
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              Welcome back
+            </p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+              ProjectPulse
+            </h2>
+            <p className="mt-2 max-w-[60%] text-sm leading-relaxed text-slate-400">
+              {counts.total} unread update
+              {counts.total === 1 ? "" : "s"} — {aggregates.updatesThisWeek} new from{" "}
+              {aggregates.sourcesUpdatedThisWeek} of {aggregates.sourcesTotal} tracked source
+              {aggregates.sourcesTotal === 1 ? "" : "s"} this week.
+            </p>
+            <div className="mt-4 grid w-full max-w-xs grid-cols-3 gap-2">
+              <div className="stat-box rounded-xl border border-white/10 px-3 py-2">
+                <div className="text-lg font-semibold text-white">{counts.total}</div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">Unread</div>
+              </div>
+              <div className="stat-box rounded-xl border border-white/10 px-3 py-2">
+                <div className="text-lg font-semibold text-[#35d28a]">
+                  {aggregates.updatesThisWeek}
+                </div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">This week</div>
+              </div>
+              <div className="stat-box rounded-xl border border-white/10 px-3 py-2">
+                <div className="text-lg font-semibold text-white">{aggregates.sourcesTotal}</div>
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">Sources</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Read rate — the demo's "Satisfaction Rate" card, as-is */}
+        <div
+          className="glass-strong rise flex flex-col"
+          style={{
+            ...delay(280),
+            padding: 22,
+            borderRadius: 20,
+            background:
+              "linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%)",
+          }}
+        >
+          <h2 className="text-lg font-bold text-white">Read rate</h2>
+          <p className="text-sm text-[#a0aec0]">of all stored updates</p>
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center">
+            <SatisfactionGauge
+              fraction={readFraction}
+              value={`${Math.round(readFraction * 100)}%`}
+              caption={`${aggregates.readUpdates} of ${aggregates.totalUpdates} read`}
+            />
+          </div>
+        </div>
+
+        {/* This week — the demo's "Referral Tracking" card, as-is */}
+        <div
+          className="glass-strong rise flex flex-col"
+          style={{
+            ...delay(340),
+            padding: 22,
+            borderRadius: 20,
+            background:
+              "linear-gradient(126.97deg, rgba(6, 11, 40, 0.74) 28.26%, rgba(10, 14, 35, 0.71) 91.2%)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white">This week</h2>
+            <span className="flex gap-1 text-slate-500" aria-hidden="true">
+              <span className="h-1 w-1 rounded-full bg-current" />
+              <span className="h-1 w-1 rounded-full bg-current" />
+              <span className="h-1 w-1 rounded-full bg-current" />
+            </span>
+          </div>
+          <div className="mt-4 flex flex-1 items-center gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
+              <div>
+                <div className="text-sm text-[#a0aec0]">Updates</div>
+                <div className="text-lg font-bold text-white">
+                  {aggregates.updatesThisWeek}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-[#a0aec0]">Active sources</div>
+                <div className="text-lg font-bold text-white">
+                  {aggregates.sourcesUpdatedThisWeek}
+                  <span className="font-medium text-[#a0aec0]">
+                    {" "}
+                    / {aggregates.sourcesTotal}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <RingGauge
+              fraction={weekFraction}
+              value={(weekFraction * 10).toFixed(1)}
+              top="Pulse"
+              bottom="Sources active"
+              size="min(200px, 55%)"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Chart row: activity area chart with week delta + bars / unread by category */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="glass-strong rise p-4" style={delay(400)}>
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <Glyph name="trending" className="section-accent h-4 w-4" />
+              Activity overview
+            </h2>
+            <span
+              className={`text-xs font-medium ${
+                weekDelta >= 0 ? "text-[#35d28a]" : "text-[#ee5d50]"
+              }`}
+            >
+              {weekDelta === 0
+                ? "no change vs last week"
+                : `(${weekDelta > 0 ? "+" : ""}${weekDelta}) ${
+                    weekDelta > 0 ? "more" : "fewer"
+                  } than last week`}
+            </span>
+          </div>
+          <AreaChart data={aggregates.activityTotalByDay} labels={labels} />
+        </div>
+        <div className="glass-strong rise flex flex-col p-4" style={delay(460)}>
+          <div className="stat-box rounded-[20px] p-3">
+            <VerticalBars data={aggregates.activityTotalByDay} labels={labels} />
+          </div>
+          <h3 className="mb-3 mt-4 self-start text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Unread by category
+          </h3>
+          <div className="flex-1">
+            <BarChart items={barItems} />
+          </div>
+        </div>
+      </div>
+
       {/* Projects with category controls */}
       <section className="glass-strong rise space-y-4 p-4" style={delay(300)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Glyph name="grid" className="h-5 w-5 text-violet-300" />
+            <Glyph name="grid" className="section-accent h-5 w-5" />
             Projects
           </h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -517,7 +693,7 @@ export default function DashboardClient({
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Glyph name="bell" className="h-5 w-5 text-violet-300" />
+            <Glyph name="bell" className="section-accent h-5 w-5" />
             Recent updates
           </h2>
           <div className="flex items-center gap-2">
@@ -529,6 +705,14 @@ export default function DashboardClient({
                 setAttention([]);
                 setCounts({ critical: 0, high: 0, normal: 0, total: 0 });
                 setCategoryUnread({});
+                setAggregates((a) => ({
+                  ...a,
+                  totalUpdates: 0,
+                  readUpdates: 0,
+                  updatesThisWeek: 0,
+                  updatesPrevWeek: 0,
+                  activityTotalByDay: [0, 0, 0, 0, 0, 0, 0],
+                }));
                 prevTotal.current = 0;
               }}
             />

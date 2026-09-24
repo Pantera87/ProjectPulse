@@ -95,11 +95,11 @@ fun RulesEditorDialog(
                         "Watch rules",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Palette.Foreground,
+                        color = LocalPpTokens.current.Foreground,
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.Close, "Close", tint = Palette.TextSecondary)
+                        Icon(Icons.Filled.Close, "Close", tint = LocalPpTokens.current.TextSecondary)
                     }
                 }
                 Text(
@@ -109,7 +109,7 @@ fun RulesEditorDialog(
                         append(". Exclude rules set the priority of what they match.")
                     },
                     fontSize = 12.sp,
-                    color = Palette.TextSecondary,
+                    color = LocalPpTokens.current.TextSecondary,
                 )
                 Column(
                     Modifier
@@ -122,7 +122,7 @@ fun RulesEditorDialog(
                         Text(
                             "No rules yet. Tap Add rule to create one.",
                             fontSize = 13.sp,
-                            color = Palette.TextTertiary,
+                            color = LocalPpTokens.current.TextTertiary,
                         )
                     }
                     rules.forEachIndexed { i, rule ->
@@ -148,7 +148,7 @@ fun RulesEditorDialog(
                         Icon(
                             Icons.Filled.Add,
                             contentDescription = null,
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -195,7 +195,7 @@ private fun RuleRow(
                 )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onRemove) {
-                    Icon(Icons.Filled.Close, "Remove rule", tint = Palette.TextSecondary)
+                    Icon(Icons.Filled.Close, "Remove rule", tint = LocalPpTokens.current.TextSecondary)
                 }
             }
             GlassTextField(
@@ -218,7 +218,7 @@ private fun RuleRow(
                     Text(
                         "Priority",
                         fontSize = 12.sp,
-                        color = Palette.TextSecondary,
+                        color = LocalPpTokens.current.TextSecondary,
                         modifier = Modifier.padding(end = 8.dp),
                     )
                     GlassChip(

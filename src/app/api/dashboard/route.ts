@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getDashboardAggregates } from "@/lib/dashboard-aggregates";
 
 export const dynamic = "force-dynamic";
 
@@ -106,5 +107,6 @@ export function GET() {
     latestBySource: Object.fromEntries(latestBySource),
     activityBySource,
     attention,
+    aggregates: getDashboardAggregates(d),
   });
 }

@@ -1,5 +1,6 @@
 package com.pantera87.projectpulse.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,47 +16,70 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
 
 /**
- * The web app's aurora background (`.aurora` + the body radial tints):
- * a near-black base, three fixed soft tints, three slowly drifting blobs
- * and a faint 26dp dot grid.
+ * The web app's backdrop, themed:
+ *
+ * - **Pulse** — the original look: a near-black base, three fixed soft tints,
+ *   three slowly drifting blobs and a faint 26dp dot grid.
+ * - **Aurora** — a static canvas: the `--aurora-bg` navy base with five fixed
+ *   radial glows (the web's `:root[data-theme="aurora"] body` rule). No blobs,
+ *   no dot grid, no animation.
  *
  * Compose has no backdrop blur, but the glass sits on this static,
  * pre-softened backdrop, so the blobs are painted as radial gradients
  * (the CSS `blur(90px)` blobs have no hard edges to preserve).
- *
- * Two Canvases: the static layer composes once per size change, the blob
- * layer redraws every animation frame.
  */
 @Composable
 fun AuroraBackground(modifier: Modifier = Modifier) {
+    val tokens = LocalPpTokens.current
+    val isPulse = tokens.theme == PpTheme.PULSE
+    // Theme switches crossfade the base color; the glow layers swap at once.
+    val base by animateColorAsState(
+        targetValue = if (isPulse) tokens.Background else tokens.BackdropBase,
+        animationSpec = tween(250),
+    )
     Box(modifier = modifier.fillMaxSize()) {
+        if (isPulse) {
+            PulseBackdrop(base)
+        } else {
+            AuroraStaticBackdrop(base)
+        }
+    }
+}
+
+/** Pulse: the original tints + dot grid + drifting blobs (unchanged). */
+@Composable
+private fun PulseBackdrop(base: Color) {
+    val t = LocalPpTokens.current
+    Box(Modifier.fillMaxSize()) {
         // ---- static: base + tints + dot grid ----
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            drawRect(Palette.Background)
+            drawRect(base)
             // Web body background: fixed radial tints.
             drawRect(
                 Brush.radialGradient(
-                    listOf(Palette.TintBlue, Color.Transparent),
+                    listOf(t.TintBlue, Color.Transparent),
                     center = Offset(0.85f * w, -0.10f * h),
                     radius = 0.8f * w,
                 ),
             )
             drawRect(
                 Brush.radialGradient(
-                    listOf(Palette.TintViolet, Color.Transparent),
+                    listOf(t.TintViolet, Color.Transparent),
                     center = Offset(-0.10f * w, 0.20f * h),
                     radius = 0.75f * w,
                 ),
             )
             drawRect(
                 Brush.radialGradient(
-                    listOf(Palette.TintPurple, Color.Transparent),
+                    listOf(t.TintPurple, Color.Transparent),
                     center = Offset(0.55f * w, 1.15f * h),
                     radius = 0.75f * w,
                 ),
@@ -77,7 +101,7 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
                     val a = ((0.8f - d) / 0.5f).coerceIn(0f, 1f)
                     if (a > 0f) {
                         drawCircle(
-                            Palette.Dot.copy(alpha = Palette.Dot.alpha * a),
+                            t.Dot.copy(alpha = t.Dot.alpha * a),
                             radius = 1.2f,
                             center = Offset(x, y),
                         )
@@ -123,9 +147,9 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
             // blur, so painted alpha is half the palette value and each blob's
             // extent is roughly a third of the screen width (the CSS gradient
             // runs `color → transparent 70%` across the circle).
-            val blue = Palette.BlobBlue.copy(alpha = Palette.BlobBlue.alpha * 0.5f)
-            val violet = Palette.BlobViolet.copy(alpha = Palette.BlobViolet.alpha * 0.5f)
-            val fuchsia = Palette.BlobFuchsia.copy(alpha = Palette.BlobFuchsia.alpha * 0.5f)
+            val blue = t.BlobBlue.copy(alpha = t.BlobBlue.alpha * 0.5f)
+            val violet = t.BlobViolet.copy(alpha = t.BlobViolet.alpha * 0.5f)
+            val fuchsia = t.BlobFuchsia.copy(alpha = t.BlobFuchsia.alpha * 0.5f)
             drawRect(
                 Brush.radialGradient(
                     listOf(blue, Color.Transparent),
@@ -148,5 +172,57 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
                 ),
             )
         }
+    }
+}
+
+/** Aurora: the static layered glow canvas (no animation). */
+@Composable
+private fun AuroraStaticBackdrop(base: Color) {
+    val t = LocalPpTokens.current
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(base)
+        t.AuroraGlows.forEach { g ->
+            drawEllipseGlow(
+                cx = g.cx * size.width,
+                cy = g.cy * size.height,
+                rx = g.rx * size.width,
+                ry = g.ry * size.width,
+                color = g.color,
+                fadeAt = g.fadeAt,
+            )
+        }
+    }
+}
+
+/**
+ * Paints a CSS-style `radial-gradient(rx ry at cx cy, color …, transparent)`:
+ * an ellipse (rx/ry) whose color fades to transparent at [fadeAt] of the
+ * radius. Compose only has circular radial brushes, so the Y axis is scaled
+ * around the center — the circular gradient then sweeps out as the ellipse.
+ */
+private fun DrawScope.drawEllipseGlow(
+    cx: Float,
+    cy: Float,
+    rx: Float,
+    ry: Float,
+    color: Color,
+    fadeAt: Float,
+) {
+    if (rx <= 0f || ry <= 0f) return
+    drawIntoCanvas { canvas ->
+        canvas.save()
+        canvas.translate(cx, cy)
+        canvas.scale(1f, ry / rx)
+        canvas.translate(-cx, -cy)
+        drawRect(
+            Brush.radialGradient(
+                0f to color,
+                fadeAt to color,
+                1f to Color.Transparent,
+                center = Offset(cx, cy),
+                radius = rx,
+            ),
+        )
+        canvas.restore()
     }
 }

@@ -147,14 +147,14 @@ fun DashboardScreen(
                         Icon(
                             Icons.Default.Search,
                             "Search",
-                            tint = Palette.GhostText,
+                            tint = LocalPpTokens.current.GhostText,
                         )
                     }
                     if (data != null && data.counts.total > 0) {
                         Text(
                             "${data.counts.total} unread",
                             fontSize = 12.sp,
-                            color = Palette.TextSecondary,
+                            color = LocalPpTokens.current.TextSecondary,
                             modifier = Modifier.padding(end = 12.dp),
                         )
                     }
@@ -267,7 +267,7 @@ private fun SectionTitle(text: String) {
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.2.sp,
-        color = Palette.TextSecondary,
+        color = LocalPpTokens.current.TextSecondary,
         modifier = Modifier.padding(top = 22.dp, bottom = 10.dp, start = 4.dp),
     )
 }
@@ -280,9 +280,9 @@ private fun UnreadSummary(critical: Int, high: Int, normal: Int) {
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (critical > 0) StatChip("CRIT $critical", Palette.Critical)
-        if (high > 0) StatChip("HIGH $high", Palette.High)
-        if (normal > 0) StatChip("$normal", Palette.BrandBlue)
+        if (critical > 0) StatChip("CRIT $critical", LocalPpTokens.current.Critical)
+        if (high > 0) StatChip("HIGH $high", LocalPpTokens.current.High)
+        if (normal > 0) StatChip("$normal", LocalPpTokens.current.BrandBlue)
     }
 }
 
@@ -346,7 +346,7 @@ fun UpdateRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Palette.Foreground,
+                    color = LocalPpTokens.current.Foreground,
                     modifier = Modifier.weight(1f),
                 )
                 if (update.priority == "critical" || update.priority == "high") {
@@ -358,13 +358,13 @@ fun UpdateRow(
                 Text(
                     formatTime(update.created_at),
                     fontSize = 12.sp,
-                    color = Palette.TextTertiary,
+                    color = LocalPpTokens.current.TextTertiary,
                 )
                 update.source_name?.let {
                     Text(
                         "  ·  $it",
                         fontSize = 12.sp,
-                        color = Palette.TextTertiary,
+                        color = LocalPpTokens.current.TextTertiary,
                     )
                 }
                 if (update.kind.isNotBlank()) {
@@ -420,7 +420,7 @@ private fun SourceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Palette.Foreground,
+                    color = LocalPpTokens.current.Foreground,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
                 Sparkline(values = activity)
@@ -430,13 +430,13 @@ private fun SourceCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextSecondary,
+                color = LocalPpTokens.current.TextSecondary,
                 modifier = Modifier.padding(top = 6.dp),
             )
             Text(
                 latestTime,
                 style = MaterialTheme.typography.labelSmall,
-                color = Palette.TextTertiary,
+                color = LocalPpTokens.current.TextTertiary,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -446,6 +446,7 @@ private fun SourceCard(
 /** Tiny bar sparkline over the last N hourly update counts (web: 24 buckets). */
 @Composable
 private fun Sparkline(values: List<Int>?) {
+    val t = LocalPpTokens.current
     val points = values?.takeLast(24).orEmpty()
     val peak = points.maxOfOrNull { it }?.takeIf { it > 0 } ?: 1
     Canvas(
@@ -457,7 +458,7 @@ private fun Sparkline(values: List<Int>?) {
         points.forEachIndexed { i, v ->
             val h = (v.toFloat() / peak * size.height).coerceAtLeast(1f)
             drawRect(
-                color = Palette.BrandViolet.copy(alpha = 0.55f),
+                color = t.BrandViolet.copy(alpha = 0.55f),
                 topLeft = androidx.compose.ui.geometry.Offset(i * barW, size.height - h),
                 size = androidx.compose.ui.geometry.Size(barW * 0.7f, h),
             )

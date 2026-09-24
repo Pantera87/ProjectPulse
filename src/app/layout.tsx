@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import Image from "next/image";
+import { Geist, Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ensureStartup } from "@/lib/startup";
 import { getDb } from "@/lib/db";
-import SearchBox from "@/components/search-box";
-import AiStatus from "@/components/ai-status";
 import AiActivityProvider from "@/components/ai-activity-provider";
-import AiBusyRing from "@/components/ai-busy-ring";
 import Aurora from "@/components/aurora";
-import NavLinks from "@/components/nav-links";
+import AppShell from "@/components/app-shell";
+import { THEME_BOOTSTRAP_SCRIPT } from "@/components/theme-toggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,6 +16,21 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Reference-theme body font (Inter). Toggled via data-theme — see the
+// --font-sans mapping in globals.css.
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+// Vision UI reference font (Plus Jakarta). Vision uses this via
+// --font-sans: var(--font-pjs) in globals.css.
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-pjs",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -63,7 +74,8 @@ export const metadata: Metadata = {
   },
 };
 
-function Nav() {
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  ensureStartup();
   let unread = 0;
   let critical = 0;
   try {
@@ -81,62 +93,23 @@ function Nav() {
     // DB not ready (first boot) — render without badge
   }
   return (
-    <nav className="sticky top-0 z-40 border-b border-white/10 bg-[#060814]/70 backdrop-blur-xl">
-      <div className="app-shell mx-auto flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
-        <Link
-          href="/"
-          className="mr-4 flex items-center gap-1.5"
-          aria-label="ProjectPulse home"
-        >
-          <Image
-            src="/logo.png"
-            alt=""
-            aria-hidden="true"
-            width={48}
-            height={48}
-            className="h-12 w-12 shrink-0 drop-shadow-[0_0_10px_rgba(56,189,248,0.45)]"
-          />
-          <span className="grad-text text-3xl font-semibold leading-none">
-            ProjectPulse
-          </span>
-        </Link>
-        <NavLinks unread={unread} critical={critical} />
-        <div className="ml-auto flex items-center gap-2">
-          <AiBusyRing />
-          <AiStatus />
-          <SearchBox />
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  ensureStartup();
-  return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-theme="vision"
+      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${plusJakarta.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <Aurora />
-        {/* Shared AI-activity context: the nav ring, the check buttons and
+        {/* Shared AI-activity context: the sidebar ring, the check buttons and
             the status badge all see live "AI is processing" state. */}
         <AiActivityProvider>
-          <Nav />
-          <main className="app-shell mx-auto flex-1 px-4 py-6">{children}</main>
+          <AppShell unread={unread} critical={critical}>
+            {children}
+          </AppShell>
         </AiActivityProvider>
-        <footer className="app-shell mx-auto flex items-center justify-between px-4 pb-4 text-xs text-slate-500">
-          <span>ProjectPulse — local project tracker.</span>
-          <a
-            href="https://github.com/pantera87/ProjectPulse"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-slate-300 hover:underline"
-          >
-            GitHub
-          </a>
-        </footer>
       </body>
     </html>
   );

@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { SourceRow } from "@/lib/db";
 import SourceActions from "./source-actions";
 import AiBadge from "./ai-badge";
-import CategoryIcon, { iconForCategory } from "./category-icon";
+import CategoryIcon from "./category-icon";
 import { Glyph, KIND_ICON } from "./icons";
 import Time from "./time";
 import StatusDot from "./status-dot";
@@ -14,13 +14,8 @@ const TYPE_BADGE: Record<string, string> = {
   rss: "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-300",
 };
 
-// Gradient tile behind the type icon (compact/minimal densities).
-const TYPE_GRADIENT: Record<string, string> = {
-  website: "from-sky-500 to-blue-600",
-  github: "from-violet-500 to-purple-600",
-  rss: "from-fuchsia-500 to-pink-600",
-};
-
+// Glyph name for the source type icon (compact/minimal densities); the
+// tile behind it is the shared brand gradient (.brand-tile).
 const TYPE_ICON: Record<string, string> = {
   website: "globe",
   github: "github",
@@ -62,7 +57,6 @@ export default function SourceCard({
   categoryIcon?: string | null;
 }) {
   const mode = density ?? (compact ? "compact" : "comfortable");
-  const catGrad = iconForCategory(source.category).gradient;
   const detailHref =
     source.type === "github"
       ? `/repos/${source.id}`
@@ -74,7 +68,7 @@ export default function SourceCard({
     return (
       <div className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-white/5">
         <span
-          className={`h-3.5 w-1 shrink-0 rounded-full bg-gradient-to-b ${catGrad}`}
+          className="h-3.5 w-1 shrink-0 rounded-full aurora-stripe"
           title={source.category ?? "uncategorized"}
         />
         <StatusDot
@@ -105,7 +99,7 @@ export default function SourceCard({
     return (
       <div className="glass glass-hover group relative flex h-full flex-col gap-2 p-2.5">
         <span
-          className={`absolute inset-y-2 left-0 w-1 rounded-r-full bg-gradient-to-b ${catGrad}`}
+          className="absolute inset-y-2 left-0 w-1 rounded-r-full aurora-stripe"
           aria-hidden="true"
         />
         <div className="flex items-center gap-1.5">
@@ -139,9 +133,7 @@ export default function SourceCard({
             </span>
           )}
           <span
-            className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-gradient-to-br text-white shadow-md ${
-              TYPE_GRADIENT[source.type] ?? TYPE_GRADIENT.website
-            }`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md brand-tile text-white shadow-md"
             title={source.type}
           >
             <Glyph name={TYPE_ICON[source.type] ?? "globe"} className="h-3 w-3" />
@@ -222,7 +214,7 @@ export default function SourceCard({
   return (
     <div className="glass glass-hover glass-shine relative p-3.5">
       <span
-        className={`absolute inset-y-3 left-0 w-1 rounded-r-full bg-gradient-to-b ${catGrad}`}
+        className="absolute inset-y-3 left-0 w-1 rounded-r-full aurora-stripe"
         aria-hidden="true"
       />
       <div className="flex flex-wrap items-start gap-2">
