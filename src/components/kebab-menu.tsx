@@ -38,9 +38,11 @@ export default function KebabMenu({
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         className="btn-ghost h-7 w-7 justify-center px-0 text-base"
         title={title}
+        aria-label={title}
         aria-haspopup="menu"
         aria-expanded={open}
       >

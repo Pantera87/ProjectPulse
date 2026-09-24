@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { SourceRow } from "@/lib/db";
@@ -55,6 +62,11 @@ interface Props {
   initialLatest: LatestUpdate[];
   initialLatestBySource: Record<number, LatestBySource>;
   initialActivity: Record<number, number[]>;
+  /**
+   * Updates created since each source's last check (keyed by source id) —
+   * the "+N since last check" badge on source cards.
+   */
+  initialNews: Record<number, number>;
   initialAttention: LatestUpdate[];
   initialAggregates: DashboardAggregates;
   /** AI-picked glyph per category (categories table) — optional, old UIs pass none. */
@@ -121,6 +133,7 @@ export default function DashboardClient({
   initialLatest,
   initialLatestBySource,
   initialActivity,
+  initialNews,
   initialAttention,
   initialAggregates,
   categoryIcons = {},
@@ -136,6 +149,9 @@ export default function DashboardClient({
   );
   const [attention, setAttention] = useState<LatestUpdate[]>(initialAttention);
   const [activity, setActivity] = useState<Record<number, number[]>>(initialActivity);
+  const [newsSinceCheck, setNewsSinceCheck] = useState<Record<number, number>>(
+    initialNews
+  );
   const [aggregates, setAggregates] = useState<DashboardAggregates>(initialAggregates);
   const [sort, setSort] = useState<SortMode>("category");
   const [grouped, setGrouped] = useState(true);
@@ -145,10 +161,16 @@ export default function DashboardClient({
   const [density, setDensityState] = useState<DensityMode>("compact");
   const [flashKey, setFlashKey] = useState(0);
   const prevTotal = useRef(initialCounts.total);
+  // Monotonic id per load() call + its AbortController: a new load (poll tick
+  // vs. tab-refocus) aborts and supersedes any in-flight one, so an older
+  // response can never overwrite newer state.
+  const loadSeq = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Density default is compact; a previously picked mode is restored from
-  // localStorage after mount to avoid a hydration mismatch.
-  useEffect(() => {
+  // localStorage in a layout effect so the swap lands before paint (no visible
+  // layout shift) while the first render still matches the server.
+  useLayoutEffect(() => {
     let saved: string | null = null;
     try {
       saved = window.localStorage.getItem("pp-dashboard-density");
@@ -157,6 +179,8 @@ export default function DashboardClient({
     }
     if (saved === "comfortable" || saved === "compact" || saved === "minimal") {
       const chosen = saved;
+      // Defer to a microtask so the update lands before the first paint
+      // (no visible shift) without a synchronous setState in the effect.
       queueMicrotask(() => setDensityState(chosen));
     }
   }, []);
@@ -172,27 +196,38 @@ export default function DashboardClient({
   // Live poll: refresh unread counts + recent feed every 30 s, flash when
   // the total unread changes.
   const load = useCallback(async () => {
+    const myId = ++loadSeq.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const r = await fetch("/api/dashboard", { cache: "no-store" });
+      const r = await fetch("/api/dashboard", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
       const j = (await r.json()) as {
         counts: Counts;
         categoryUnread: Record<string, number>;
         latest: LatestUpdate[];
         latestBySource: Record<number, LatestBySource>;
         activityBySource: Record<number, number[]>;
+        newsSinceCheck: Record<number, number>;
         attention: LatestUpdate[];
         aggregates?: DashboardAggregates;
       };
+      if (myId !== loadSeq.current) return; // superseded — drop stale poll
       setCounts(j.counts);
       setCategoryUnread(j.categoryUnread);
       setLatest(j.latest);
       setLatestBySource(j.latestBySource ?? {});
       setActivity(j.activityBySource ?? {});
+      setNewsSinceCheck(j.newsSinceCheck ?? {});
       setAttention(j.attention ?? []);
       if (j.aggregates) setAggregates(j.aggregates);
       if (j.counts.total !== prevTotal.current) setFlashKey((k) => k + 1);
       prevTotal.current = j.counts.total;
     } catch {
+      if (myId !== loadSeq.current) return;
       // server momentarily unavailable — keep showing stale data
     }
   }, []);
@@ -202,7 +237,17 @@ export default function DashboardClient({
       if (document.hidden) return; // no hidden-tab polling (visibilitychange reloads)
       load();
     }, 30_000);
-    return () => clearInterval(iv);
+    // Refresh immediately when the tab becomes visible again after polling
+    // was paused in the background.
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   const categories = useMemo(() => {
@@ -656,7 +701,7 @@ export default function DashboardClient({
                             unread={s.unread}
                             latest={latestBySource[s.id] ?? null}
                             activity={activity[s.id] ?? null}
-                            categoryIcon={categoryIcons[s.category ?? "uncategorized"] ?? null}
+                            newsSinceCheck={newsSinceCheck[s.id] ?? 0}
                           />
                         </div>
                       ))}
@@ -677,7 +722,7 @@ export default function DashboardClient({
                   unread={s.unread}
                   latest={latestBySource[s.id] ?? null}
                   activity={activity[s.id] ?? null}
-                  categoryIcon={categoryIcons[s.category ?? "uncategorized"] ?? null}
+                  newsSinceCheck={newsSinceCheck[s.id] ?? 0}
                 />
               </div>
             ))}
@@ -702,6 +747,7 @@ export default function DashboardClient({
                 setLatest([]);
                 setLatestBySource({});
                 setActivity({});
+          setNewsSinceCheck({});
                 setAttention([]);
                 setCounts({ critical: 0, high: 0, normal: 0, total: 0 });
                 setCategoryUnread({});

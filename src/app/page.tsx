@@ -119,6 +119,21 @@ export default function DashboardPage() {
     (activityBySource[r.source_id] ??= [0, 0, 0, 0, 0, 0, 0])[idx] = r.c;
   }
 
+  // Updates created since each source's last check (0 if never checked) —
+  // the "+N since last check" badge on the dashboard source cards.
+  const newsRows = d
+    .prepare(
+      `SELECT u.source_id, COUNT(*) AS c
+       FROM updates u JOIN sources s ON s.id = u.source_id
+       WHERE u.created_at > s.last_checked_at
+       GROUP BY u.source_id`
+    )
+    .all() as { source_id: number; c: number }[];
+  const newsSinceCheck: Record<number, number> = {};
+  for (const r of newsRows) {
+    newsSinceCheck[r.source_id] = r.c;
+  }
+
   // Hero card / gauges / 7-day chart aggregates (shared with the API route).
   const aggregates = getDashboardAggregates(d);
 
@@ -135,6 +150,7 @@ export default function DashboardPage() {
       initialLatest={latest}
       initialLatestBySource={Object.fromEntries(latestBySource)}
       initialActivity={activityBySource}
+      initialNews={newsSinceCheck}
       initialAttention={attention}
       initialAggregates={aggregates}
       categoryIcons={categoryIconMap(d)}

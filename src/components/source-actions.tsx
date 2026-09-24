@@ -7,7 +7,6 @@ import KebabMenu from "./kebab-menu";
 import Time from "./time";
 import { useAiBusy } from "./ai-activity-provider";
 import { Glyph } from "./icons";
-import StatusDot from "./status-dot";
 
 
 interface Props {
@@ -152,14 +151,6 @@ export default function SourceActions({
             { label: "Delete", onClick: runDelete, danger: true, disabled: busy !== null },
           ]}
         />
-        <span className="ml-auto">
-          <StatusDot
-            lastCheckedAt={lastCheckedAt}
-            intervalHours={intervalHours}
-            lastError={lastError}
-            withTime={!!lastCheckedAt}
-          />
-        </span>
       </div>
     );
   }
