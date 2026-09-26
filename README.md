@@ -62,23 +62,31 @@
 
 - **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, with images/styles/scripts archived for fully offline rendering ("full" mode); history depth and storage mode configurable in Settings.
 
-  <img src="public/screenshots/website-snapshot.png" alt="Website snapshot" width="480" />
+  <p align="center">
+    <img src="public/screenshots/website-snapshot.png" alt="Website snapshot" width="480" />
+  </p>
 
 - **Change tracking** — scheduled checks detect page changes; every change produces a new snapshot version plus an update entry with a text diff.
 - **GitHub tracking** — keywordless change tracking (new releases / README changes / new commits — per-repo toggles), milestones, issue-label watching, and README/commit keyword scans.
 
-  <img src="public/screenshots/github-repo.png" alt="GitHub tracking" width="480" />
+  <p align="center">
+    <img src="public/screenshots/github-repo.png" alt="GitHub tracking" width="480" />
+  </p>
 
 - **Feeds** — RSS/Atom feeds as first-class sources.
 - **Priority keyword rules** — word-boundary matching with negation and priorities (e.g. flag anything mentioning *kernel, linux* as *critical*), plus an optional AI semantic second pass.
 
-  <img src="public/screenshots/keyword-rules.png" alt="Keyword rules" width="480" />
+  <p align="center">
+    <img src="public/screenshots/keyword-rules.png" alt="Keyword rules" width="480" />
+  </p>
 
 - **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content: keyword hints first, and when no keyword matches the AI reads the full page/feed content.
 - **Optional AI** — change summaries, importance classification of updates, goal extraction, semantic keyword matching, category assignment, and project summaries. Local Ollama, OpenAI-compatible, Anthropic, or MCP providers; the app is fully functional without it.
 - **Updates feed** — priority-sorted, digest time windows, muting, full-text search (SQLite FTS5), and JSON backup/restore.
 
-  <img src="public/screenshots/updates.png" alt="Updates feed" width="480" />
+  <p align="center">
+    <img src="public/screenshots/updates.png" alt="Updates feed" width="480" />
+  </p>
 
 - **Dashboard** — activity overview (7-day chart, week-over-week delta, sources active this week), unread-by-category and per-project stat tiles with 7-day sparklines.
 - **Alerts** — push new updates to **webhook, ntfy, Telegram or email**; per-channel minimum priority and update-kind filters, a test send, and a delivery log in Settings → Alerts.
@@ -101,8 +109,10 @@ persistent notification, always the latest).
 - **Dashboard** — aggregate stats (total updates, sources, this week's
   activity), a 7-day activity chart and the project grid, with unread counters.
 
-  <img src="public/screenshots/android-app.png" alt="Android app, portrait" width="200" />
-  <img src="public/screenshots/android-landscape.png" alt="Android app, landscape" width="420" />
+  <p align="center">
+    <img src="public/screenshots/android-app.png" alt="Android app, portrait" width="200" />
+    <img src="public/screenshots/android-landscape.png" alt="Android app, landscape" width="420" />
+  </p>
 
 - **Updates** — the same priority-sorted feed as the web app: pagination,
   pull-to-refresh, priority badges and the full update detail (summary, diff,
@@ -382,7 +392,9 @@ RAM-rich servers / *very accurate* 8B+ / *moderately accurate* 3–4B /
 *basic* ≤ 2B) and a hardware-fit hint for *this* server (based on system
 RAM — Node cannot read VRAM).
 
-<img src="public/screenshots/settings-ai.png" alt="AI model manager" width="480" />
+<p align="center">
+  <img src="public/screenshots/settings-ai.png" alt="AI model manager" width="480" />
+</p>
 
 - Status per model: *installed / loaded / downloading %*
 - One-click **Download** and **Delete** per model, plus **Unload** to free RAM
