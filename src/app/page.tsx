@@ -61,11 +61,14 @@ export default function DashboardPage() {
     ).map((r) => [r.cat, r.c])
   );
 
+  // Most recent UNREAD updates — the "Recent updates" sidebar widget. Read
+  // updates drop out of the widget (older unread ones fill in as they're read).
   const latest = d
     .prepare(
       `SELECT u.id, u.priority, u.kind, u.title, u.summary, u.url, u.created_at, u.read_at,
               s.name AS source_name, s.type AS source_type
        FROM updates u JOIN sources s ON s.id = u.source_id
+       WHERE u.read_at IS NULL
        ORDER BY u.created_at DESC LIMIT 10`
     )
     .all() as never[];

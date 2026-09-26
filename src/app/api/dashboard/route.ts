@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/dashboard — lightweight snapshot the client dashboard polls
  * every ~30 s: unread counts per priority, unread per category, and the
- * 10 most recent updates.
+ * 10 most recent unread updates.
  */
 export function GET() {
   const d = getDb();
@@ -34,11 +34,14 @@ export function GET() {
     ).map((r) => [r.cat, r.c])
   );
 
+  // 10 most recent UNREAD updates for the "Recent updates" sidebar widget —
+  // read updates drop out of the widget (older unread ones fill in).
   const latest = d
     .prepare(
       `SELECT u.id, u.priority, u.kind, u.title, u.summary, u.url, u.created_at, u.read_at,
               s.name AS source_name, s.type AS source_type
        FROM updates u JOIN sources s ON s.id = u.source_id
+       WHERE u.read_at IS NULL
        ORDER BY u.created_at DESC LIMIT 10`
     )
     .all();
