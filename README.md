@@ -7,7 +7,8 @@
 <p align="center">
   A self-hosted tracker for projects: snapshot and watch project websites,<br/>
   follow GitHub releases and milestones, and monitor RSS/Atom feeds — with<br/>
-  priority keyword rules and optional local AI.
+  priority keyword rules, optional local AI, push alerts (webhook / ntfy /<br/>
+  Telegram / email) and a native <b>Android companion app</b>.
 </p>
 
 <p align="center">
@@ -16,6 +17,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5" />
   <img src="https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker ready" />
+  <img src="https://img.shields.io/badge/Android-8%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 8+" />
 </p>
 
 <p align="center">
@@ -35,7 +37,11 @@
     <span>&nbsp;·&nbsp;</span>
     <a href="#features">Features</a>
     <span>&nbsp;·&nbsp;</span>
+    <a href="#android-app">Android app</a>
+    <span>&nbsp;·&nbsp;</span>
     <a href="#how-it-works">How it works</a>
+    <span>&nbsp;·&nbsp;</span>
+    <a href="#alerts">Alerts</a>
     <span>&nbsp;·&nbsp;</span>
     <a href="#getting-started">Getting started</a>
     <span>&nbsp;·&nbsp;</span>
@@ -67,9 +73,13 @@
 | ![GitHub tracking](public/screenshots/github-repo.png) | ![AI model manager](public/screenshots/settings-ai.png) |
 | Releases, README diffs, milestones and state-change scans per repo | Ollama model catalog with sizes, accuracy and hardware hints, one-click download |
 
+| Android companion app | |
+|---|---|
+| ![Android companion app](public/screenshots/android-app.png) | The native app: dashboard with activity chart, priority-sorted updates, sources, keyword rules and background-sync notifications |
+
 ## Features
 
-- **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, last 10 versions kept.
+- **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, with images/styles/scripts archived for fully offline rendering ("full" mode); history depth and storage mode configurable in Settings.
 - **Change tracking** — scheduled checks detect page changes; every change produces a new snapshot version plus an update entry with a text diff.
 - **GitHub tracking** — keywordless change tracking (new releases / README changes / new commits — per-repo toggles), milestones, issue-label watching, and README/commit keyword scans.
 - **Feeds** — RSS/Atom feeds as first-class sources.
@@ -77,13 +87,52 @@
 - **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content: keyword hints first, and when no keyword matches the AI reads the full page/feed content.
 - **Optional AI** — change summaries, importance classification of updates, goal extraction, semantic keyword matching, category assignment, and project summaries. Local Ollama, OpenAI-compatible, Anthropic, or MCP providers; the app is fully functional without it.
 - **Updates feed** — priority-sorted, digest time windows, muting, full-text search (SQLite FTS5), and JSON backup/restore.
+- **Dashboard** — activity overview (7-day chart, week-over-week delta, sources active this week), unread-by-category and per-project stat tiles with 7-day sparklines.
+- **Alerts** — push new updates to **webhook, ntfy, Telegram or email**; per-channel minimum priority and update-kind filters, a test send, and a delivery log in Settings → Alerts.
+- **Android companion app** — native Kotlin/Jetpack Compose app: dashboard, updates, sources, search, snapshots, add source and keyword rules from your phone, plus background sync with local notifications ([details](#android-app)).
+- **Two themes** — *Aurora* (blue, reference) and *Pulse* (classic violet) share one design language between the web app and the Android app.
+
+## Android app
+
+A native **Kotlin / Jetpack Compose** companion app (in `android/`) that talks
+to your ProjectPulse server over the network — LAN `http` or `https`; login is
+reused from the server's auth. There is no server push: a WorkManager job
+polls the server on the interval you pick (default 15 min) and posts local
+notifications for new updates (one persistent notification, always the latest).
+
+- **Dashboard** — aggregate stats (total updates, sources, this week's
+  activity), a 7-day activity chart and the project grid, with unread counters.
+- **Updates** — the same priority-sorted feed as the web app: pagination,
+  pull-to-refresh, priority badges and the full update detail (summary, diff,
+  links).
+- **Sources** — list with per-source logos, detail page with an offline
+  snapshot viewer (WebView), **add source** (website / GitHub / feed) and the
+  **keyword rules editor** — all from your phone.
+- **Search** — full-text search over projects and update history.
+- **Settings** — server address, notification toggle + interval, and the
+  Aurora / Pulse theme (matching the web app); adaptive launcher icons and a
+  minified R8 release build.
+
+### Building & installing
+
+```bash
+cd android
+./gradlew assembleDebug     # debug APK → app/build/outputs/apk/debug/
+./gradlew assembleRelease   # minified (R8) release build
+```
+
+Install the APK by sideloading (copy it to the device, or
+`adb install app/build/outputs/apk/debug/app-debug.apk`). There is no Play
+Store distribution — build it once and you're done.
 
 ## How it works
 
 ### Websites
 
 - **Add a URL** → an HTML snapshot is captured immediately (read offline,
-  rendered in a sandboxed iframe; last 10 versions kept).
+  rendered in a sandboxed iframe; history depth and storage mode — "full" with
+  the page's assets archived for fully offline rendering, or HTML-only — are
+  configurable in Settings).
 - **Track updates**: a scheduled check extracts the page's main text,
   normalizes it and hashes it. On change: a new snapshot version is stored and
   an update entry with a text diff is created. The check always looks at the
@@ -122,7 +171,9 @@
   feed — a plain endpoint *outside* the API rate limit. If it is unchanged and
   nothing else is being watched, the cycle only fetches milestones instead of
   releases, README, commits and issues.
-- Unauthenticated GitHub API: 60 requests/h per IP. Set `GITHUB_TOKEN` for 5000/h.
+- Unauthenticated GitHub API: 60 requests/h per IP. Set `GITHUB_TOKEN` — or
+  save a token in **Settings → GitHub** (verified against the API before it is
+  stored) — for 5000/h.
 
 ### Feeds (RSS/Atom)
 
@@ -182,11 +233,31 @@ Every source type gets a two-level classification, auto-assigned:
 
 - Priority-sorted (critical first), filter by priority / source / time window
   (1d / 7d / 30d digests), mark read/unread, mute a source for 30 days.
-- Dashboard shows unread counters per priority and projects grouped by
-  category (extracted goal).
-- Full-text search over project goals/names and update history (SQLite FTS5).
+- The dashboard groups projects by category (extracted goal) as stat tiles —
+  7-day activity sparkline, unread count and a "+N since last check" badge —
+  above an **activity overview** (7-day activity chart, updates this week with
+  the week-over-week delta, sources active this week) and unread counters per
+  priority and category.
+- Full-text search over project goals/names and update history (SQLite FTS5),
+  from the dashboard search box or the dedicated `/search` page.
 - **Backup/restore**: download the whole database as JSON, restore later
   (Settings page) — handy across a TrueNAS migration.
+
+### Alerts
+
+Every new update fans out to all enabled channels — **webhook** (a short JSON
+message), **ntfy**, **Telegram** or **email** (SMTP) — configured in
+Settings → Alerts:
+
+- Per-channel **minimum priority** (critical / high / normal) and an optional
+  update-kind whitelist, so e.g. only *critical* GitHub events reach your
+  phone.
+- **Send test** per channel, and a **delivery log** of the recent attempts
+  (status / error / attempts) — failures are visible instead of silent.
+- Delivery is best-effort and non-blocking: one retry with a short backoff,
+  logged either way.
+- `WEBHOOK_URL` in the environment acts as an extra always-on webhook channel
+  until you save a webhook channel in the UI.
 
 ## Getting started
 
@@ -259,7 +330,8 @@ All extras are env-driven and off by default:
 | Variable | Effect |
 |---|---|
 | `AUTH_PASSWORD` | enables a login screen (single shared password) |
-| `WEBHOOK_URL` | POSTs every new update as a short JSON message `{title, url, summary}` — the summary is the AI's plain-prose summary of the major changes (no bullets) |
+| `TZ` | IANA timezone (e.g. `Europe/Athens`) for the scheduler, log timestamps and the times shown in the UI — the UI picks it up automatically after a container restart |
+| `WEBHOOK_URL` | extra always-on webhook channel — POSTs every new update as a short JSON message `{title, url, summary}` (the AI's plain-prose summary of the major changes, no bullets); Settings → Alerts can add more channels (ntfy, Telegram, email) |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | AI via local Ollama (see [AI](#ai-optional)); the compose file sets `OLLAMA_URL` to the bundled service by default |
 | `OLLAMA_KEEP_ALIVE` | minutes a model stays loaded after use before Ollama frees the RAM (default 5; also settable in Settings) |
 | `OPENAI_URL` / `OPENAI_API_KEY` | AI via any OpenAI-compatible endpoint |
@@ -267,7 +339,7 @@ All extras are env-driven and off by default:
 | `MCP_URL` | AI via a remote MCP server (Streamable HTTP) |
 | `GITHUB_TOKEN` | higher GitHub API rate limit |
 | `SCHEDULER_INTERVAL_MINUTES` | scheduler wake-up cadence (default 5) |
-| `SNAPSHOT_KEEP_VERSIONS` | snapshot history depth (default 10) |
+| `SNAPSHOT_KEEP_VERSIONS` | snapshot history depth (default 10; also settable in Settings → Snapshots & summaries) |
 
 > **Security note:** if you store API keys in Settings and the app has no
 > `AUTH_PASSWORD`, anyone with network access can read them — enable the shared
@@ -309,7 +381,10 @@ RAM-rich servers / *very accurate* 8B+ / *moderately accurate* 3–4B /
 RAM — Node cannot read VRAM).
 
 - Status per model: *installed / loaded / downloading %*
-- One-click **Download** and **Delete** per model
+- One-click **Download** and **Delete** per model, plus **Unload** to free RAM
+  on demand
+- **Live Ollama server log** — the bundled container tees its output to a
+  shared volume the app reads from, so Settings → AI shows the real server log
 - **Delete all models & reset AI** — wipes every installed model and starts
   over from the default
 - Before README text is handed to a model, badges, images, inline HTML and
@@ -384,8 +459,14 @@ npm run icons:fetch  # refresh the bundled category glyph set (offline once gene
   AI-picked icon (stored in the `categories` table);
   `src/lib/glyphs.generated.ts` — bundled curated Iconify "Glyphs" bodies
   (regenerate with `npm run icons:fetch`)
-- `src/lib/notifiers.ts` — notifier seam (webhook implementation)
+- `src/lib/notifiers.ts` — alert fan-out: webhook / ntfy / Telegram / email
+  channels with priority + kind filters, retries and a delivery log
+- `src/lib/archive.ts` — offline snapshot archiving (downloads a page's assets
+  and rewrites the HTML to local URLs)
+- `src/lib/dashboard-aggregates.ts` — dashboard hero stats + 7-day activity
 - `src/middleware.ts` — optional password auth gate
+- `android/` — native Android companion app (Kotlin, Jetpack Compose,
+  WorkManager background sync + local notifications)
 - API routes under `src/app/api/` mirror the pages; UI is Next.js App Router
   with server components reading SQLite directly.
 
