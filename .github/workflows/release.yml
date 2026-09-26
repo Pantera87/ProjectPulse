@@ -1,0 +1,75 @@
+# Publishes a GitHub release for every pushed v* tag.
+#
+# Trigger: `npm run release -- minor` (see scripts/release.mjs) pushes the tag.
+# Builds the R8-optimized release APKs for all ABIs and attaches them to a
+# GitHub release named "ProjectPulse x.y.z" with notes generated from the
+# commit subjects since the previous tag.
+#
+# Note: APKs are signed with the debug keystore (the project has no Play
+# Store signing set up; AGP auto-generates one per runner).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history for commit subjects / previous tag
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build release APKs (all ABIs)
+        working-directory: android
+        run: ./gradlew :app:assembleRelease
+
+      - name: Collect and rename APKs
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          mkdir -p dist
+          OUT="android/app/build/outputs/apk/release"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            if [ ! -f "$OUT/app-$abi-release.apk" ]; then
+              echo "::error::missing $OUT/app-$abi-release.apk"
+              exit 1
+            fi
+            cp "$OUT/app-$abi-release.apk" "dist/ProjectPulse-${VER}-${abi}.apk"
+          done
+          # Previous tag reachable from the tag's parent ("" if first release)
+          git describe --tags --abbrev=0 "${TAG}^" > prev_tag 2>/dev/null || rm -f prev_tag
+          ls -la dist
+
+      - name: Create GitHub release with APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          {
+            echo "# ProjectPulse $VER"
+            echo
+            if [ -f prev_tag ] && [ -s prev_tag ]; then
+              git log --no-merges --format='- %s' "$(cat prev_tag)..${TAG}"
+            else
+              git log --no-merges --format='- %s' "${TAG}"
+            fi
+          } > release_notes.md
+          cat release_notes.md
+          gh release create "$TAG" \
+            --title "ProjectPulse ${VER}" \
+            --notes-file release_notes.md \
+            dist/ProjectPulse-*.apk
