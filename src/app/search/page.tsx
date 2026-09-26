@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { search } from "@/lib/models";
-import { formatDateTime } from "@/lib/format";
+import { formatCategoryLabel, formatDateTime } from "@/lib/format";
 import AiBadge from "@/components/ai-badge";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +75,7 @@ export default async function SearchPage({
                           <AiBadge title="Category assigned by AI" />
                         </span>
                       )}
-                      {s.category}
+                      {formatCategoryLabel(s.category)}
                     </span>
                   )}
                 </div>

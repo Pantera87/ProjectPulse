@@ -236,10 +236,10 @@ fun SourceDetailScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 KindBadge(d.source.type)
                                 d.source.category?.takeIf { it.isNotBlank() }?.let {
-                                    KindBadge(it, modifier = Modifier.padding(start = 6.dp))
+                                    KindBadge(it.asCategoryLabel(), modifier = Modifier.padding(start = 6.dp))
                                 }
                                 d.source.subcategory?.takeIf { it.isNotBlank() }?.let {
-                                    KindBadge(it, modifier = Modifier.padding(start = 6.dp))
+                                    KindBadge(it.asCategoryLabel(), modifier = Modifier.padding(start = 6.dp))
                                 }
                                 if (d.source.unread > 0) {
                                     GlassChip(

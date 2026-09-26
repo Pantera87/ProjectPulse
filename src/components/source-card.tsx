@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { SourceRow } from "@/lib/db";
+import { formatCategoryLabel } from "@/lib/format";
 import SourceActions from "./source-actions";
 import AiBadge from "./ai-badge";
 import Sparkline from "./dashboard/sparkline";
@@ -23,6 +25,39 @@ const PRIORITY_DOT: Record<string, string> = {
   high: "bg-amber-400",
   normal: "bg-sky-400",
 };
+
+// Narrowest width at which the card sparkline is still worth drawing —
+// below this the chart is hidden entirely (category label keeps the space).
+const SPARKLINE_MIN_WIDTH = 64;
+
+/**
+ * Sparkline sized to whatever free width the card actually has: the wrapper
+ * takes the leftover flex space (after the always-visible category label and
+ * the "+N since last check" badge) and a ResizeObserver re-measures it on
+ * window resize, grid reflow and density changes. When less than
+ * [SPARKLINE_MIN_WIDTH] px are left, the chart is hidden instead of
+ * squashing into an unreadable sliver.
+ */
+function AdaptiveSparkline({ data }: { data: number[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setWidth(Math.floor(el.clientWidth));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="min-w-0 flex-1 self-center">
+      {width !== null && width >= SPARKLINE_MIN_WIDTH && (
+        <Sparkline data={data} width={width} />
+      )}
+    </div>
+  );
+}
 
 export default function SourceCard({
   source,
@@ -173,7 +208,7 @@ export default function SourceCard({
             )}
           </div>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            {activity && <Sparkline data={activity} />}
+            {activity && <AdaptiveSparkline data={activity} />}
             {newsSinceCheck > 0 && (
               <span
                 className="badge inline-flex shrink-0 items-center border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
@@ -183,21 +218,21 @@ export default function SourceCard({
               </span>
             )}
             {(source.category || source.subcategory) && (
-              <div className="flex min-w-0 flex-col items-center justify-end gap-1">
+              <div className="flex shrink-0 flex-col items-center justify-end gap-1">
                 {source.category && (
                   <span
-                    className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-slate-900"
+                    className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase text-slate-900"
                     title={source.category}
                   >
-                    {source.category}
+                    {formatCategoryLabel(source.category)}
                   </span>
                 )}
                 {source.subcategory && (
                   <span
-                    className="max-w-full truncate text-[11px] text-slate-400"
+                    className="whitespace-nowrap text-[11px] text-slate-400"
                     title={source.subcategory}
                   >
-                    {source.subcategory}
+                    {formatCategoryLabel(source.subcategory)}
                   </span>
                 )}
               </div>

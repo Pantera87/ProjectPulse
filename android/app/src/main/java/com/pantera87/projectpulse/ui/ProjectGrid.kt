@@ -102,13 +102,13 @@ fun ProjectCard(
             )
             if (category != null) {
                 CategoryBadge(
-                    text = category,
+                    text = category.asCategoryLabel(),
                     modifier = Modifier.padding(top = 5.dp),
                 )
             }
             if (subcategory != null) {
                 Text(
-                    subcategory,
+                    subcategory.asCategoryLabel(),
                     fontSize = 12.sp,
                     color = t.TextSecondary,
                     maxLines = 1,

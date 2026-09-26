@@ -20,7 +20,7 @@ import KpiCard from "./dashboard/kpi-card";
 import AreaChart from "./dashboard/area-chart";
 import BarChart, { VerticalBars } from "./dashboard/bar-chart";
 import { SatisfactionGauge, RingGauge } from "./dashboard/gauges";
-import { repoDisplayName } from "@/lib/format";
+import { formatCategoryLabel, repoDisplayName } from "@/lib/format";
 import type { DashboardAggregates } from "@/lib/dashboard-aggregates";
 import { Glyph, KIND_ICON } from "./icons";
 import EmptyPulse from "./empty-pulse";
@@ -306,7 +306,10 @@ export default function DashboardClient({
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 6)
-        .map(([label, value]) => ({ label, value })),
+        .map(([label, value]) => ({
+          label: formatCategoryLabel(label) ?? label,
+          value,
+        })),
     [categoryUnread]
   );
   const labels = useMemo(() => dayLabels(), []);
@@ -638,7 +641,7 @@ export default function DashboardClient({
                 title={`${categories.get(c)?.length ?? 0} projects`}
               >
                 <CategoryIcon category={c} size="sm" icon={categoryIcons[c] ?? null} />
-                <span className="ml-1.5">{c}</span>
+                <span className="ml-1.5">{formatCategoryLabel(c) ?? c}</span>
                 {(categoryUnread[c] ?? 0) > 0 && (
                   <span className="ml-1 flex items-center gap-1 text-rose-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
@@ -681,7 +684,7 @@ export default function DashboardClient({
                     </span>
                     <CategoryIcon category={cat} icon={categoryIcons[cat] ?? null} />
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      {cat}
+                      {formatCategoryLabel(cat) ?? cat}
                     </span>
                     <span className="text-xs text-slate-600">({items.length})</span>
                     {(categoryUnread[cat] ?? 0) > 0 && (
@@ -771,7 +774,9 @@ export default function DashboardClient({
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <EmptyPulse className="h-24 w-24" />
             <p className="text-sm text-slate-500">
-              No updates yet. Add a website, GitHub repo or feed and run “Check now”.
+              {aggregates.totalUpdates > 0
+                ? "All caught up — every update is marked as read."
+                : "No updates yet. Add a website, GitHub repo or feed and run “Check now”."}
             </p>
           </div>
         ) : (
@@ -781,7 +786,7 @@ export default function DashboardClient({
                 key={u.id}
                 className={`rise relative overflow-hidden rounded-xl border backdrop-blur-md ${
                   ROW_STYLES[u.priority] ?? ROW_STYLES.normal
-                } ${u.read_at ? "opacity-60" : ""}`}
+                }`}
                 style={delay(300 + i * 40)}
               >
                 <span

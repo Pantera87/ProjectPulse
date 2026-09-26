@@ -56,3 +56,20 @@ export function formatDateTime(iso: string | null | undefined, timeZone?: string
     timeZoneName: "short",
   });
 }
+
+/**
+ * Display form of a category/subcategory tag: hyphens that separate words
+ * become spaces and the first letter of every word is capitalized
+ * (e.g. "cnc-controller-firmware" -> "Cnc Controller Firmware").
+ * Empty or missing values pass through unchanged.
+ */
+export function formatCategoryLabel(
+  value: string | null | undefined
+): string | null | undefined {
+  if (!value) return value;
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}

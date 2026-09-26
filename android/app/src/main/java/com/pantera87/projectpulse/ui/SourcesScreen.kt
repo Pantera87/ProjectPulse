@@ -439,7 +439,7 @@ private fun buildSections(sources: List<Source>): List<SourceSectionRow> {
         val raw = s.category?.trim().orEmpty()
         val key = raw.lowercase().ifEmpty { uncategorizedKey }
         val group = groups.getOrPut(key) {
-            CategoryGroup(raw.ifEmpty { UNCATEGORIZED }, mutableListOf())
+            CategoryGroup(raw.ifEmpty { UNCATEGORIZED }.asCategoryLabel(), mutableListOf())
         }
         group.sources.add(s)
     }
