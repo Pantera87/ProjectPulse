@@ -33,8 +33,6 @@
 <div align="center">
   <hr/>
   <p>
-    <a href="#screenshots">Screenshots</a>
-    <span>&nbsp;·&nbsp;</span>
     <a href="#features">Features</a>
     <span>&nbsp;·&nbsp;</span>
     <a href="#android-app">Android app</a>
@@ -56,39 +54,32 @@
   <hr/>
 </div>
 
-## Screenshots
-
-| Dashboard | Updates feed |
-|---|---|
-| ![Dashboard](public/screenshots/dashboard.png) | ![Updates feed](public/screenshots/updates.png) |
-| Project cards with activity sparklines, unread counts and the "needs attention" strip | Priority-sorted updates with AI summaries, digest windows and full-text search |
-
-| Website snapshot | Keyword rules |
-|---|---|
-| ![Website snapshot](public/screenshots/website-snapshot.png) | ![Keyword rules](public/screenshots/keyword-rules.png) |
-| Offline snapshots rendered in a sandboxed iframe, with version history and text diffs | Word-boundary rules with negation, priorities and issue-label watching |
-
-| GitHub tracking | AI model manager |
-|---|---|
-| ![GitHub tracking](public/screenshots/github-repo.png) | ![AI model manager](public/screenshots/settings-ai.png) |
-| Releases, README diffs, milestones and state-change scans per repo | Ollama model catalog with sizes, accuracy and hardware hints, one-click download |
-
-| Android app — portrait | Android app — landscape |
-|---|---|
-| ![Android companion app](public/screenshots/android-app.png) | ![Android companion app, landscape](public/screenshots/android-landscape.png) |
-| The native app: dashboard with activity chart, priority-sorted updates, sources, keyword rules and background-sync notifications | The same dashboard on a tablet in landscape — the adaptive layout works on phones and tablets, in any orientation |
-
 ## Features
 
 - **Offline snapshots** — save project websites for later: captured HTML rendered in a sandboxed iframe, with images/styles/scripts archived for fully offline rendering ("full" mode); history depth and storage mode configurable in Settings.
+
+  ![Website snapshot](public/screenshots/website-snapshot.png)
+
 - **Change tracking** — scheduled checks detect page changes; every change produces a new snapshot version plus an update entry with a text diff.
 - **GitHub tracking** — keywordless change tracking (new releases / README changes / new commits — per-repo toggles), milestones, issue-label watching, and README/commit keyword scans.
+
+  ![GitHub tracking](public/screenshots/github-repo.png)
+
 - **Feeds** — RSS/Atom feeds as first-class sources.
 - **Priority keyword rules** — word-boundary matching with negation and priorities (e.g. flag anything mentioning *kernel, linux* as *critical*), plus an optional AI semantic second pass.
+
+  ![Keyword rules](public/screenshots/keyword-rules.png)
+
 - **Two-level category classification** — a generic category and a specific subcategory, auto-assigned from project content: keyword hints first, and when no keyword matches the AI reads the full page/feed content.
 - **Optional AI** — change summaries, importance classification of updates, goal extraction, semantic keyword matching, category assignment, and project summaries. Local Ollama, OpenAI-compatible, Anthropic, or MCP providers; the app is fully functional without it.
 - **Updates feed** — priority-sorted, digest time windows, muting, full-text search (SQLite FTS5), and JSON backup/restore.
+
+  ![Updates feed](public/screenshots/updates.png)
+
 - **Dashboard** — activity overview (7-day chart, week-over-week delta, sources active this week), unread-by-category and per-project stat tiles with 7-day sparklines.
+
+  ![Dashboard](public/screenshots/dashboard.png)
+
 - **Alerts** — push new updates to **webhook, ntfy, Telegram or email**; per-channel minimum priority and update-kind filters, a test send, and a delivery log in Settings → Alerts.
 - **Android companion app** — native Kotlin/Jetpack Compose app, **optimized for both phones and tablets**: dashboard, updates, sources, search, snapshots, add source and keyword rules, plus background sync with local notifications ([details](#android-app)).
 - **Two themes** — *Aurora* (blue, reference) and *Pulse* (classic violet) share one design language between the web app and the Android app.
@@ -108,6 +99,10 @@ persistent notification, always the latest).
   persistent side rail on tablets and in landscape.
 - **Dashboard** — aggregate stats (total updates, sources, this week's
   activity), a 7-day activity chart and the project grid, with unread counters.
+
+  ![Android app, portrait](public/screenshots/android-app.png)
+  ![Android app, landscape](public/screenshots/android-landscape.png)
+
 - **Updates** — the same priority-sorted feed as the web app: pagination,
   pull-to-refresh, priority badges and the full update detail (summary, diff,
   links).
@@ -385,6 +380,8 @@ builds) with their size, context, an accuracy hint (*power* MoE for
 RAM-rich servers / *very accurate* 8B+ / *moderately accurate* 3–4B /
 *basic* ≤ 2B) and a hardware-fit hint for *this* server (based on system
 RAM — Node cannot read VRAM).
+
+![AI model manager](public/screenshots/settings-ai.png)
 
 - Status per model: *installed / loaded / downloading %*
 - One-click **Download** and **Delete** per model, plus **Unload** to free RAM
