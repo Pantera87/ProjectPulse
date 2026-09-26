@@ -2,30 +2,30 @@
 
 package com.pantera87.projectpulse.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,11 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
+import com.pantera87.projectpulse.data.Aggregates
 import com.pantera87.projectpulse.data.ApiResult
 import com.pantera87.projectpulse.data.Dashboard
 import com.pantera87.projectpulse.data.Source
@@ -62,24 +59,25 @@ import kotlinx.coroutines.delay
 
 private const val POLL_MS = 30_000L
 
-private data class SourceRow(
-    val name: String,
-    val latestTitle: String,
-    val latestTime: String,
-    val activity: List<Int>?,
-)
-
+/**
+ * Home tab — the web dashboard ported: widget-row boxes on top (welcome hero,
+ * read-rate gauge, "this week" ring), a borderless type-tab row, a 2-3 column
+ * project grid, and the two update lists ("Needs attention", "Latest").
+ * On tablet the update lists move into a fixed rail beside the main pane.
+ */
 @Composable
 fun DashboardScreen(
     refreshPulse: Int = 0,
     onOpenUpdates: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenSource: (Int) -> Unit,
 ) {
     val app = App.instance
     var refreshing by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableStateOf(0) }
     var dash by remember { mutableStateOf<Dashboard?>(null) }
-    var sourceRows by remember { mutableStateOf<List<SourceRow>>(emptyList()) }
+    var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
+    var selectedTab by remember { mutableStateOf("All") }
     var error by remember { mutableStateOf<String?>(null) }
     val uiMode = rememberUiMode()
 
@@ -102,21 +100,8 @@ fun DashboardScreen(
                     dash = d.value
                     error = null
                     refreshing = false
-                    // Join source names for the source cards.
                     val s = app.api.sources()
-                    val names: Map<Int, Source> =
-                        if (s is ApiResult.Ok) s.value.associateBy({ it.id }) else emptyMap()
-                    sourceRows = d.value.latestBySource.map { entry ->
-                        val sid = entry.key
-                        val lu = entry.value
-                        val src = names[sid.toIntOrNull() ?: -1]
-                        SourceRow(
-                            name = src?.displayName ?: "Source $sid",
-                            latestTitle = lu.title,
-                            latestTime = formatTime(lu.created_at),
-                            activity = d.value.activityBySource[sid],
-                        )
-                    }
+                    if (s is ApiResult.Ok) sources = s.value
                 }
             }
             delay(POLL_MS)
@@ -170,91 +155,311 @@ fun DashboardScreen(
             },
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            AdaptiveContent(uiMode, maxWidth = 720.dp) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = 4.dp,
-                        // The tablet nav rail replaces the floating pill: no
-                        // bottom clearance needed.
-                        bottom = if (uiMode.isTablet) 16.dp else FLOATING_BAR_BOTTOM_PADDING,
-                    ),
-            ) {
-            when {
-                data == null && error == null -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator() }
+            // The denser tablet two-pane layout needs more room than the old
+            // 720dp column cap.
+            AdaptiveContent(uiMode, maxWidth = 1100.dp) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = 4.dp,
+                            // The tablet nav rail replaces the floating pill: no
+                            // bottom clearance needed.
+                            bottom = if (uiMode.isTablet) 16.dp else FLOATING_BAR_BOTTOM_PADDING,
+                        ),
+                ) {
+                    when {
+                        data == null && error == null -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularProgressIndicator() }
 
-                error != null && data == null -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) { Text(error!!, color = MaterialTheme.colorScheme.error) }
+                        error != null && data == null -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(error!!, color = MaterialTheme.colorScheme.error) }
 
-                else -> {
-                    data?.let { d ->
-                        var item = 0
-                        if (d.counts.total > 0) {
-                            Box(Modifier.rise(0)) {
-                                UnreadSummary(d.counts.critical, d.counts.high, d.counts.normal)
-                            }
-                        }
-                        if (d.attention.isNotEmpty()) {
-                            SectionTitle("Needs attention")
-                            val attention = d.attention.take(5)
+                        else -> data?.let { d ->
+                            val agg = d.aggregates ?: Aggregates()
                             if (uiMode.isTablet) {
-                                TwoColumnList(attention) { _, u ->
-                                    UpdateRow(u) { onOpenUpdates() }
-                                }
+                                TabletDashboard(
+                                    d = d,
+                                    agg = agg,
+                                    sources = sources,
+                                    selectedTab = selectedTab,
+                                    onSelectedTab = { selectedTab = it },
+                                    onOpenUpdates = onOpenUpdates,
+                                    onOpenSource = onOpenSource,
+                                )
                             } else {
-                                attention.forEach { u ->
-                                    UpdateRow(u, modifier = Modifier.rise(item++)) { onOpenUpdates() }
-                                }
-                            }
-                        }
-                        SectionTitle("Latest")
-                        val latest = d.latest.take(10)
-                        if (uiMode.isTablet) {
-                            TwoColumnList(latest) { _, u ->
-                                UpdateRow(u) { onOpenUpdates() }
-                            }
-                        } else {
-                            latest.forEach { u ->
-                                UpdateRow(u, modifier = Modifier.rise(item++)) { onOpenUpdates() }
-                            }
-                        }
-                        if (sourceRows.isNotEmpty()) {
-                            SectionTitle("Sources")
-                            if (uiMode.isTablet) {
-                                TwoColumnList(sourceRows) { _, row ->
-                                    SourceCard(
-                                        name = row.name,
-                                        latestTitle = row.latestTitle,
-                                        latestTime = row.latestTime,
-                                        activity = row.activity,
-                                    )
-                                }
-                            } else {
-                                sourceRows.forEach { row ->
-                                    SourceCard(
-                                        name = row.name,
-                                        latestTitle = row.latestTitle,
-                                        latestTime = row.latestTime,
-                                        activity = row.activity,
-                                        index = item++,
-                                    )
-                                }
+                                PhoneDashboard(
+                                    d = d,
+                                    agg = agg,
+                                    sources = sources,
+                                    selectedTab = selectedTab,
+                                    onSelectedTab = { selectedTab = it },
+                                    onOpenUpdates = onOpenUpdates,
+                                    onOpenSource = onOpenSource,
+                                )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Phone: KPI + gauge side by side, full-width "This week", tabs, grid. */
+@Composable
+private fun PhoneDashboard(
+    d: Dashboard,
+    agg: Aggregates,
+    sources: List<Source>,
+    selectedTab: String,
+    onSelectedTab: (String) -> Unit,
+    onOpenUpdates: () -> Unit,
+    onOpenSource: (Int) -> Unit,
+) {
+    Row(
+        // Fixed height: the row lives in a vertically scrolling column, where
+        // an unbounded height would let fillMaxHeight children collapse.
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+            .height(224.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        WelcomeBox(
+            unread = d.counts.total,
+            updatesThisWeek = agg.updatesThisWeek,
+            sourcesUpdatedThisWeek = agg.sourcesUpdatedThisWeek,
+            sourcesTotal = agg.sourcesTotal,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+        ReadRateGaugeBox(
+            totalUpdates = agg.totalUpdates,
+            readUpdates = agg.readUpdates,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+    ThisWeekBox(
+        updatesThisWeek = agg.updatesThisWeek,
+        sourcesUpdatedThisWeek = agg.sourcesUpdatedThisWeek,
+        sourcesTotal = agg.sourcesTotal,
+        updatesPrevWeek = agg.updatesPrevWeek,
+        activityByDay = agg.activityTotalByDay,
+        modifier = Modifier.padding(vertical = 5.dp),
+    )
+    TypeTabs(selected = selectedTab, onSelect = onSelectedTab)
+    ProjectGrid(
+        sources = filteredSources(sources, selectedTab),
+        columns = 2,
+        onOpenSource = onOpenSource,
+    )
+    UpdateLists(
+        d = d,
+        onOpenUpdates = onOpenUpdates,
+    )
+}
+
+/**
+ * Tablet: full-width stacked rows — gauge row on top, then the update
+ * lists as horizontal rows, then the type tabs and the 3-col project grid.
+ */
+@Composable
+private fun TabletDashboard(
+    d: Dashboard,
+    agg: Aggregates,
+    sources: List<Source>,
+    selectedTab: String,
+    onSelectedTab: (String) -> Unit,
+    onOpenUpdates: () -> Unit,
+    onOpenSource: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            // Fixed height bounds the row inside the scrolling column so the
+            // fillMaxHeight boxes stretch instead of collapsing. The "This
+            // week" card grew (pulse meter on top, activity overview below),
+            // so the row is taller than the old gauge-only layout.
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp)
+                .height(336.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            WelcomeBox(
+                unread = d.counts.total,
+                updatesThisWeek = agg.updatesThisWeek,
+                sourcesUpdatedThisWeek = agg.sourcesUpdatedThisWeek,
+                sourcesTotal = agg.sourcesTotal,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            ReadRateGaugeBox(
+                totalUpdates = agg.totalUpdates,
+                readUpdates = agg.readUpdates,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            ThisWeekBox(
+                updatesThisWeek = agg.updatesThisWeek,
+                sourcesUpdatedThisWeek = agg.sourcesUpdatedThisWeek,
+                sourcesTotal = agg.sourcesTotal,
+                updatesPrevWeek = agg.updatesPrevWeek,
+                activityByDay = agg.activityTotalByDay,
+                compact = true,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
+        AttentionGrid(
+            updates = d.attention.take(5),
+            onOpenUpdates = onOpenUpdates,
+        )
+        UpdatesRow(
+            title = "Latest",
+            updates = d.latest.take(10),
+            onOpenUpdates = onOpenUpdates,
+        )
+        TypeTabs(selected = selectedTab, onSelect = onSelectedTab)
+        ProjectGrid(
+            sources = filteredSources(sources, selectedTab),
+            columns = 5,
+            onOpenSource = onOpenSource,
+        )
+    }
+}
+
+private fun filteredSources(sources: List<Source>, tab: String): List<Source> {
+    val type = tabToType(tab) ?: return sources
+    return sources.filter { it.type == type }
+}
+
+/** Phone: "Needs attention" (top 5) + "Latest" (top 10) as vertical lists. */
+@Composable
+private fun UpdateLists(
+    d: Dashboard,
+    onOpenUpdates: () -> Unit,
+) {
+    if (d.attention.isNotEmpty()) {
+        SectionTitle("Needs attention")
+        d.attention.take(5).forEachIndexed { i, u ->
+            UpdateRow(u, modifier = Modifier.rise(i)) { onOpenUpdates() }
+        }
+    }
+    SectionTitle("Latest")
+    d.latest.take(10).forEachIndexed { i, u ->
+        UpdateRow(u, modifier = Modifier.rise(i)) { onOpenUpdates() }
+    }
+}
+
+/**
+ * Tablet: one horizontal row of compact update cards. Hidden entirely when
+ * the list is empty.
+ */
+@Composable
+private fun UpdatesRow(
+    title: String,
+    updates: List<Update>,
+    onOpenUpdates: () -> Unit,
+) {
+    if (updates.isEmpty()) return
+    SectionTitle(title)
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(updates) { u ->
+            CompactUpdateCard(
+                u,
+                onClick = onOpenUpdates,
+                modifier = Modifier.width(320.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Tablet: "Needs attention" as a 4-per-row grid of compact cards. Hidden
+ * entirely when the list is empty.
+ */
+@Composable
+private fun AttentionGrid(
+    updates: List<Update>,
+    onOpenUpdates: () -> Unit,
+) {
+    if (updates.isEmpty()) return
+    SectionTitle("Needs attention")
+    updates.chunked(4).forEach { rowItems ->
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            rowItems.forEach { u ->
+                CompactUpdateCard(
+                    u,
+                    onClick = onOpenUpdates,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            repeat(4 - rowItems.size) {
+                Spacer(Modifier.weight(1f))
             }
         }
+    }
+}
+
+/** Fixed-width card for the tablet horizontal update rows. */
+@Composable
+private fun CompactUpdateCard(
+    update: Update,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GlassCard(
+        onClick = onClick,
+        radius = 12.dp,
+        modifier = modifier
+            .then(
+                if (update.read_at != null) {
+                    Modifier.graphicsLayer { alpha = 0.6f }
+                } else Modifier,
+            ),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PriorityDot(priority = update.priority)
+                Text(
+                    update.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LocalPpTokens.current.Foreground,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    formatTime(update.created_at),
+                    fontSize = 12.sp,
+                    color = LocalPpTokens.current.TextTertiary,
+                )
+                update.source_name?.let {
+                    Text(
+                        "  ·  $it",
+                        fontSize = 12.sp,
+                        color = LocalPpTokens.current.TextTertiary,
+                    )
+                }
+                if (update.kind.isNotBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    KindBadge(update.kind)
+                }
+            }
         }
     }
 }
@@ -272,52 +477,10 @@ private fun SectionTitle(text: String) {
     )
 }
 
-@Composable
-private fun UnreadSummary(critical: Int, high: Int, normal: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (critical > 0) StatChip("CRIT $critical", LocalPpTokens.current.Critical)
-        if (high > 0) StatChip("HIGH $high", LocalPpTokens.current.High)
-        if (normal > 0) StatChip("$normal", LocalPpTokens.current.BrandBlue)
-    }
-}
-
-/** Web `.stat` chip: 16% tint fill + 30% tint border, tinted label. */
-@Composable
-private fun StatChip(label: String, tint: Color) {
-    Box(
-        modifier = Modifier
-            .background(color = tint.copy(alpha = 0.16f), shape = CircleShape)
-            .drawBehind {
-                val stroke = 1.dp.toPx()
-                drawRoundRect(
-                    color = tint.copy(alpha = 0.3f),
-                    topLeft = Offset(stroke / 2f, stroke / 2f),
-                    size = Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = CornerRadius(size.height / 2f),
-                    style = Stroke(width = stroke),
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = tint,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-        )
-    }
-}
-
-fun priorityColor(p: String): androidx.compose.ui.graphics.Color = when (p) {
-    "critical" -> androidx.compose.ui.graphics.Color(0xFFFF5C7A)
-    "high" -> androidx.compose.ui.graphics.Color(0xFFFF9E64)
-    else -> androidx.compose.ui.graphics.Color(0xFF818CF8)
+fun priorityColor(p: String): Color = when (p) {
+    "critical" -> Color(0xFFFF5C7A)
+    "high" -> Color(0xFFFF9E64)
+    else -> Color(0xFF818CF8)
 }
 
 @Composable
@@ -397,75 +560,6 @@ private fun PriorityDot(priority: String, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun SourceCard(
-    name: String,
-    latestTitle: String,
-    latestTime: String,
-    activity: List<Int>?,
-    index: Int = 0,
-) {
-    GlassCard(
-        radius = 12.dp,
-        tile = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .rise(index),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    name,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = LocalPpTokens.current.Foreground,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
-                )
-                Sparkline(values = activity)
-            }
-            Text(
-                latestTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = LocalPpTokens.current.TextSecondary,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            Text(
-                latestTime,
-                style = MaterialTheme.typography.labelSmall,
-                color = LocalPpTokens.current.TextTertiary,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-    }
-}
-
-/** Tiny bar sparkline over the last N hourly update counts (web: 24 buckets). */
-@Composable
-private fun Sparkline(values: List<Int>?) {
-    val t = LocalPpTokens.current
-    val points = values?.takeLast(24).orEmpty()
-    val peak = points.maxOfOrNull { it }?.takeIf { it > 0 } ?: 1
-    Canvas(
-        modifier = Modifier
-            .size(width = 72.dp, height = 20.dp),
-    ) {
-        if (points.isEmpty()) return@Canvas
-        val barW = size.width / points.size
-        points.forEachIndexed { i, v ->
-            val h = (v.toFloat() / peak * size.height).coerceAtLeast(1f)
-            drawRect(
-                color = t.BrandViolet.copy(alpha = 0.55f),
-                topLeft = androidx.compose.ui.geometry.Offset(i * barW, size.height - h),
-                size = androidx.compose.ui.geometry.Size(barW * 0.7f, h),
-            )
-        }
-    }
-}
-
 /** "now" / "42m" / "3h" / "Mar 4" — the web UI's relative-time convention. */
 fun formatTime(iso: String): String = try {
     val inst = java.time.Instant.parse(iso)
@@ -481,4 +575,3 @@ fun formatTime(iso: String): String = try {
 } catch (e: Exception) {
     iso
 }
-

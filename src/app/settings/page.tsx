@@ -7,6 +7,7 @@ import AISettings from "@/components/ai-settings";
 import NotifySettings from "@/components/notify-settings";
 import SnapshotSettings from "@/components/snapshot-settings";
 import ThemeSettings from "@/components/theme-settings";
+import GithubSettings from "@/components/github-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function SettingsPage() {
       <section className="glass space-y-3 p-4">
         <h2 className="font-semibold">Theme</h2>
         <p className="text-sm text-slate-400">
-          “Vision” is the reference theme (blue‑dominant, Inter). “Pulse” keeps the
+          “Aurora” is the reference theme (blue‑dominant, Inter). “Pulse” keeps the
           original look (violet, Geist). The choice is stored in this browser and
           applied before the page paints.
         </p>
@@ -51,6 +52,15 @@ export default async function SettingsPage() {
           updates — stored in the <code>DATA_DIR</code> volume (SQLite).
         </p>
         <RestoreForm />
+      </section>
+
+      <section className="glass space-y-3 p-4">
+        <h2 className="font-semibold">GitHub</h2>
+        <p className="text-sm text-slate-400">
+          A personal access token raises the API budget from 60 to 5,000 requests/hour.
+          Saved tokens are verified against the API before they are stored.
+        </p>
+        <GithubSettings />
       </section>
 
       <section className="glass space-y-3 p-4">

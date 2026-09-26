@@ -62,7 +62,14 @@ export default function AreaChart({ data, labels }: AreaChartProps) {
   const pts = data.map((v, i) => ({ x: x(i), y: y(v) }));
   const line = smoothPath(pts);
   const area = `${line} L ${x(n - 1).toFixed(1)} ${(H - padBottom).toFixed(1)} L ${x(0).toFixed(1)} ${(H - padBottom).toFixed(1)} Z`;
-  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  // Evenly spaced INTEGER tick values: each label sits exactly on its own
+  // grid line, so a dot for value N lines up with the dashed "N" line
+  // (fixed fractions + rounded labels drifted whenever max wasn't a
+  // multiple of 4, e.g. max 5 put the "1" line at 1.25).
+  const tickStep =
+    max % 4 === 0 ? max / 4 : max % 5 === 0 ? max / 5 : max % 2 === 0 ? max / 2 : max;
+  const ticks: number[] = [];
+  for (let v = 0; v <= max; v += tickStep) ticks.push(v);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Area chart: ${data.reduce((a, b) => a + b, 0)} updates over ${n} days`}>
@@ -77,10 +84,10 @@ export default function AreaChart({ data, labels }: AreaChartProps) {
         </linearGradient>
       </defs>
 
-      {ticks.map((f) => {
-        const gy = (H - padBottom) - f * (H - padTop - padBottom);
+      {ticks.map((v) => {
+        const gy = (H - padBottom) - (v / max) * (H - padTop - padBottom);
         return (
-          <g key={f}>
+          <g key={v}>
             <line
               x1={padLeft}
               x2={W - padRight}
@@ -88,10 +95,10 @@ export default function AreaChart({ data, labels }: AreaChartProps) {
               y2={gy}
               stroke="rgba(255,255,255,0.07)"
               strokeWidth="1"
-              strokeDasharray={f === 0 ? undefined : "3 4"}
+              strokeDasharray={v === 0 ? undefined : "3 4"}
             />
             <text x={padLeft - 6} y={gy + 3} textAnchor="end" fontSize="9" fill="#64748b">
-              {fmtTick(Math.round(f * max))}
+              {fmtTick(v)}
             </text>
           </g>
         );

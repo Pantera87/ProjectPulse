@@ -59,6 +59,12 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         .readTimeout(6, TimeUnit.SECONDS)
         .build()
 
+    // External pages (website favicons) — no auth, modest window, capped read.
+    private val htmlClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
     /** Connection test + auth probe. Exempt from the server's auth gate. */
     suspend fun health(): ApiResult<Health> = withContext(Dispatchers.IO) {
         try {
@@ -420,6 +426,46 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
 
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
+        private const val PAGE_UA =
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36"
+        /** ~200 KB is far beyond any <head> — enough to find the favicon link. */
+        private const val HTML_CAP = 200 * 1024
+    }
+
+    /**
+     * Plain GET of an external page's HTML (website favicon discovery). No
+     * auth, no cookie jar; the read is capped so a huge page can't eat memory.
+     * Null on any failure — the UI falls back to the initial tile.
+     */
+    suspend fun pageHtml(url: String): String? = withContext(Dispatchers.IO) {
+        if (!url.startsWith("http")) return@withContext null
+        val req = Request.Builder().url(url).header("User-Agent", PAGE_UA).build()
+        try {
+            htmlClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val bytes = resp.body?.source()?.readByteArray(HTML_CAP.toLong()) ?: return@use null
+                String(bytes, Charsets.UTF_8)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Download one favicon file (bytes of a PNG/ICO/… image). Returns null
+     * when the URL is unreachable, wrong-typed, or empty.
+     */
+    suspend fun fetchFavicon(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        if (!url.startsWith("http")) return@withContext null
+        val req = Request.Builder().url(url).header("User-Agent", PAGE_UA).build()
+        try {
+            htmlClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                resp.body?.bytes()?.takeIf { it.isNotEmpty() && it.size <= 512 * 1024 }
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 

@@ -2,6 +2,8 @@
 
 package com.pantera87.projectpulse.ui
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material3.Icon
@@ -86,19 +90,28 @@ fun RootNav() {
         NavHost(
             navController = nav,
             startDestination = DASHBOARD,
+            // Instant tab switches: the default 700ms crossfade keeps the
+            // exiting screen's composition alive (and on top) for the whole
+            // transition — an open UpdateDetailSheet scrim would keep
+            // intercepting taps, and if the transition is interrupted before
+            // it settles that ghost never goes away.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
         ) {
             composable(DASHBOARD) {
                 if (configured) DashboardScreen(
                     refreshPulse = tabPulse,
                     onOpenUpdates = { nav.navigate(UPDATES) },
                     onOpenSearch = { nav.navigate(SEARCH) },
+                    onOpenSource = { id -> nav.navigate("source/$id") },
                 )
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
-            composable(UPDATES) {
+            composable(UPDATES) { entry ->
                 if (configured) UpdatesScreen(
                     refreshPulse = tabPulse,
                     onOpenSearch = { nav.navigate(SEARCH) },
+                    isActive = nav.currentBackStackEntryAsState()?.value == entry,
                 )
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
@@ -116,8 +129,11 @@ fun RootNav() {
             composable(CONNECT) {
                 ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
-            composable(SEARCH) {
-                SearchScreen(onBack = { nav.popBackStack() })
+            composable(SEARCH) { entry ->
+                SearchScreen(
+                    onBack = { nav.popBackStack() },
+                    isActive = nav.currentBackStackEntryAsState()?.value == entry,
+                )
             }
             composable(ADD_SOURCE) {
                 if (configured) AddSourceScreen(
@@ -139,6 +155,7 @@ fun RootNav() {
                     sourceId = id,
                     onOpenSnapshot = { v -> nav.navigate("snapshot/$id/$v") },
                     onBack = { nav.popBackStack() },
+                    isActive = nav.currentBackStackEntryAsState()?.value == entry,
                 )
             }
             composable(
@@ -178,6 +195,7 @@ fun RootNav() {
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }
@@ -200,7 +218,7 @@ private val TABS: List<TabSpec> = listOf(
         Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp), tint = tint)
     },
     TabSpec(UPDATES, "Updates") { tint ->
-        Icon(Icons.AutoMirrored.Filled.List, null, modifier = Modifier.size(18.dp), tint = tint)
+        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(18.dp), tint = tint)
     },
     TabSpec(SOURCES, "Sources") { tint ->
         Icon(Icons.Outlined.RssFeed, null, modifier = Modifier.size(18.dp), tint = tint)
@@ -248,11 +266,16 @@ private fun TabletNavRail(
         modifier = Modifier
             .fillMaxHeight()
             .width(88.dp)
-            .glass(strong = true, radius = 20.dp)
-            .padding(vertical = 6.dp),
+            .glass(strong = true, radius = 20.dp),
     ) {
+        // Edge-to-edge: the glass pill runs behind the status bar, but the
+        // tabs themselves must start below it — otherwise the top item
+        // (Home) sits under the clock in landscape.
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             TABS.forEach { tab ->
@@ -319,9 +342,24 @@ private fun navigate(
     nav: androidx.navigation.NavHostController,
     route: String,
 ) {
-    nav.navigate(route) {
-        popUpTo(DASHBOARD) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    if (route == DASHBOARD) {
+        // Home is the popUpTo anchor of the tab-switch below. Using the
+        // generic popUpTo + saveState + restoreState options for it is a
+        // silent no-op: the pop attributes the saved state of the screens
+        // above DASHBOARD to DASHBOARD itself, and restoreState then
+        // re-pushes exactly that state, cancelling the navigation — the
+        // old screen (and any open UpdateDetailSheet) stays on top.
+        // Popping back to the start destination always lands on Home.
+        if (!nav.popBackStack(DASHBOARD, inclusive = false)) {
+            // DASHBOARD not found on the stack (should not happen): fall
+            // back to a plain push so Home still works.
+            nav.navigate(DASHBOARD)
+        }
+    } else {
+        nav.navigate(route) {
+            popUpTo(DASHBOARD) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 }

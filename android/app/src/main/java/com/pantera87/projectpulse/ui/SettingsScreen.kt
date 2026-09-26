@@ -5,6 +5,7 @@ package com.pantera87.projectpulse.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.BuildConfig
+import com.pantera87.projectpulse.R
 import com.pantera87.projectpulse.notif.Notifier
 import com.pantera87.projectpulse.notif.SyncScheduler
 
@@ -108,7 +112,17 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
                 .padding(start = 12.dp, top = 4.dp, end = 12.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            SectionLabel("Connection", modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo_256),
+                    contentDescription = "ProjectPulse logo",
+                    modifier = Modifier.size(28.dp),
+                )
+                SectionLabel("Connection", modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+            }
             GlassPanel(strong = true) {
                 Column(
                     Modifier.padding(16.dp),

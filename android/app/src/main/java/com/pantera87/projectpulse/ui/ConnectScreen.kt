@@ -2,11 +2,13 @@
 
 package com.pantera87.projectpulse.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
+import com.pantera87.projectpulse.R
 import com.pantera87.projectpulse.data.ApiResult
 import com.pantera87.projectpulse.data.Health
 import kotlinx.coroutines.launch
@@ -124,6 +128,13 @@ fun ConnectScreen(onSuccess: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Image(
+                painter = painterResource(R.drawable.logo_1024),
+                contentDescription = "ProjectPulse logo",
+                modifier = Modifier
+                    .size(112.dp)
+                    .padding(top = 8.dp),
+            )
             GlassTextField(
                 value = url,
                 onValueChange = { url = it },

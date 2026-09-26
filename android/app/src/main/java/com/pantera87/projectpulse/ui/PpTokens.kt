@@ -38,16 +38,14 @@ enum class PpTheme(val id: String) {
 // --------------------------------------------------------------------------
 
 /**
- * One static radial glow for the aurora canvas. Positions are fractions of
- * the canvas; radii are fractions of the canvas *width* (the CSS `rem` sizes
- * normalized against the 72rem app-shell width, the same normalization the
- * pulse blob layer uses).
+ * One radial glow for the aurora canvas. Positions are fractions of the
+ * canvas; the radius is a fraction of the canvas *short side*, so a glow
+ * keeps the same relative size in portrait and landscape.
  */
 data class GlowSpec(
     val cx: Float,
     val cy: Float,
-    val rx: Float,
-    val ry: Float,
+    val radius: Float,
     val color: Color,
     /** Fraction of the radius at which the color has faded to transparent. */
     val fadeAt: Float,
@@ -269,8 +267,6 @@ class PpTokens(
     val BlobViolet: Color,
     val BlobFuchsia: Color,
     val Dot: Color,
-    /** Static radial glows for the aurora canvas (empty in pulse). */
-    val AuroraGlows: List<GlowSpec>,
 
     // Material3 fallback surfaces
     val colorScheme: ColorScheme,
@@ -368,7 +364,7 @@ private val AuroraDark = darkColorScheme(
 val AuroraTokens = PpTokens(
     theme = PpTheme.AURORA,
     Background = Color(0xFF030C1D),
-    BackdropBase = Color(0xFF020515),   // --aurora-bg
+    BackdropBase = Color(0xFF04102A),   // --vision-bg
     Foreground = Color(0xFFF1F5F9),
     BrandBlue = Color(0xFF0075FF),
     BrandViolet = Color(0xFF4318FF),
@@ -385,7 +381,7 @@ val AuroraTokens = PpTokens(
     GlassHighlight = Color.Transparent,   // box-shadow: none
     GlassDeepBase = Color.Transparent,
     FieldFill = Color(0x8C080C20),        // rgba(8,12,32,.55), unchanged
-    GlassStrongShadow = Color(0xE6020617), // rgba(2,6,23,.9)
+    GlassStrongShadow = Color.Transparent, // web vision: box-shadow: none
     GlowIndigo = Color(0x8C4318FF),       // rgba(67,24,255,.55)
     GlowAccent = Color(0x594318FF),       // rgba(67,24,255,.35)
     FocusBorder = Color(0xA60075FF),      // rgba(0,117,255,.65)
@@ -455,15 +451,9 @@ val AuroraTokens = PpTokens(
     BlobViolet = Color.Transparent,
     BlobFuchsia = Color.Transparent,
     Dot = Color.Transparent,
-    // The web's `:root[data-theme="aurora"] body` stacked radial glows
-    // (rem sizes normalized to fractions of a 72rem-wide canvas).
-    AuroraGlows = listOf(
-        GlowSpec(0.35f, 0.50f, 30f / 72f, 24f / 72f, Color(0x806094FF), 0.72f),
-        GlowSpec(0.36f, 0.48f, 66f / 72f, 50f / 72f, Color(0xC73E64EB), 0.72f),
-        GlowSpec(0.12f, 0.96f, 46f / 72f, 36f / 72f, Color(0x856C4CE2), 0.70f),
-        GlowSpec(0.66f, 1.12f, 56f / 72f, 42f / 72f, Color(0x992D80F0), 0.70f),
-        GlowSpec(0.92f, 0.32f, 52f / 72f, 40f / 72f, Color(0x61235CE0), 0.72f),
-    ),
+    // The aurora canvas draws a random scatter of bright-blue glows at
+    // composition time (see AuroraBackground); a fixed width-normalized list
+    // washes out on wide/landscape canvases, so none is stored here.
     colorScheme = AuroraDark,
     typography = typography(AuroraFontFamily),
 )
@@ -550,7 +540,7 @@ val PulseTokens = PpTokens(
     BlobViolet = Color(0x80A855F7),
     BlobFuchsia = Color(0x38E879F9),
     Dot = Color(0x0DFFFFFF),
-    AuroraGlows = emptyList(),
+    // Pulse theme: the aurora canvas is not used (PulseBackdrop instead).
     colorScheme = PulseDark,
     typography = typography(PulseFontFamily),
 )

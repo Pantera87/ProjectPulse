@@ -55,6 +55,10 @@ private const val PAGE_SIZE = 50
 fun UpdatesScreen(
     refreshPulse: Int = 0,
     onOpenSearch: () -> Unit,
+    // Whether this entry is still the current destination. A tab switch
+    // (popUpTo + push) can briefly keep a non-active entry composed; while
+    // inactive its interactive overlays must be dropped.
+    isActive: Boolean = true,
 ) {
     val app = App.instance
     val scope = rememberCoroutineScope()
@@ -258,7 +262,7 @@ fun UpdatesScreen(
             }
         }
     }
-    selected?.let { u ->
+    if (isActive) selected?.let { u ->
         UpdateDetailSheet(
             update = u,
             onDismiss = { selected = null },

@@ -56,6 +56,10 @@ fun SourceDetailScreen(
     sourceId: Int,
     onOpenSnapshot: (Int) -> Unit,
     onBack: () -> Unit,
+    // Whether this entry is still the current destination. A tab switch
+    // (popUpTo + push) can briefly keep a non-active entry composed; while
+    // inactive its interactive overlays must be dropped.
+    isActive: Boolean = true,
 ) {
     val app = App.instance
     val context = LocalContext.current
@@ -388,7 +392,7 @@ fun SourceDetailScreen(
         }
     }
 
-    selected?.let { u ->
+    if (isActive) selected?.let { u ->
         UpdateDetailSheet(
             update = u,
             onDismiss = { selected = null },

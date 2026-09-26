@@ -46,7 +46,7 @@ import kotlinx.coroutines.delay
 
 /** Full-text search over updates + substring match on projects (server: /api/search). */
 @Composable
-fun SearchScreen(onBack: () -> Unit) {
+fun SearchScreen(onBack: () -> Unit, isActive: Boolean = true) {
     val app = App.instance
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<SearchPage?>(null) }
@@ -194,7 +194,7 @@ fun SearchScreen(onBack: () -> Unit) {
                 }
             }
         }
-        selected?.let { u ->
+        if (isActive) selected?.let { u ->
             UpdateDetailSheet(
                 update = u,
                 onDismiss = { selected = null },

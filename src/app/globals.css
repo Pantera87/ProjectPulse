@@ -11,7 +11,7 @@
   --brand-indigo: #6366f1;
   --sky: #38bdf8;
 
-  /* Parameterized so the "vision" theme can re-tint every glass/glow
+  /* Parameterized so the "aurora" theme can re-tint every glass/glow
      surface. The values below are the original "pulse" palette, kept
      verbatim as the default. */
   --card-border: rgba(255, 255, 255, 0.12);
@@ -37,12 +37,12 @@
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* ---------- "vision" theme (the reference look) ----------
+/* ---------- "aurora" theme (the reference look) ----------
    Blue-dominant dark navy, emerald positive accent, blue-tinted glass.
-   Applied via data-theme="vision" on <html> (see layout.tsx /
+   Applied via data-theme="aurora" on <html> (see layout.tsx /
    theme-toggle.tsx). Everything the pulse theme gets from the :root
    defaults above is re-tinted here; no pulse value is modified. */
-:root[data-theme="vision"] {
+:root[data-theme="aurora"] {
   --background: #030c1d;
   --foreground: #f1f5f9;
 
@@ -78,71 +78,73 @@
   --accent-soft: #8f7bff;
   --font-sans: var(--font-pjs), Arial, Helvetica, sans-serif;
 
-  /* Page background base for the vision theme; the layered glow on top is
+  /* Page background base for the aurora theme; the layered glow on top is
      painted in the body rule below. Lifted slightly off black so the glow
      fades dissolve into it instead of dropping to a flat dark tone. */
-  --vision-bg: #04102a;
-  --vision-card: linear-gradient(
+  --aurora-bg: #04102a;
+  --aurora-card: linear-gradient(
     127.09deg,
     rgba(6, 11, 40, 0.94) 19.41%,
     rgba(10, 14, 35, 0.49) 76.65%
   );
-  --vision-card-deep: linear-gradient(126.97deg, #060b28 28.26%, #0a0e23 91.2%);
-  --vision-menu: linear-gradient(126.97deg, #05153f 28.26%, #072561 91.2%);
+  --aurora-card-deep: linear-gradient(126.97deg, #060b28 28.26%, #0a0e23 91.2%);
+  --aurora-menu: linear-gradient(126.97deg, #05153f 28.26%, #072561 91.2%);
 }
 
-/* ---------- "vision" theme: surfaces (exact gradients from the live
-   Vision UI dashboard) ----------
+/* ---------- "aurora" theme: surfaces (exact gradients from the live
+   Aurora UI dashboard) ----------
    The page background is the theme's body background image (dark navy with
    a soft blue glow); cards and the sidenav use translucent navy gradients
    so the background shows through; the navbar is a near-transparent white
    gradient. The shine sweep, dot grid and aurora blobs are dropped. */
-:root[data-theme="vision"] .glass {
-  background: var(--vision-card);
+:root[data-theme="aurora"] .glass {
+  background: var(--aurora-card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
   border-radius: 14px;
 }
-:root[data-theme="vision"] .glass-strong {
-  background: var(--vision-card);
+:root[data-theme="aurora"] .glass-strong {
+  background: var(--aurora-card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: 0 10px 30px -22px rgba(2, 6, 23, 0.9);
   border-radius: 18px;
 }
-:root[data-theme="vision"] .glass-shine::after {
+:root[data-theme="aurora"] .glass-shine::after {
   display: none;
 }
-:root[data-theme="vision"] .glass-tile::before {
+:root[data-theme="aurora"] .glass-tile::before {
   opacity: 0.45;
 }
-:root[data-theme="vision"] .aurora-blob {
+:root[data-theme="aurora"] .aurora-blob {
   opacity: 0;
 }
-/* The base body rule stacks radial glows over a flat color; vision re-stacks
+/* The base body rule stacks radial glows over a flat color; aurora re-stacks
    its own layered glow (main blue bloom left-of-center, violet and blue
    blooms along the bottom) over the navy base (higher specificity). Each
    glow fades out over a long 85-92% tail and the base is lifted, so the
    glows dissolve seamlessly into the surroundings with no visible dark
    edge. */
-:root[data-theme="vision"] body {
+:root[data-theme="aurora"] body {
   background:
     radial-gradient(38rem 30rem at 35% 50%, rgba(96, 148, 255, 0.4), transparent 88%),
     radial-gradient(82rem 62rem at 36% 48%, rgba(62, 100, 235, 0.48), transparent 90%),
     radial-gradient(58rem 46rem at 12% 96%, rgba(108, 76, 226, 0.36), transparent 88%),
     radial-gradient(70rem 54rem at 66% 112%, rgba(45, 128, 240, 0.4), transparent 88%),
     radial-gradient(64rem 50rem at 92% 32%, rgba(35, 92, 224, 0.28), transparent 90%),
-    var(--vision-bg);
+    var(--aurora-bg);
   background-attachment: fixed;
 }
-/* Sidebar: the .sidenav rule below carries the liquid-glass surface for the
-   vision theme (the utilities on the aside set background-color, so the
-   higher-specificity .sidenav shorthand wins). */
+/* Sidebar + top bar: the utilities set background-color, so a higher-
+   specificity background shorthand here wins. */
+:root[data-theme="aurora"] aside {
+  background: var(--aurora-card);
+}
 /* The sidenav is liquid glass: a thin white-tinted gradient over the page
    glow (which shows through the backdrop blur) with a specular top edge
    and a faint inner glow — transparent, not a dark card. */
-:root[data-theme="vision"] .sidenav {
+:root[data-theme="aurora"] .sidenav {
   background: linear-gradient(
     165deg,
     rgba(255, 255, 255, 0.08) 0%,
@@ -156,88 +158,51 @@
   backdrop-filter: blur(24px) saturate(1.5);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
 }
-:root[data-theme="vision"] header {
+:root[data-theme="aurora"] header {
   /* Liquid glass, matching the sidenav: a thin white-tinted gradient over
      the page glow (which shows through the backdrop blur) with a specular
      top edge — lighter than the flat dark bar it used to be. */
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.14) 0%,
-    rgba(255, 255, 255, 0.06) 55%,
-    rgba(255, 255, 255, 0.03) 100%
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.04) 55%,
+    rgba(255, 255, 255, 0.01) 100%
   );
   border-bottom-color: rgba(255, 255, 255, 0.14);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 8px 28px -14px rgba(2, 6, 23, 0.6);
-  backdrop-filter: blur(22px) saturate(1.8);
-  -webkit-backdrop-filter: blur(22px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
 }
-:root[data-theme="vision"] .aurora::before {
+:root[data-theme="aurora"] .aurora::before {
   display: none;
 }
-:root[data-theme="vision"] .chip-active {
-  background: var(--vision-menu);
+:root[data-theme="aurora"] .chip-active {
+  background: var(--aurora-menu);
   border-color: rgba(0, 117, 255, 0.35);
   box-shadow: none;
   color: #fff;
 }
 
-/* Top bar (pulse): the vision override above is more specific, so this base
-   carries the same liquid-glass treatment for the pulse theme — a thin
-   white-tinted gradient over the page glow with a specular top edge, so the
-   glow reads through the bar instead of the flat dark strip it used to be. */
-:root header {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.05) 55%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 8px 28px -14px rgba(2, 6, 23, 0.6);
-  backdrop-filter: blur(22px) saturate(1.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.6);
-}
-
-/* Sidebar (pulse): frosted liquid glass, matching the top bar — a thin
-   white-tinted gradient over the page glow with a specular inner top edge,
-   so the background glow blurs through instead of reading as a dark card. */
-.sidenav {
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.03) 45%,
-    rgba(255, 255, 255, 0.01) 100%
-  );
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 20px -8px rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-}
-
-/* Inset stat boxes inside dashboard cards (hero, gauge cards). In vision
+/* Inset stat boxes inside dashboard cards (hero, gauge cards). In aurora
    they use the theme's "cardContent" gradient, darker than the card. */
 .stat-box {
   background: rgba(255, 255, 255, 0.05);
 }
-:root[data-theme="vision"] .stat-box {
-  background: var(--vision-card-deep);
+:root[data-theme="aurora"] .stat-box {
+  background: var(--aurora-card-deep);
   border-color: rgba(148, 163, 200, 0.12);
 }
 
 /* Active sidebar nav item: vivid blue pill in pulse, the theme's "menu"
-   gradient in vision (the reference look). */
+   gradient in aurora (the reference look). */
 .nav-item-active {
   background: linear-gradient(90deg, rgba(37, 99, 235, 0.9), rgba(99, 102, 241, 0.8));
   box-shadow: 0 0 18px -4px rgba(59, 130, 246, 0.55);
 }
-:root[data-theme="vision"] .nav-item-active {
-  background: var(--vision-menu);
+:root[data-theme="aurora"] .nav-item-active {
+  background: var(--aurora-menu);
   box-shadow: none;
 }
 
@@ -562,7 +527,7 @@ body {
 
 /* ---------- section heading accent ----------
    Theme-reactive icon tint for dashboard/section headings: violet in
-   pulse, blue in vision. */
+   pulse, blue in aurora. */
 .section-accent {
   color: var(--accent-soft);
 }
@@ -570,7 +535,7 @@ body {
 /* ---------- glyph tiles ----------
    Theme-aware gradient square behind <Glyph> icon tiles (KPI cards,
    category/type icons): the brand gradient, so the fill follows the
-   active theme (blue→violet→fuchsia in pulse, blue→violet→cyan in vision).
+   active theme (blue→violet→fuchsia in pulse, blue→violet→cyan in aurora).
    Half-stops via color-mix (oklab) interpolate the hue smoothly so the
    mid-point never reads as a hard band. */
 .glyph-tile {
@@ -620,6 +585,99 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* ---------- brand wordmark ----------
+   The "ProjectPulse" name next to the logo mark. Unlike .grad-text it is
+   deliberately NOT theme-reactive: the wordmark is locked to the neon
+   cyan → blue → magenta ramp of the logo itself, so it always reads as
+   one brand lockup with the icon in either theme. The soft dual glow
+   echoes the mark's neon halo. */
+.brand-word {
+  position: relative;
+  /* stacking context so the glow copy (z-index:-1 pseudo) stays between the
+     page background and the text, never sinking behind the sidebar/card */
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    #33d4fd 0%,
+    #4f8cff 48%,
+    #ec4ff0 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* The glow is a blurred duplicate of the wordmark painted with the SAME
+   gradient, so every letter haloes in its own color and the halo reads as
+   even. A fixed cyan/magenta drop-shadow washed over the whole word looked
+   patchy where the letter color and the shadow color didn't match. */
+.brand-word::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    #33d4fd 0%,
+    #4f8cff 48%,
+    #ec4ff0 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: blur(9px);
+  opacity: 0.5;
+  z-index: -1;
+  pointer-events: none;
+  animation: wordmark-pulse 7s ease-in-out infinite;
+}
+/* The glow color is already gradient-matched, so the 7 s cycle (shared with
+   the logo mark) only moves the intensity and a gentle breath. */
+@keyframes wordmark-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(1);
+  }
+  38% {
+    opacity: 0.72;
+    transform: scale(1.03);
+  }
+  72% {
+    opacity: 0.58;
+    transform: scale(1.02);
+  }
+}
+
+/* ---------- logo pulse ----------
+   Slow "breathing light" on the logo mark and the ProjectPulse wordmark:
+   the neon halo cycles through the brand's own ramp (cyan → blue →
+   magenta) on a shared 7s cycle, so the lockup pulses as one. The static
+   filters above / below are the reduced-motion / pre-animation baseline,
+   so the glow never disappears when the animation is disabled. */
+.logo-pulse {
+  filter: drop-shadow(0 0 14px rgba(51, 212, 253, 0.5))
+    drop-shadow(0 0 28px rgba(51, 212, 253, 0.35));
+  animation: logo-pulse 7s ease-in-out infinite;
+  will-change: filter, transform;
+}
+@keyframes logo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 11px rgba(51, 212, 253, 0.6))
+      drop-shadow(0 0 25px rgba(51, 212, 253, 0.4));
+  }
+  38% {
+    transform: scale(1.06);
+    filter: drop-shadow(0 0 16px rgba(79, 140, 255, 0.75))
+      drop-shadow(0 0 32px rgba(79, 140, 255, 0.5));
+  }
+  72% {
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 16px rgba(236, 79, 240, 0.7))
+      drop-shadow(0 0 32px rgba(236, 79, 240, 0.45));
+  }
 }
 
 /* ---------- aurora background ---------- */
@@ -740,6 +798,9 @@ body {
   .glass-shine::after {
     transition: none;
   }
+  /* The brand logo/wordmark pulse is deliberately NOT listed here: it's a
+     short 7 s loop on one small icon and the user expects to always see it,
+     even on systems where "reduce motion" is enabled. */
   .rise,
   .count-flash {
     animation: none;

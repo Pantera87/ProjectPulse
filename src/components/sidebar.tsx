@@ -12,21 +12,24 @@ import NavLinks from "./nav-links";
  */
 export default function Sidebar({ unread, critical }: { unread: number; critical: number }) {
   return (
-    <aside className="sidenav sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-5 border-r border-white/10 bg-[var(--background)]/60 px-4 py-5 backdrop-blur-xl lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-5 border-r border-white/10 bg-[var(--background)]/60 px-4 py-5 backdrop-blur-xl lg:flex">
       <Link
         href="/"
         className="flex items-center gap-2.5 px-1"
         aria-label="ProjectPulse home"
       >
         <Image
-          src="/logo.png"
+          src="/logo256transparent.png"
           alt=""
           aria-hidden="true"
           width={48}
           height={48}
-          className="h-9 w-9 shrink-0 drop-shadow-[0_0_10px_rgba(56,189,248,0.45)]"
+          className="logo-pulse h-12 w-12 shrink-0"
         />
-        <span className="grad-text text-lg font-semibold leading-none">
+        <span
+          className="brand-word text-xl font-bold tracking-tight"
+          data-text="ProjectPulse"
+        >
           ProjectPulse
         </span>
       </Link>

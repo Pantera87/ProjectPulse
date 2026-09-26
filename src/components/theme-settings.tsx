@@ -6,16 +6,16 @@ import type { ThemeName } from "./theme-toggle";
 
 /**
  * Settings-page theme picker: switches data-theme on <html> between
- * "vision" (reference look, default) and "pulse" (original theme) and
+ * "aurora" (reference look, default) and "pulse" (original theme) and
  * persists it under localStorage("pp-theme") — same key the top-bar
  * toggle and the pre-paint bootstrap use.
  */
 export default function ThemeSettings() {
-  const [theme, setTheme] = useState<ThemeName>("vision");
+  const [theme, setTheme] = useState<ThemeName>("aurora");
 
   useEffect(() => {
     setTheme(
-      (document.documentElement.getAttribute("data-theme") as ThemeName) ?? "vision"
+      (document.documentElement.getAttribute("data-theme") as ThemeName) ?? "aurora"
     );
   }, []);
 
@@ -31,8 +31,8 @@ export default function ThemeSettings() {
 
   const options: { id: ThemeName; name: string; desc: string; icon: string }[] = [
     {
-      id: "vision",
-      name: "Vision",
+      id: "aurora",
+      name: "Aurora",
       desc: "Reference theme — blue-dominant navy, Inter, emerald accents. Default.",
       icon: "sparkles",
     },

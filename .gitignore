@@ -55,3 +55,16 @@ server.err.log
 /android/*.jpeg
 /android/*.py
 /android/ui.xml
+
+# ADB debug dumps left in the repo ROOT (screencap / uiautomator / logcat)
+/*.png
+/*.jpg
+/*.jpeg
+/*.txt
+/*.xml
+
+# IDE worktrees (full repo copies — never commit)
+.kilo/
+
+# One-off local image backups
+scripts/.img-backup/

@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,10 @@ import com.pantera87.projectpulse.ui.RootNav
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Draw edge-to-edge on every API level: the aurora backdrop extends
+        // behind the transparent system bars (TopAppBars pad themselves by the
+        // status-bar inset; RootNav pads the floating tab bar for the nav bar).
+        enableEdgeToEdge()
         setContent {
             val themeId by App.instance.prefs.theme.collectAsState()
             ProjectPulseTheme(theme = PpTheme.fromId(themeId)) {

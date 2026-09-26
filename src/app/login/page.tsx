@@ -36,14 +36,17 @@ function LoginInner() {
       >
         <div className="mx-auto mb-3 flex w-44 flex-col items-center">
           <Image
-            src="/logo.png"
+            src="/logo256transparent.png"
             alt=""
             aria-hidden="true"
-            width={48}
-            height={48}
-            className="h-12 w-12"
+            width={72}
+            height={72}
+            className="logo-pulse h-[72px] w-[72px]"
           />
-          <h1 className="grad-text -mt-1.5 text-center text-lg font-semibold leading-none">
+          <h1
+            className="brand-word -mt-1.5 text-center text-xl font-bold tracking-tight"
+            data-text="ProjectPulse login"
+          >
             ProjectPulse login
           </h1>
         </div>

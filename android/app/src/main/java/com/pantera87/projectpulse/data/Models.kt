@@ -38,6 +38,19 @@ data class Dashboard(
     val latestBySource: Map<String, LatestUpdate> = emptyMap(),
     val activityBySource: Map<String, List<Int>> = emptyMap(),
     val attention: List<Update> = emptyList(),
+    val aggregates: Aggregates? = null,
+)
+
+/** Whole-dashboard aggregates (null on servers that predate the field). */
+@Serializable
+data class Aggregates(
+    val totalUpdates: Int = 0,
+    val readUpdates: Int = 0,
+    val sourcesTotal: Int = 0,
+    val sourcesUpdatedThisWeek: Int = 0,
+    val updatesThisWeek: Int = 0,
+    val updatesPrevWeek: Int = 0,
+    val activityTotalByDay: List<Int> = emptyList(),
 )
 
 @Serializable
@@ -99,6 +112,7 @@ data class Source(
     val url: String = "",
     val name: String? = null,
     val goal: String? = null,
+    val project_summary: String? = null,
     val category: String? = null,
     val subcategory: String? = null,
     val notes: String? = null,

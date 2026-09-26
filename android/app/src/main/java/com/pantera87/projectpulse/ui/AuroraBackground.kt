@@ -12,23 +12,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 /**
  * The web app's backdrop, themed:
  *
  * - **Pulse** — the original look: a near-black base, three fixed soft tints,
  *   three slowly drifting blobs and a faint 26dp dot grid.
- * - **Aurora** — a static canvas: the `--aurora-bg` navy base with five fixed
- *   radial glows (the web's `:root[data-theme="aurora"] body` rule). No blobs,
- *   no dot grid, no animation.
+ * - **Aurora** — a dark navy canvas with a random scatter of bright-blue
+ *   glows. A fresh scatter is rolled once per app launch (stable while the
+ *   app runs); glows are circular radial gradients sized against the canvas
+ *   *short side*, so they stay distinct bright pools on a portrait phone
+ *   and a landscape tablet alike.
  *
  * Compose has no backdrop blur, but the glass sits on this static,
  * pre-softened backdrop, so the blobs are painted as radial gradients
@@ -175,54 +177,61 @@ private fun PulseBackdrop(base: Color) {
     }
 }
 
-/** Aurora: the static layered glow canvas (no animation). */
+/**
+ * Aurora canvas: dark base + [randomGlowScatter] — bright-blue pools at
+ * random sizes, tints and positions, rolled once per composition.
+ */
 @Composable
 private fun AuroraStaticBackdrop(base: Color) {
-    val t = LocalPpTokens.current
+    val glows = remember { randomGlowScatter() }
     Canvas(Modifier.fillMaxSize()) {
         drawRect(base)
-        t.AuroraGlows.forEach { g ->
-            drawEllipseGlow(
-                cx = g.cx * size.width,
-                cy = g.cy * size.height,
-                rx = g.rx * size.width,
-                ry = g.ry * size.width,
-                color = g.color,
-                fadeAt = g.fadeAt,
+        glows.forEach { g ->
+            drawRect(
+                Brush.radialGradient(
+                    0f to g.color,
+                    g.fadeAt to g.color,
+                    1f to Color.Transparent,
+                    center = Offset(g.cx * size.width, g.cy * size.height),
+                    radius = g.radius * minOf(size.width, size.height),
+                ),
             )
         }
     }
 }
 
 /**
- * Paints a CSS-style `radial-gradient(rx ry at cx cy, color …, transparent)`:
- * an ellipse (rx/ry) whose color fades to transparent at [fadeAt] of the
- * radius. Compose only has circular radial brushes, so the Y axis is scaled
- * around the center — the circular gradient then sweeps out as the ellipse.
+ * One screenful of glows: 8–10 bright-blue pools spread over a jittered
+ * 3-column grid (so no region of the canvas is left bare), each with a
+ * random size, tint and strength. Sized against the short side so the
+ * scatter reads the same in portrait and landscape.
  */
-private fun DrawScope.drawEllipseGlow(
-    cx: Float,
-    cy: Float,
-    rx: Float,
-    ry: Float,
-    color: Color,
-    fadeAt: Float,
-) {
-    if (rx <= 0f || ry <= 0f) return
-    drawIntoCanvas { canvas ->
-        canvas.save()
-        canvas.translate(cx, cy)
-        canvas.scale(1f, ry / rx)
-        canvas.translate(-cx, -cy)
-        drawRect(
-            Brush.radialGradient(
-                0f to color,
-                fadeAt to color,
-                1f to Color.Transparent,
-                center = Offset(cx, cy),
-                radius = rx,
-            ),
+private fun randomGlowScatter(): List<GlowSpec> {
+    val rnd = Random
+    val palette = listOf(
+        Color(0xFF4F8CFF),
+        Color(0xFF6094FF),
+        Color(0xFF2D80F0),
+        Color(0xFF3E64EB),
+        Color(0xFF21D4FD),
+        Color(0xFF6C4CE2),
+    )
+    val count = 8 + rnd.nextInt(3)
+    val rows = (count + 2) / 3
+    return (0 until count).shuffled(rnd).map { slot ->
+        val col = slot % 3
+        val row = slot / 3
+        GlowSpec(
+            cx = (col + rnd.between(0.1f, 0.9f)) / 3f,
+            cy = (row + rnd.between(0.1f, 0.9f)) / rows,
+            radius = rnd.between(0.30f, 0.55f),
+            color = palette[rnd.nextInt(palette.size)]
+                .copy(alpha = rnd.between(0.5f, 0.85f)),
+            fadeAt = rnd.between(0.55f, 0.8f),
         )
-        canvas.restore()
     }
 }
+
+/** Uniform random float in [from, until). */
+private fun Random.between(from: Float, until: Float): Float =
+    from + nextFloat() * (until - from)

@@ -25,7 +25,7 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// Vision UI reference font (Plus Jakarta). Vision uses this via
+// Aurora theme reference font (Plus Jakarta). Aurora uses this via
 // --font-sans: var(--font-pjs) in globals.css.
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-pjs",
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     "docker",
   ],
   applicationName: "ProjectPulse",
-  icons: { icon: "/logo.png" },
+  icons: { icon: "/logo256transparent.png" },
   openGraph: {
     type: "website",
     siteName: "ProjectPulse",
@@ -95,7 +95,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      data-theme="vision"
+      data-theme="aurora"
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${plusJakarta.variable} h-full antialiased`}
     >
       <head>

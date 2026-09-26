@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureStartup } from "@/lib/startup";
 import { schedulerStatus } from "@/lib/scheduler";
 import { getAI, aiProviderLabel } from "@/lib/ai";
+import { githubRateLimitStatus } from "@/lib/github";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export function GET() {
       provider: label.provider,
       model: label.model,
     },
+    github: githubRateLimitStatus(),
     webhook: Boolean(process.env.WEBHOOK_URL),
     auth: Boolean(process.env.AUTH_PASSWORD),
     time: new Date().toISOString(),
