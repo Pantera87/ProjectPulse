@@ -117,6 +117,12 @@ const delay = (ms: number) => ({ "--delay": `${ms}ms` }) as CSSProperties;
 
 const chipCls = (active: boolean) => `chip ${active ? "chip-active" : ""}`;
 
+// True once this client session has mounted the dashboard. A remount
+// (browser back/forward or a round trip) can carry a stale RSC snapshot —
+// e.g. an update marked read since the page first rendered still appears
+// in the recent-updates widget — so revisit mounts refresh immediately.
+let mountedBefore = false;
+
 export function PriorityDot({ priority }: { priority: string }) {
   const color =
     priority === "critical"
@@ -231,6 +237,16 @@ export default function DashboardClient({
       // server momentarily unavailable — keep showing stale data
     }
   }, []);
+
+  // Revisit refresh: App Router restores back/forward navigations from a
+  // cached RSC snapshot, so a remounted dashboard can start from stale
+  // initial props (an update read since the first render still showing in
+  // the widget). Fetch once immediately on remount; a first-ever mount
+  // already holds fresh server data and needs no fetch.
+  useEffect(() => {
+    if (mountedBefore) queueMicrotask(() => load());
+    mountedBefore = true;
+  }, [load]);
 
   useEffect(() => {
     const iv = setInterval(() => {
