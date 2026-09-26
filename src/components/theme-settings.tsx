@@ -14,8 +14,14 @@ export default function ThemeSettings() {
   const [theme, setTheme] = useState<ThemeName>("aurora");
 
   useEffect(() => {
+    // Mount-only read of external state: data-theme on <html> was set by
+    // the pre-paint bootstrap script before React ran, so this is a
+    // one-way read of a value React doesn't own (hydration-safe, unlike
+    // reading localStorage in the render phase).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(
-      (document.documentElement.getAttribute("data-theme") as ThemeName) ?? "aurora"
+      (document.documentElement.getAttribute("data-theme") as ThemeName) ??
+        "aurora"
     );
   }, []);
 
