@@ -73,9 +73,10 @@
 | ![GitHub tracking](public/screenshots/github-repo.png) | ![AI model manager](public/screenshots/settings-ai.png) |
 | Releases, README diffs, milestones and state-change scans per repo | Ollama model catalog with sizes, accuracy and hardware hints, one-click download |
 
-| Android companion app | |
+| Android app — portrait | Android app — landscape |
 |---|---|
-| ![Android companion app](public/screenshots/android-app.png) | The native app: dashboard with activity chart, priority-sorted updates, sources, keyword rules and background-sync notifications |
+| ![Android companion app](public/screenshots/android-app.png) | ![Android companion app, landscape](public/screenshots/android-landscape.png) |
+| The native app: dashboard with activity chart, priority-sorted updates, sources, keyword rules and background-sync notifications | The same dashboard on a tablet in landscape — the adaptive layout works on phones and tablets, in any orientation |
 
 ## Features
 
@@ -89,17 +90,22 @@
 - **Updates feed** — priority-sorted, digest time windows, muting, full-text search (SQLite FTS5), and JSON backup/restore.
 - **Dashboard** — activity overview (7-day chart, week-over-week delta, sources active this week), unread-by-category and per-project stat tiles with 7-day sparklines.
 - **Alerts** — push new updates to **webhook, ntfy, Telegram or email**; per-channel minimum priority and update-kind filters, a test send, and a delivery log in Settings → Alerts.
-- **Android companion app** — native Kotlin/Jetpack Compose app: dashboard, updates, sources, search, snapshots, add source and keyword rules from your phone, plus background sync with local notifications ([details](#android-app)).
+- **Android companion app** — native Kotlin/Jetpack Compose app, **optimized for both phones and tablets**: dashboard, updates, sources, search, snapshots, add source and keyword rules, plus background sync with local notifications ([details](#android-app)).
 - **Two themes** — *Aurora* (blue, reference) and *Pulse* (classic violet) share one design language between the web app and the Android app.
 
 ## Android app
 
-A native **Kotlin / Jetpack Compose** companion app (in `android/`) that talks
-to your ProjectPulse server over the network — LAN `http` or `https`; login is
-reused from the server's auth. There is no server push: a WorkManager job
-polls the server on the interval you pick (default 15 min) and posts local
-notifications for new updates (one persistent notification, always the latest).
+A native **Kotlin / Jetpack Compose** companion app (in `android/`),
+**optimized for both mobile phones and tablets** — the layout adapts to the
+screen and orientation. It talks to your ProjectPulse server over the network
+— LAN `http` or `https`; login is reused from the server's auth. There is no
+server push: a WorkManager job polls the server on the interval you pick
+(default 15 min) and posts local notifications for new updates (one
+persistent notification, always the latest).
 
+- **Phones & tablets** — fully adaptive Compose layout: compact cards and a
+  bottom navigation bar in portrait on phones; wider multi-column grids and a
+  persistent side rail on tablets and in landscape.
 - **Dashboard** — aggregate stats (total updates, sources, this week's
   activity), a 7-day activity chart and the project grid, with unread counters.
 - **Updates** — the same priority-sorted feed as the web app: pagination,
