@@ -5,10 +5,17 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.data.ApiResult
+import com.pantera87.projectpulse.engine.CollectorNotifier
+import com.pantera87.projectpulse.engine.PpEngine
+import com.pantera87.projectpulse.engine.nowIso
+import com.pantera87.projectpulse.engine.toUpdate
 
 /**
- * Background poll: fetches recent updates, posts a local notification for
- * anything newer than [com.pantera87.projectpulse.data.ServerPrefs.lastSeenUpdateId].
+ * Background poll: in remote data mode it fetches recent updates from the
+ * server and posts a local notification for anything newer than
+ * [com.pantera87.projectpulse.data.ServerPrefs.lastSeenUpdateId]; in local
+ * data mode it runs the on-device checkers ([PpEngine]) for all sources and
+ * notifies for what they find.
  *
  * The session cookie is in-memory only, so after a process restart the worker
  * re-runs POST /api/auth first when the server gates the API.
@@ -18,6 +25,12 @@ class PpWorker(context: Context, params: WorkerParameters) : CoroutineWorker(con
     override suspend fun doWork(): Result {
         val app = applicationContext as App
         val prefs = app.prefs
+
+        // Local data mode: the on-device engine checks all sources directly.
+        if (prefs.dataMode.value == "local") {
+            return runLocal(app)
+        }
+
         if (!prefs.configured.value) return Result.success()
 
         // Re-authenticate when the in-memory cookie was wiped with the process.
@@ -58,5 +71,31 @@ class PpWorker(context: Context, params: WorkerParameters) : CoroutineWorker(con
                 Result.success()
             }
         }
+    }
+
+    /**
+     * Local mode: runs the on-device checkers for every watched source and
+     * posts one notification for everything newly found (no server polling).
+     */
+    private suspend fun runLocal(app: App): Result {
+        val db = app.db
+        val prefs = app.prefs
+        PpEngine.init(db)
+        val collector = CollectorNotifier()
+        for (source in db.sourceDao().all()) {
+            if (!source.watchEnabled) continue
+            try {
+                PpEngine.check(db, source, collector)
+            } catch (e: Exception) {
+                // The checkers record their own last_error on known failures;
+                // this catches only the unexpected and keeps the run going.
+                db.sourceDao().setCheckState(source.id, nowIso(), null, e.message ?: e.toString())
+            }
+        }
+        if (prefs.notificationsEnabled.value) {
+            val fresh = collector.notices.map { it.toUpdate() }
+            if (fresh.isNotEmpty()) Notifier.post(app, fresh)
+        }
+        return Result.success()
     }
 }

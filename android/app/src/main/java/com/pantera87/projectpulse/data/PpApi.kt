@@ -26,8 +26,10 @@ sealed interface ApiResult<out T> {
 /**
  * Thin OkHttp client for the ProjectPulse server. All endpoints return
  * JSON; the one exception is a snapshot page, which returns raw HTML.
+ * Implements [PpBackend] directly so [App] can hand it out as the remote
+ * data source (wrapped in [RemoteBackend] for symmetry with [LocalBackend]).
  */
-class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
+class PpApi(baseUrl: String, private val jar: SessionCookieJar) : PpBackend {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -66,7 +68,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         .build()
 
     /** Connection test + auth probe. Exempt from the server's auth gate. */
-    suspend fun health(): ApiResult<Health> = withContext(Dispatchers.IO) {
+    override suspend fun health(): ApiResult<Health> = withContext(Dispatchers.IO) {
         try {
             val req = Request.Builder().url("$base/api/health").build()
             healthClient.newCall(req).execute().use { resp ->
@@ -84,7 +86,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** POST /api/auth — sets the pp_session cookie in the jar. */
-    suspend fun login(password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun login(password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
         val payload = json.encodeToString(LoginBody(password))
         val req = Request.Builder()
             .url("$base/api/auth")
@@ -109,15 +111,15 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         }
     }
 
-    suspend fun dashboard(): ApiResult<Dashboard> = getJson("/api/dashboard", Dashboard.serializer())
+    override suspend fun dashboard(): ApiResult<Dashboard> = getJson("/api/dashboard", Dashboard.serializer())
 
-    suspend fun updates(
-        priority: String? = null,
-        sourceId: Int? = null,
-        unreadOnly: Boolean = false,
-        window: String? = null,
-        limit: Int = 100,
-        offset: Int = 0,
+    override suspend fun updates(
+        priority: String?,
+        sourceId: Int?,
+        unreadOnly: Boolean,
+        window: String?,
+        limit: Int,
+        offset: Int,
     ): ApiResult<UpdatesPage> {
         val sb = StringBuilder()
         fun put(k: String, v: String) {
@@ -132,7 +134,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         return getJson("/api/updates$sb", UpdatesPage.serializer())
     }
 
-    suspend fun sources(type: String? = null): ApiResult<List<Source>> {
+    override suspend fun sources(type: String?): ApiResult<List<Source>> {
         val path = "/api/sources" + (type?.takeIf { it.isNotBlank() }?.let { "?type=$it" } ?: "")
         val r = getRaw(path)
         return when (r) {
@@ -148,11 +150,11 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** POST /api/sources — creates a source and returns its new id. */
-    suspend fun addSource(
+    override suspend fun addSource(
         type: String,
         url: String,
-        name: String = "",
-        checkIntervalHours: Int = 6,
+        name: String,
+        checkIntervalHours: Int,
     ): ApiResult<Int> = withContext(Dispatchers.IO) {
         val body = CreateSourceBody(
             type = type,
@@ -186,23 +188,23 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
         }
     }
 
-    suspend fun markRead(ids: List<Int>, read: Boolean = true): ApiResult<Unit> {
+    override suspend fun markRead(ids: List<Int>, read: Boolean): ApiResult<Unit> {
         val payload = json.encodeToString(MarkBody(ids, read))
         return post("/api/updates", payload)
     }
 
-    suspend fun deleteUpdate(id: Int): ApiResult<Unit> = delete("/api/updates/$id")
+    override suspend fun deleteUpdate(id: Int): ApiResult<Unit> = delete("/api/updates/$id")
 
     /** Raw HTML of a snapshot version — render in a sandboxed WebView. */
-    suspend fun snapshotHtml(sourceId: Int, version: Int): ApiResult<String> =
+    override suspend fun snapshotHtml(sourceId: Int, version: Int): ApiResult<String> =
         getRaw("/api/sources/$sourceId/snapshots?version=$version")
 
     /** GET /api/sources/:id — source row + its snapshot versions. */
-    suspend fun sourceDetail(id: Int): ApiResult<SourceDetail> =
+    override suspend fun sourceDetail(id: Int): ApiResult<SourceDetail> =
         getJson("/api/sources/$id", SourceDetail.serializer())
 
     /** POST /api/sources/:id/check — run the checker for this source now. */
-    suspend fun checkSource(id: Int): ApiResult<CheckResult> = withContext(Dispatchers.IO) {
+    override suspend fun checkSource(id: Int): ApiResult<CheckResult> = withContext(Dispatchers.IO) {
         val req = Request.Builder()
             .url("$base/api/sources/$id/check")
             .post("{}".toRequestBody(JSON))
@@ -228,7 +230,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** POST /api/sources/check-all — start a background "check all" run. */
-    suspend fun checkAll(): ApiResult<CheckAllStarted> = withContext(Dispatchers.IO) {
+    override suspend fun checkAll(): ApiResult<CheckAllStarted> = withContext(Dispatchers.IO) {
         val req = Request.Builder()
             .url("$base/api/sources/check-all")
             .post("{}".toRequestBody(JSON))
@@ -254,14 +256,14 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** GET /api/sources/check-all?run=0 — live progress of a running check-all. */
-    suspend fun checkAllProgress(): ApiResult<CheckAllProgress> =
+    override suspend fun checkAllProgress(): ApiResult<CheckAllProgress> =
         getJson("/api/sources/check-all?run=0", CheckAllProgress.serializer())
 
     /** DELETE /api/sources/:id — remove the source and its snapshots. */
-    suspend fun deleteSource(id: Int): ApiResult<Unit> = delete("/api/sources/$id")
+    override suspend fun deleteSource(id: Int): ApiResult<Unit> = delete("/api/sources/$id")
 
     /** PATCH /api/sources/:id with a partial JSON body. */
-    suspend fun patchSource(id: Int, body: String): ApiResult<Unit> =
+    override suspend fun patchSource(id: Int, body: String): ApiResult<Unit> =
         patch("/api/sources/$id", body)
 
     /**
@@ -269,7 +271,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
      * endpoint, so fetch the unread ids and POST them (the web UI does the same
      * two-step in mark-all.tsx).
      */
-    suspend fun markAllReadForSource(sourceId: Int): ApiResult<Unit> {
+    override suspend fun markAllReadForSource(sourceId: Int): ApiResult<Unit> {
         when (
             val r = getJson("/api/updates?source_id=$sourceId&unreadOnly=1&limit=500", UpdatesPage.serializer())
         ) {
@@ -283,7 +285,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** Persist the editor's rule list as the source's rules_json (PATCH). */
-    suspend fun saveRules(id: Int, type: String, rules: List<WatchRule>): ApiResult<Unit> {
+    override suspend fun saveRules(id: Int, type: String, rules: List<WatchRule>): ApiResult<Unit> {
         val cleaned = rules.map { r ->
             val srcs = r.sources.filter { it.isNotBlank() }
             r.copy(
@@ -312,7 +314,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
     }
 
     /** GET /api/search — FTS5 over updates + substring over project fields. */
-    suspend fun search(query: String): ApiResult<SearchPage> {
+    override suspend fun search(query: String): ApiResult<SearchPage> {
         val q = java.net.URLEncoder.encode(query.trim(), "UTF-8")
         return getJson("/api/search?q=$q", SearchPage.serializer())
     }
@@ -413,7 +415,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
      * avatar) as PNG bytes, or null when the source has none or the file is
      * missing. Uses the authenticated client so the session cookie is sent.
      */
-    suspend fun logo(sourceId: Int): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun logo(sourceId: Int): ByteArray? = withContext(Dispatchers.IO) {
         val req = Request.Builder().url("$base/api/sources/$sourceId/logo").build()
         try {
             client.newCall(req).execute().use { resp ->
@@ -437,7 +439,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
      * auth, no cookie jar; the read is capped so a huge page can't eat memory.
      * Null on any failure — the UI falls back to the initial tile.
      */
-    suspend fun pageHtml(url: String): String? = withContext(Dispatchers.IO) {
+    override suspend fun pageHtml(url: String): String? = withContext(Dispatchers.IO) {
         if (!url.startsWith("http")) return@withContext null
         val req = Request.Builder().url(url).header("User-Agent", PAGE_UA).build()
         try {
@@ -455,7 +457,7 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) {
      * Download one favicon file (bytes of a PNG/ICO/… image). Returns null
      * when the URL is unreachable, wrong-typed, or empty.
      */
-    suspend fun fetchFavicon(url: String): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun fetchFavicon(url: String): ByteArray? = withContext(Dispatchers.IO) {
         if (!url.startsWith("http")) return@withContext null
         val req = Request.Builder().url(url).header("User-Agent", PAGE_UA).build()
         try {

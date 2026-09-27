@@ -37,6 +37,7 @@ class ServerPrefs(context: Context) {
     private val _notifIntervalMin = MutableStateFlow(plain.getInt(KEY_NOTIF_INTERVAL, 15))
     private val _lastSeenId = MutableStateFlow(plain.getInt(KEY_LAST_SEEN_ID, 0))
     private val _theme = MutableStateFlow(plain.getString(KEY_THEME, "aurora") ?: "aurora")
+    private val _dataMode = MutableStateFlow(plain.getString(KEY_DATA_MODE, "remote") ?: "remote")
 
     val url: StateFlow<String> = _url.asStateFlow()
     val password: StateFlow<String> = _password.asStateFlow()
@@ -46,6 +47,8 @@ class ServerPrefs(context: Context) {
     val notifIntervalMin: StateFlow<Int> = _notifIntervalMin.asStateFlow()
     val lastSeenUpdateId: StateFlow<Int> = _lastSeenId.asStateFlow()
     val theme: StateFlow<String> = _theme.asStateFlow()
+    /** Which data source the app uses: "remote" (server) or "local" (on-device engine). */
+    val dataMode: StateFlow<String> = _dataMode.asStateFlow()
 
     fun saveUrl(value: String) {
         _url.value = value
@@ -89,6 +92,12 @@ class ServerPrefs(context: Context) {
         plain.edit().putString(KEY_THEME, id).apply()
     }
 
+    /** Switch between the remote server and the local on-device engine. */
+    fun setDataMode(mode: String) {
+        _dataMode.value = mode
+        plain.edit().putString(KEY_DATA_MODE, mode).apply()
+    }
+
     /** Highest update id this device has notified about; 0 = first run. */
     fun setLastSeenUpdateId(value: Int) {
         _lastSeenId.value = value
@@ -104,6 +113,7 @@ class ServerPrefs(context: Context) {
         private const val KEY_NOTIF_INTERVAL = "notif_interval_min"
         private const val KEY_LAST_SEEN_ID = "last_seen_update_id"
         private const val KEY_THEME = "pp_theme"
+        private const val KEY_DATA_MODE = "data_mode"
     }
 }
 
