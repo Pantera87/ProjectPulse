@@ -50,7 +50,20 @@ private fun parseRules(rulesJson: String?): List<WatchRule> {
     }
 }
 
-private fun newRule(): WatchRule = WatchRule(type = "include")
+/** Web `SOURCE_OPTIONS`: the areas a rule can search, per source type. */
+private fun sourceOptions(type: String): List<String> = when (type) {
+    "github" -> listOf("releases", "readme", "commits")
+    "rss" -> listOf("feed")
+    else -> listOf("content")
+}
+
+/**
+ * Web `addRule`: a fresh include-rule that searches every source area of the
+ * type (releases + readme + commits for GitHub, "content" for websites,
+ * "feed" for RSS).
+ */
+private fun newRule(type: String): WatchRule =
+    WatchRule(type = "include", sources = sourceOptions(type))
 
 private fun toCsv(list: List<String>): String = list.joinToString(", ")
 
@@ -127,6 +140,7 @@ fun RulesEditorDialog(
                     }
                     rules.forEachIndexed { i, rule ->
                         RuleRow(
+                            type = type,
                             rule = rule,
                             onChange = { updated ->
                                 val m = rules.toMutableList()
@@ -143,7 +157,7 @@ fun RulesEditorDialog(
                 }
                 GhostButton(
                     "Add rule",
-                    onClick = { rules = rules + newRule() },
+                    onClick = { rules = rules + newRule(type) },
                     icon = {
                         Icon(
                             Icons.Filled.Add,
@@ -161,7 +175,15 @@ fun RulesEditorDialog(
                     )
                     GlassButton(
                         "Save",
-                        onClick = { onSave(rules) },
+                        onClick = {
+                            // Web `save()`: drop empty rules and backfill an
+                            // empty sources list with every area of the type.
+                            val opts = sourceOptions(type)
+                            val cleaned = rules
+                                .filter { r -> r.keywords.isNotEmpty() || r.labels.isNotEmpty() }
+                                .map { r -> if (r.sources.isEmpty()) r.copy(sources = opts) else r }
+                            onSave(cleaned)
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -171,6 +193,7 @@ fun RulesEditorDialog(
 
 @Composable
 private fun RuleRow(
+    type: String,
     rule: WatchRule,
     onChange: (WatchRule) -> Unit,
     onRemove: () -> Unit,
@@ -208,6 +231,31 @@ private fun RuleRow(
                 onValueChange = { onChange(rule.copy(labels = splitCsv(it))) },
                 placeholder = "Labels (comma-separated)",
             )
+            // Web "Search keywords in:" — the source areas this rule scans.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Search keywords in:",
+                    fontSize = 12.sp,
+                    color = LocalPpTokens.current.TextSecondary,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                sourceOptions(type).forEach { opt ->
+                    GlassChip(
+                        opt,
+                        active = opt in rule.sources,
+                        onClick = {
+                            onChange(
+                                if (opt in rule.sources) {
+                                    rule.copy(sources = rule.sources - opt)
+                                } else {
+                                    rule.copy(sources = rule.sources + opt)
+                                }
+                            )
+                        },
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+            }
             GlassTextField(
                 value = toCsv(rule.negate),
                 onValueChange = { onChange(rule.copy(negate = splitCsv(it))) },
