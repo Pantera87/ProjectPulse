@@ -63,7 +63,12 @@ services:
     # Tee the server output into /logs/ollama.log so the app can display it
     # (Settings → AI → "Ollama server log"). The file sits on the ollama_logs
     # volume, read-only-mounted into the app container.
-    command: ["sh", "-c", "ollama serve 2>&1 | tee -a /logs/ollama.log"]
+    #
+    # The image's default entrypoint is the `ollama` binary itself, so a
+    # command starting with `sh` would be parsed as an ollama subcommand
+    # ("unknown command sh") — override the entrypoint to a shell instead.
+    entrypoint: ["sh", "-c"]
+    command: ["ollama serve 2>&1 | tee -a /logs/ollama.log"]
     volumes:
       - ollama_data:/root/.ollama
       - ollama_logs:/logs
