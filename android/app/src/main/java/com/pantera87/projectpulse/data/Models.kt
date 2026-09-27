@@ -122,8 +122,16 @@ data class Source(
     val check_interval_hours: Int? = 6,
     val rules_json: String? = null,
     val unread: Int = 0,
+    /** Keywordless change-tracking (server 0/1, defaults 1/0/0); null when absent. */
+    val track_releases: Int? = null,
+    val track_readme: Int? = null,
+    val track_commits: Int? = null,
 ) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: url
+    /** Web parity: `track_releases ?? 1 !== 0` — tracked unless explicitly off. */
+    val tracksReleases: Boolean get() = track_releases?.let { it != 0 } ?: true
+    val tracksReadme: Boolean get() = track_readme == 1
+    val tracksCommits: Boolean get() = track_commits == 1
 }
 
 /** One stored snapshot version of a source (GET /api/sources/:id). */

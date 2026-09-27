@@ -433,6 +433,9 @@ class LocalBackend : PpBackend {
         check_interval_hours = checkIntervalHours.toInt(),
         rules_json = rulesJson,
         unread = unread,
+        track_releases = if (trackReleases) 1 else 0,
+        track_readme = if (trackReadme) 1 else 0,
+        track_commits = if (trackCommits) 1 else 0,
     )
 
     private fun UpdateEntity.toModel(byId: Map<Long, SourceEntity>): Update = Update(

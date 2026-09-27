@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package com.pantera87.projectpulse.ui
 
@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,6 +77,8 @@ fun SourceDetailScreen(
     var showRules by remember { mutableStateOf(false) }
     var markingAll by remember { mutableStateOf(false) }
     var markAllMsg by remember { mutableStateOf<String?>(null) }
+    var trackMsg by remember { mutableStateOf<String?>(null) }
+    var trackFailed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val uiMode = rememberUiMode()
 
@@ -175,6 +179,40 @@ fun SourceDetailScreen(
                         is ApiResult.Ok -> detail = d.value
                     }
                     markAllMsg = "Marked all updates as read"
+                }
+            }
+        }
+    }
+
+    /**
+     * Keywordless change-tracking (web parity: `TrackingToggles`). Toggles one of
+     * track_releases / track_readme / track_commits with the same partial PATCH
+     * the web uses, optimistically applied and rolled back on failure.
+     */
+    fun toggleTrack(key: String, current: Boolean) {
+        val next = if (current) 0 else 1
+        val before = detail ?: return
+        detail = before.copy(
+            source = when (key) {
+                "track_releases" -> before.source.copy(track_releases = next)
+                "track_readme" -> before.source.copy(track_readme = next)
+                else -> before.source.copy(track_commits = next)
+            },
+        )
+        scope.launch {
+            when (val r = app.backend.patchSource(sourceId, """{"$key":$next}""")) {
+                is ApiResult.Error -> {
+                    detail = before
+                    if (r.needsAuth) {
+                        app.prefs.markConfigured(false)
+                        return@launch
+                    }
+                    trackFailed = true
+                    trackMsg = "Save failed"
+                }
+                is ApiResult.Ok -> {
+                    trackFailed = false
+                    trackMsg = "Saved"
                 }
             }
         }
@@ -282,6 +320,52 @@ fun SourceDetailScreen(
                             .fillMaxWidth()
                             .padding(top = 12.dp),
                     )
+                    if (d.source.type == "github") {
+                        GlassPanel(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                        ) {
+                            Column(
+                                Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                SectionLabel("Track changes")
+                                Text(
+                                    "Create an update on these events — no keywords required.",
+                                    fontSize = 12.sp,
+                                    color = LocalPpTokens.current.TextSecondary,
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    GlassChip(
+                                        text = "New releases",
+                                        active = d.source.tracksReleases,
+                                        onClick = { toggleTrack("track_releases", d.source.tracksReleases) },
+                                    )
+                                    GlassChip(
+                                        text = "README changes",
+                                        active = d.source.tracksReadme,
+                                        onClick = { toggleTrack("track_readme", d.source.tracksReadme) },
+                                    )
+                                    GlassChip(
+                                        text = "New commits",
+                                        active = d.source.tracksCommits,
+                                        onClick = { toggleTrack("track_commits", d.source.tracksCommits) },
+                                    )
+                                }
+                                trackMsg?.let { msg ->
+                                    Text(
+                                        msg,
+                                        fontSize = 12.sp,
+                                        color = if (trackFailed) LocalPpTokens.current.Error else LocalPpTokens.current.Link,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     GhostButton(
                         "Edit rules",
                         onClick = { showRules = true },
