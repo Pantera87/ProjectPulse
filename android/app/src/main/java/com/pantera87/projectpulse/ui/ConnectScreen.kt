@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,9 @@ import kotlinx.coroutines.launch
  * First-launch / re-authentication screen: server URL + password.
  * Probes GET /api/health (auth-exempt) to learn whether the server is
  * gated, then POST /api/auth when it is.
+ *
+ * In on-device (local) data mode there is nothing to connect to, so the
+ * form is replaced by a local status panel with the database storage size.
  */
 @Composable
 fun ConnectScreen(onSuccess: () -> Unit) {
@@ -55,6 +59,8 @@ fun ConnectScreen(onSuccess: () -> Unit) {
     val prefs = app.prefs
     val scope = rememberCoroutineScope()
 
+    val dataMode by prefs.dataMode.collectAsState()
+    val isLocal = dataMode == "local"
     var url by remember { mutableStateOf(prefs.url.value) }
     var password by remember { mutableStateOf(prefs.password.value) }
     var requiresAuth by remember { mutableStateOf(prefs.authEnabled.value) }
@@ -135,51 +141,99 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                     .size(112.dp)
                     .padding(top = 8.dp),
             )
-            GlassTextField(
-                value = url,
-                onValueChange = { url = it },
-                placeholder = "http://192.168.1.100:4701",
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (requiresAuth || password.isNotEmpty()) {
-                GlassTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = "Password",
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    leadingIcon = {
-                        Icon(Icons.Default.Lock, null, tint = LocalPpTokens.current.TextSecondary)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (busy) {
-                CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
+            if (isLocal) {
+                val dbSize = remember { localDbSize(app) }
+                GlassPanel {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SectionLabel("On-device mode")
+                        Text(
+                            "Data is stored and checked on this device — no " +
+                                "server connection is needed.",
+                            color = LocalPpTokens.current.TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            "Database storage: ${formatBytes(dbSize)}",
+                            color = LocalPpTokens.current.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Switch the data source in Settings to use the " +
+                                "server again.",
+                            color = LocalPpTokens.current.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             } else {
-                GlassButton(
-                    text = "Connect",
-                    onClick = { connect() },
+                GlassTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    placeholder = "http://192.168.1.100:4701",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            error?.let {
+                if (requiresAuth || password.isNotEmpty()) {
+                    GlassTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Password",
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, null, tint = LocalPpTokens.current.TextSecondary)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (busy) {
+                    CircularProgressIndicator(color = LocalPpTokens.current.BrandViolet)
+                } else {
+                    GlassButton(
+                        text = "Connect",
+                        onClick = { connect() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                error?.let {
+                    Text(
+                        it,
+                        color = LocalPpTokens.current.Error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 Text(
-                    it,
-                    color = LocalPpTokens.current.Error,
-                    style = MaterialTheme.typography.bodyMedium,
+                    "The URL and password are stored on this device only. The " +
+                        "password is kept in Android's encrypted storage; the " +
+                        "session cookie is held in memory and re-created on launch.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalPpTokens.current.TextSecondary,
                 )
             }
-            Text(
-                "The URL and password are stored on this device only. The " +
-                    "password is kept in Android's encrypted storage; the " +
-                    "session cookie is held in memory and re-created on launch.",
-                style = MaterialTheme.typography.bodySmall,
-                color = LocalPpTokens.current.TextSecondary,
-            )
         }
         }
     }
+}
+
+/**
+ * Total size in bytes of the Room database files (main file + WAL/SHM
+ * sidecars) — the on-device storage the local status panel reports.
+ */
+private fun localDbSize(app: App): Long {
+    val base = app.getDatabasePath("projectpulse.db")
+    val dir = base.parentFile ?: return 0L
+    return dir.listFiles { f -> f.isFile && f.name.startsWith(base.name) }
+        ?.sumOf { it.length() } ?: 0L
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024L * 1024 -> String.format("%.1f KB", bytes / 1024.0)
+    else -> String.format("%.1f MB", bytes / (1024.0 * 1024))
 }

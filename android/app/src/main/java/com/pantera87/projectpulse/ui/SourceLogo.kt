@@ -46,7 +46,7 @@ fun SourceLogo(source: Source, size: Dp, modifier: Modifier = Modifier) {
 
     LaunchedEffect(source.id, wantLogo) {
         if (!wantLogo || bmp != null) return@LaunchedEffect
-        val bytes = App.instance.api.logo(source.id) ?: return@LaunchedEffect
+        val bytes = App.instance.backend.logo(source.id) ?: return@LaunchedEffect
         val decoded = withContext(Dispatchers.IO) {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } ?: return@LaunchedEffect

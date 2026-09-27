@@ -25,10 +25,10 @@ Server side (`src/lib/`) being ported: `check.ts` (orchestration),
 | Phase 0 - Scaffolding & data layer | Done |
 | Phase 1 - Engine core port | Done |
 | Phase 2 - Checkers + notification/sync pipeline | Done (compile + package green) |
-| Phase 3 - `LocalBackend` (local UI data path) | Not started (100% stubs) |
-| Phase 4 - UI wiring for local mode | Not started (UI hardwired to `app.api`) |
+| Phase 3 - `LocalBackend` (local UI data path) | Done (on-device smoke test passed 2026-09-27) |
+| Phase 4 - UI wiring for local mode | Done: screens → `app.backend`, data-source toggle in Settings, local bypass of the connect gate |
 | Phase 5 - AI on device | Stub (graceful degradation works) |
-| Phase 6 - On-device verification & QA | Partial (compile/assemble green, runtime untested) |
+| Phase 6 - On-device verification & QA | Partial (core runtime verified on-device 2026-09-27; engine/worker QA pending) |
 
 ## Phase 0 - Scaffolding & data layer (DONE)
 
@@ -41,8 +41,8 @@ Server side (`src/lib/`) being ported: `check.ts` (orchestration),
   patchSource, markAllReadForSource, saveRules, search, logo,
   pageHtml, fetchFavicon).
 - `RemoteBackend` - complete (every method mapped to `PpApi`).
-- `LocalBackend` - class exists, **every method is `todo()` ->
-  `NotImplementedError`** (this is Phase 3).
+- `LocalBackend` - complete: all 20 `PpBackend` methods ported from the
+  server API routes against Room + the on-device engine.
 - `ServerPrefs` - Keystore-encrypted password, URL, `dataMode`
   ("remote" default / "local"), notification toggle + interval,
   `lastSeenUpdateId` dedup cursor, theme.
@@ -109,7 +109,7 @@ pre-existing warnings); `:app:assembleDebug` BUILD SUCCESSFUL ->
   `parseHtml` / `moveReadmeToTop` call sites have try/catch fallbacks
   (empty `ParsedPage` / original-HTML passthrough).
 
-## Phase 3 - `LocalBackend`: local mode serves the UI (NOT STARTED)
+## Phase 3 - `LocalBackend`: local mode serves the UI (DONE)
 
 In local mode the worker already runs checks and writes to Room, but
 the app has no local read/write path. Task: implement all 20
@@ -135,7 +135,7 @@ the app has no local read/write path. Task: implement all 20
 **Acceptance:** every screen works with `dataMode = "local"`, an empty
 Room DB, and no server running (airplane mode).
 
-## Phase 4 - UI wiring for local mode (NOT STARTED)
+## Phase 4 - UI wiring for local mode (DONE)
 
 The UI never uses `PpBackend`: every screen calls `app.api.*`
 directly, so in local mode the UI still hits the remote server. Tasks:
@@ -150,6 +150,15 @@ directly, so in local mode the UI still hits the remote server. Tasks:
    `App.buildBackend` already react to it; the worker already
    branches on it).
 4. Local affordances: "Check now" per source, storage/size display.
+   - Done: storage/size display — the local-mode `ConnectScreen` status
+     panel shows the Room database size (main + WAL/SHM files).
+   - Open: per-source "Check now".
+
+Done (2026-09-27, on-device verified): screens route through
+`app.backend`; Settings shows the Server / On-device data-source
+toggle; `RootNav` gates on `configured || dataMode == "local"`;
+`ConnectScreen` in local mode skips URL/password and shows the local
+status panel with database storage size.
 
 **Acceptance:** with `dataMode = "local"` and no network the full app
 is usable: add a source, check it, browse dashboard / updates / detail
@@ -211,19 +220,19 @@ Remaining, in priority order:
 8. **Mode switching:** remote -> local -> remote round trip (separate
    stores by design - confirm the UX communicates this).
 
-## Immediate next steps (ordered)
+## Immediate next steps (ordered, updated 2026-09-27)
+
+Done so far: Phases 3 and 4 (LocalBackend, UI wiring, data-source
+toggle, local-aware ConnectScreen). Launcher icons regenerated from
+`logowithbg.png` (all densities, square + round, baked into every
+APK variant). On-device smoke test passed: server-mode dashboard,
+remote -> local -> remote mode switching, Connect probe, local
+status panel.
 
 1. Device smoke test of `PpWorker.runLocal` with real GitHub + RSS +
    website sources - validates Phases 0-2 end to end. Do first.
-2. Phase 3, reads batch: `health` / `login` / `sources` / `updates` /
-   `dashboard` / `sourceDetail` / `snapshotHtml` / `search` /
-   `markRead`.
-3. Phase 4: screens -> `app.backend`, data-mode toggle, local-aware
-   `ConnectScreen`. The app becomes genuinely dual-mode.
-4. Phase 3, writes batch: `addSource` / `patchSource` / `deleteSource`
-   / `saveRules` / `checkSource` / `checkAll` (+ progress).
-5. Phase 5 decision: A (degradation only) vs B (LAN Ollama).
-6. Phase 6 remainder: notifications, Doze, storage, edge cases,
+2. Phase 5 decision: A (degradation only) vs B (LAN Ollama).
+3. Phase 6 remainder: notifications, Doze, storage, edge cases,
    mode-switch UX.
 
 ## Out of scope for the local port (server-only by design)
@@ -235,8 +244,14 @@ Remaining, in priority order:
 
 ## Scope note
 
-The UI currently bypasses `PpBackend` entirely (screens call `app.api`
-directly), so `LocalBackend` is dead code until Phase 4. If "local
-mode" is redefined as *notifications/checks only* (worker-side),
-Phases 3-4 can be dropped; the app would be a "local notifier" rather
-than a full standalone app. Decide before starting Phase 3.
+UI wiring note (updated): the screens now route through `app.backend`
+(PpBackend), so local mode is fully served on-device. `ConnectScreen`
+still probes via `app.api` by design — it establishes the *remote*
+server session before the mode switch; in local mode it shows a
+status panel (database size) instead of the URL/password form.
+`RootNav` treats `configured || dataMode == "local"` as ready, so
+on-device mode works with no server configured. The
+`UpdateSourceRow` 13-column positional contract is documented in
+`Daos.kt`. Only remaining Phase-4 nice-to-have: per-source
+"Check now".
+

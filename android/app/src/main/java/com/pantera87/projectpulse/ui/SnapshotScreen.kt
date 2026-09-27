@@ -59,11 +59,11 @@ fun SnapshotScreen(
 
     LaunchedEffect(sourceId, version) {
         error = null
-        when (val r = app.api.snapshotHtml(sourceId, version)) {
+        when (val r = app.backend.snapshotHtml(sourceId, version)) {
             is ApiResult.Ok -> {
                 html = r.value
                 // The source name/URL only power the title + open-in-browser button.
-                val d = app.api.sourceDetail(sourceId)
+                val d = app.backend.sourceDetail(sourceId)
                 if (d is ApiResult.Ok) {
                     sourceName = d.value.source.displayName
                     sourceUrl = d.value.source.url

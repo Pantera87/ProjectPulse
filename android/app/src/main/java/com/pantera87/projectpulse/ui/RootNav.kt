@@ -76,6 +76,10 @@ fun RootNav() {
     val app = App.instance
     val nav = rememberNavController()
     val configured by app.prefs.configured.collectAsState()
+    val dataMode by app.prefs.dataMode.collectAsState()
+    // The connect gate only applies in remote mode — on-device mode has no
+    // server to connect to, so the real screens show even if never configured.
+    val ready = configured || dataMode == "local"
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val uiMode = rememberUiMode()
@@ -99,7 +103,7 @@ fun RootNav() {
             exitTransition = { ExitTransition.None },
         ) {
             composable(DASHBOARD) {
-                if (configured) DashboardScreen(
+                if (ready) DashboardScreen(
                     refreshPulse = tabPulse,
                     onOpenUpdates = { nav.navigate(UPDATES) },
                     onOpenSearch = { nav.navigate(SEARCH) },
@@ -108,7 +112,7 @@ fun RootNav() {
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
             composable(UPDATES) { entry ->
-                if (configured) UpdatesScreen(
+                if (ready) UpdatesScreen(
                     refreshPulse = tabPulse,
                     onOpenSearch = { nav.navigate(SEARCH) },
                     isActive = nav.currentBackStackEntryAsState()?.value == entry,
@@ -116,7 +120,7 @@ fun RootNav() {
                 else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
             }
             composable(SOURCES) {
-                if (configured) SourcesScreen(
+                if (ready) SourcesScreen(
                     refreshPulse = tabPulse,
                     onOpenSource = { id -> nav.navigate("source/$id") },
                     onAdd = { nav.navigate(ADD_SOURCE) },
@@ -136,7 +140,7 @@ fun RootNav() {
                 )
             }
             composable(ADD_SOURCE) {
-                if (configured) AddSourceScreen(
+                if (ready) AddSourceScreen(
                     onCreated = { id ->
                         nav.navigate("source/$id") {
                             popUpTo(ADD_SOURCE) { inclusive = true }
@@ -174,7 +178,7 @@ fun RootNav() {
 
     Box(Modifier.fillMaxSize()) {
         AuroraBackground()
-        if (uiMode.isTablet && configured) {
+        if (uiMode.isTablet && ready) {
             // Tablet: glass navigation rail on the left, content beside it.
             Row(Modifier.fillMaxSize()) {
                 TabletNavRail(
@@ -187,7 +191,7 @@ fun RootNav() {
             }
         } else {
             navHost()
-            if (configured) {
+            if (ready) {
                 FloatingTabBar(
                     current = currentRoute,
                     onSelect = { route ->

@@ -40,15 +40,17 @@ enum class PpTheme(val id: String) {
 /**
  * One radial glow for the aurora canvas. Positions are fractions of the
  * canvas; the radius is a fraction of the canvas *short side*, so a glow
- * keeps the same relative size in portrait and landscape.
+ * keeps the same relative size in portrait and landscape. [stops] is the
+ * full radial ramp (fraction, color) from center to edge, pre-eased so the
+ * glow dissolves softly into the backdrop instead of cutting off.
  */
 data class GlowSpec(
     val cx: Float,
     val cy: Float,
     val radius: Float,
     val color: Color,
-    /** Fraction of the radius at which the color has faded to transparent. */
-    val fadeAt: Float,
+    /** Eased center-to-edge radial stops; the last stop is transparent. */
+    val stops: List<Pair<Float, Color>>,
 )
 
 /**

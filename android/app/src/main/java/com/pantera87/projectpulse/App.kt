@@ -75,6 +75,16 @@ class App : Application() {
     }
 
     /**
+     * Switches the data mode ("remote" / "local") and swaps [backend] over to
+     * the matching implementation — the screens read `app.backend`, so the
+     * whole UI follows the toggle.
+     */
+    fun setBackendMode(mode: String) {
+        prefs.setDataMode(mode)
+        backend = buildBackend()
+    }
+
+    /**
      * A fresh client bound to the live cookie jar and current URL — used by
      * background workers so they share the in-memory session with the UI.
      */

@@ -82,7 +82,7 @@ fun UpdatesScreen(
         loading = true
         error = null
         val (p, uo) = filterArgs()
-        val r = app.api.updates(priority = p, unreadOnly = uo, limit = PAGE_SIZE)
+        val r = app.backend.updates(priority = p, unreadOnly = uo, limit = PAGE_SIZE)
         when (r) {
             is ApiResult.Ok -> {
                 updates = r.value.updates
@@ -109,7 +109,7 @@ fun UpdatesScreen(
         scope.launch {
             loadingMore = true
             val (p, uo) = filterArgs()
-            val r = app.api.updates(
+            val r = app.backend.updates(
                 priority = p,
                 unreadOnly = uo,
                 limit = PAGE_SIZE,

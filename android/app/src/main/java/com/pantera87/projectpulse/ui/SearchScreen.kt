@@ -66,7 +66,7 @@ fun SearchScreen(onBack: () -> Unit, isActive: Boolean = true) {
         delay(400) // debounce: wait for the user to stop typing
         loading = true
         error = null
-        val r = app.api.search(q)
+        val r = app.backend.search(q)
         when (r) {
             is ApiResult.Ok -> {
                 results = r.value

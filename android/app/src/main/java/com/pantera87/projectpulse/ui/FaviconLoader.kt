@@ -92,9 +92,9 @@ fun SourceLogoBox(source: Source, size: Dp, modifier: Modifier = Modifier) {
         if (bmp != null || cacheKey == null) return@LaunchedEffect
         val bytes = withContext(Dispatchers.IO) {
             if (source.type == "github") {
-                App.instance.api.logo(source.id)
+                App.instance.backend.logo(source.id)
             } else {
-                val html = App.instance.api.pageHtml(source.url)
+                val html = App.instance.backend.pageHtml(source.url)
                 val candidates = buildList {
                     html?.let { iconHref(it) }
                         ?.let { add(resolveIconUrl(source.url, it)) }
@@ -104,7 +104,7 @@ fun SourceLogoBox(source: Source, size: Dp, modifier: Modifier = Modifier) {
                         // unreachable base URL; skip the fallback candidate
                     }
                 }.filterNotNull()
-                candidates.firstNotNullOfOrNull { App.instance.api.fetchFavicon(it) }
+                candidates.firstNotNullOfOrNull { App.instance.backend.fetchFavicon(it) }
             }
         }
         val decoded = if (bytes != null) {

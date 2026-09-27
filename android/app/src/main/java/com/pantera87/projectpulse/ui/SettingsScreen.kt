@@ -80,6 +80,7 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
     val configured by prefs.configured.collectAsState()
     val notifEnabled by prefs.notificationsEnabled.collectAsState()
     val intervalMin by prefs.notifIntervalMin.collectAsState()
+    val dataMode by prefs.dataMode.collectAsState()
     val theme = PpTheme.fromId(prefs.theme.value)
     var canPost by remember { mutableStateOf(Notifier.canNotify(context)) }
     var checkedNow by remember { mutableStateOf(false) }
@@ -137,6 +138,42 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
                         text = if (configured) "Reconnect" else "Connect",
                         onClick = onOpenConnect,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            SectionLabel(
+                "Data source",
+                modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+            )
+            GlassPanel(strong = true) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GlassChip(
+                            text = "Server",
+                            active = dataMode != "local",
+                            onClick = {
+                                if (dataMode != "remote") app.setBackendMode("remote")
+                            },
+                        )
+                        GlassChip(
+                            text = "On-device",
+                            active = dataMode == "local",
+                            onClick = {
+                                if (dataMode != "local") app.setBackendMode("local")
+                            },
+                        )
+                    }
+                    Text(
+                        if (dataMode == "local") {
+                            "Data is stored and checked on this device — no server connection needed."
+                        } else {
+                            "Data is served by the connected ProjectPulse server."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalPpTokens.current.TextSecondary,
                     )
                 }
             }

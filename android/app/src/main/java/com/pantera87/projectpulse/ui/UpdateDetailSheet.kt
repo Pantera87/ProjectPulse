@@ -256,7 +256,7 @@ fun UpdateDetailSheet(
                             scope.launch {
                                 busy = true
                                 error = null
-                                val r = app.api.markRead(listOf(update.id), target)
+                                val r = app.backend.markRead(listOf(update.id), target)
                                 busy = false
                                 when (r) {
                                     is ApiResult.Ok -> onReadStateChanged(target)
@@ -418,7 +418,7 @@ fun UpdateDetailSheet(
                                 confirmDelete = false
                                 scope.launch {
                                     busy = true
-                                    val r = app.api.deleteUpdate(update.id)
+                                    val r = app.backend.deleteUpdate(update.id)
                                     busy = false
                                     if (r is ApiResult.Ok) onDeleteConfirmed()
                                 }

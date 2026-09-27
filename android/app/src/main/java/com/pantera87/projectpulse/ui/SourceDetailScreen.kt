@@ -79,11 +79,11 @@ fun SourceDetailScreen(
     val uiMode = rememberUiMode()
 
     LaunchedEffect(sourceId) {
-        when (val r = app.api.sourceDetail(sourceId)) {
+        when (val r = app.backend.sourceDetail(sourceId)) {
             is ApiResult.Ok -> {
                 detail = r.value
                 loading = false
-                when (val u = app.api.updates(sourceId = sourceId, limit = 50)) {
+                when (val u = app.backend.updates(sourceId = sourceId, limit = 50)) {
                     is ApiResult.Ok -> updates = u.value.updates
                     is ApiResult.Error -> { /* updates are secondary; ignore */ }
                 }
@@ -104,7 +104,7 @@ fun SourceDetailScreen(
         checking = true
         checkMsg = null
         scope.launch {
-            when (val r = app.api.checkSource(sourceId)) {
+            when (val r = app.backend.checkSource(sourceId)) {
                 is ApiResult.Error -> {
                     checking = false
                     if (r.needsAuth) {
@@ -133,11 +133,11 @@ fun SourceDetailScreen(
                     }
                     // In-place refresh so the unread badge and recent updates
                     // reflect the check without a full-screen spinner.
-                    when (val d = app.api.sourceDetail(sourceId)) {
+                    when (val d = app.backend.sourceDetail(sourceId)) {
                         is ApiResult.Error -> if (d.needsAuth) app.prefs.markConfigured(false)
                         is ApiResult.Ok -> detail = d.value
                     }
-                    when (val u = app.api.updates(sourceId = sourceId, limit = 50)) {
+                    when (val u = app.backend.updates(sourceId = sourceId, limit = 50)) {
                         is ApiResult.Error -> if (u.needsAuth) app.prefs.markConfigured(false)
                         is ApiResult.Ok -> updates = u.value.updates
                     }
@@ -157,7 +157,7 @@ fun SourceDetailScreen(
         markingAll = true
         markAllMsg = null
         scope.launch {
-            when (val r = app.api.markAllReadForSource(sourceId)) {
+            when (val r = app.backend.markAllReadForSource(sourceId)) {
                 is ApiResult.Error -> {
                     markingAll = false
                     if (r.needsAuth) {
@@ -170,7 +170,7 @@ fun SourceDetailScreen(
                     markingAll = false
                     val stamp = java.time.Instant.now().toString()
                     updates = updates.map { if (it.isRead) it else it.copy(read_at = stamp) }
-                    when (val d = app.api.sourceDetail(sourceId)) {
+                    when (val d = app.backend.sourceDetail(sourceId)) {
                         is ApiResult.Error -> if (d.needsAuth) app.prefs.markConfigured(false)
                         is ApiResult.Ok -> detail = d.value
                     }
@@ -417,7 +417,7 @@ fun SourceDetailScreen(
                 onSave = { rules ->
                     showRules = false
                     scope.launch {
-                        when (val r = app.api.saveRules(sourceId, d.source.type, rules)) {
+                        when (val r = app.backend.saveRules(sourceId, d.source.type, rules)) {
                             is ApiResult.Error -> {
                                 if (r.needsAuth) {
                                     app.prefs.markConfigured(false)

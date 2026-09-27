@@ -85,7 +85,7 @@ fun DashboardScreen(
     // effect cancels the pending poll delay and fetches immediately.
     LaunchedEffect(refreshKey, refreshPulse) {
         while (true) {
-            val d = app.api.dashboard()
+            val d = app.backend.dashboard()
             when (d) {
                 is ApiResult.Error -> {
                     if (d.needsAuth) {
@@ -100,7 +100,7 @@ fun DashboardScreen(
                     dash = d.value
                     error = null
                     refreshing = false
-                    val s = app.api.sources()
+                    val s = app.backend.sources()
                     if (s is ApiResult.Ok) sources = s.value
                 }
             }

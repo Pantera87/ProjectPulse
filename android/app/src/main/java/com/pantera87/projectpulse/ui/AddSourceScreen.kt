@@ -89,7 +89,7 @@ fun AddSourceScreen(onCreated: (Int) -> Unit, onBack: () -> Unit) {
         busy = true
         error = null
         scope.launch {
-            when (val r = app.api.addSource(type, u, name, interval)) {
+            when (val r = app.backend.addSource(type, u, name, interval)) {
                 is ApiResult.Error -> {
                     if (r.needsAuth) {
                         app.prefs.markConfigured(false)

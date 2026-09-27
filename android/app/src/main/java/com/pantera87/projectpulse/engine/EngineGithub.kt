@@ -2,7 +2,9 @@ package com.pantera87.projectpulse.engine
 
 import android.util.Base64
 import com.pantera87.projectpulse.data.db.MetaDao
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -236,40 +238,47 @@ object EngineGithub {
             add("x-github-api-version", "2022-11-28")
             if (token != null) add("authorization", "Bearer $token")
         }.build()
-        var attempt = 0
-        while (true) {
-            acquireSlot()
-            val res: Response =
-                try {
-                    val req = Request.Builder().url("$API$path").headers(headers).build()
-                    client.newCall(req).execute()
-                } finally {
-                    releaseSlot()
-                }
-            updateBudget(res.headers, token)
-            if ((res.code == 403 || res.code == 429) && isRateLimited(res)) {
-                if (attempt < MAX_RETRIES) {
-                    val waitMs = rateLimitWaitMs(res.headers, attempt)
-                    attempt++
-                    res.close()
-                    delay(waitMs)
-                    continue
-                }
-                res.close()
-                throw Exception(
-                    if (token != null) {
-                        "GitHub rate limit reached — retries exhausted until the rate-limit window resets"
-                    } else {
-                        "GitHub rate limit reached (60 req/h unauthenticated) — add a GitHub token in Settings → GitHub for 5,000 req/h"
+        // The OkHttp call below is blocking, so the whole retry loop runs on
+        // Dispatchers.IO - the caller may be the main thread (the UI's
+        // per-source "Check now" calls this inline).
+        return withContext(Dispatchers.IO) {
+            var attempt = 0
+            var result: Response? = null
+            while (result == null) {
+                acquireSlot()
+                val res: Response =
+                    try {
+                        val req = Request.Builder().url("$API$path").headers(headers).build()
+                        client.newCall(req).execute()
+                    } finally {
+                        releaseSlot()
                     }
-                )
+                updateBudget(res.headers, token)
+                if ((res.code == 403 || res.code == 429) && isRateLimited(res)) {
+                    if (attempt < MAX_RETRIES) {
+                        val waitMs = rateLimitWaitMs(res.headers, attempt)
+                        attempt++
+                        res.close()
+                        delay(waitMs)
+                    } else {
+                        res.close()
+                        throw Exception(
+                            if (token != null) {
+                                "GitHub rate limit reached — retries exhausted until the rate-limit window resets"
+                            } else {
+                                "GitHub rate limit reached (60 req/h unauthenticated) — add a GitHub token in Settings → GitHub for 5,000 req/h"
+                            }
+                        )
+                    }
+                } else if (!res.isSuccessful) {
+                    val msg = "GitHub API ${res.code} for $path"
+                    res.close()
+                    throw IOException(msg)
+                } else {
+                    result = res
+                }
             }
-            if (!res.isSuccessful) {
-                val msg = "GitHub API ${res.code} for $path"
-                res.close()
-                throw IOException(msg)
-            }
-            return res
+            result!!
         }
     }
 

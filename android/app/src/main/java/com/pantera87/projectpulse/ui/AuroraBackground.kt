@@ -189,9 +189,7 @@ private fun AuroraStaticBackdrop(base: Color) {
         glows.forEach { g ->
             drawRect(
                 Brush.radialGradient(
-                    0f to g.color,
-                    g.fadeAt to g.color,
-                    1f to Color.Transparent,
+                    *g.stops.toTypedArray(),
                     center = Offset(g.cx * size.width, g.cy * size.height),
                     radius = g.radius * minOf(size.width, size.height),
                 ),
@@ -221,13 +219,24 @@ private fun randomGlowScatter(): List<GlowSpec> {
     return (0 until count).shuffled(rnd).map { slot ->
         val col = slot % 3
         val row = slot / 3
+        val alpha = rnd.between(0.45f, 0.75f)
+        val c = palette[rnd.nextInt(palette.size)]
         GlowSpec(
             cx = (col + rnd.between(0.1f, 0.9f)) / 3f,
             cy = (row + rnd.between(0.1f, 0.9f)) / rows,
             radius = rnd.between(0.30f, 0.55f),
-            color = palette[rnd.nextInt(palette.size)]
-                .copy(alpha = rnd.between(0.5f, 0.85f)),
-            fadeAt = rnd.between(0.55f, 0.8f),
+            color = c,
+            // Eased falloff: full color through the core, then a concave
+            // decay (≈(1−t)²) so the glow melts into the backdrop — no
+            // flat plateau, no hard outer edge.
+            stops = listOf(
+                0f to c.copy(alpha = alpha),
+                0.30f to c.copy(alpha = alpha * 0.78f),
+                0.55f to c.copy(alpha = alpha * 0.50f),
+                0.75f to c.copy(alpha = alpha * 0.24f),
+                0.90f to c.copy(alpha = alpha * 0.08f),
+                1f to c.copy(alpha = 0f),
+            ),
         )
     }
 }

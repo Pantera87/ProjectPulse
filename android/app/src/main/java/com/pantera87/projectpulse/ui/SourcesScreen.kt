@@ -80,7 +80,7 @@ fun SourcesScreen(
     LaunchedEffect(refreshKey, refreshPulse) {
         loading = true
         error = null
-        when (val r = app.api.sources()) {
+        when (val r = app.backend.sources()) {
             is ApiResult.Ok -> { sources = r.value; loading = false; refreshing = false }
             is ApiResult.Error -> {
                 if (r.needsAuth) {
@@ -100,7 +100,7 @@ fun SourcesScreen(
         checkingAll = true
         checkAllMsg = null
         scope.launch {
-            when (val r = app.api.checkAll()) {
+            when (val r = app.backend.checkAll()) {
                 is ApiResult.Error -> {
                     checkingAll = false
                     progressRunning = false
@@ -133,7 +133,7 @@ fun SourcesScreen(
     LaunchedEffect(progressRunning) {
         while (progressRunning) {
             delay(1500)
-            when (val r = app.api.checkAllProgress()) {
+            when (val r = app.backend.checkAllProgress()) {
                 is ApiResult.Error -> {
                     if (r.needsAuth) {
                         app.prefs.markConfigured(false)
@@ -160,7 +160,7 @@ fun SourcesScreen(
         managing = true
         scope.launch {
             when (
-                val r = app.api.patchSource(
+                val r = app.backend.patchSource(
                     src.id,
                     """{"watch_enabled":${if (toArchive) 0 else 1}}""",
                 )
@@ -186,7 +186,7 @@ fun SourcesScreen(
     fun doDelete(src: Source) {
         managing = true
         scope.launch {
-            when (val r = app.api.deleteSource(src.id)) {
+            when (val r = app.backend.deleteSource(src.id)) {
                 is ApiResult.Error -> {
                     managing = false
                     if (r.needsAuth) {
