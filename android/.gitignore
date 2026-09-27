@@ -14,3 +14,4 @@ local.properties
 # Keystore
 *.keystore
 *.jks
+tools/u.xml
