@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.window.size)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.lottie.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

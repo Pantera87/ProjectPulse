@@ -38,6 +38,9 @@ class ServerPrefs(context: Context) {
     private val _lastSeenId = MutableStateFlow(plain.getInt(KEY_LAST_SEEN_ID, 0))
     private val _theme = MutableStateFlow(plain.getString(KEY_THEME, "aurora") ?: "aurora")
     private val _dataMode = MutableStateFlow(plain.getString(KEY_DATA_MODE, "remote") ?: "remote")
+    private val _onboarded = MutableStateFlow(
+        plain.getBoolean(KEY_ONBOARDED, false) || plain.getBoolean(KEY_CONFIGURED, false),
+    )
     private val _ollamaEnabled = MutableStateFlow(plain.getBoolean(KEY_OLLAMA_ENABLED, false))
     private val _ollamaUrl = MutableStateFlow(plain.getString(KEY_OLLAMA_URL, DEFAULT_OLLAMA_URL) ?: DEFAULT_OLLAMA_URL)
     private val _ollamaModel = MutableStateFlow(plain.getString(KEY_OLLAMA_MODEL, DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
@@ -52,6 +55,8 @@ class ServerPrefs(context: Context) {
     val theme: StateFlow<String> = _theme.asStateFlow()
     /** Which data source the app uses: "remote" (server) or "local" (on-device engine). */
     val dataMode: StateFlow<String> = _dataMode.asStateFlow()
+    /** True once the first-run intro has been completed (splash + tour + mode pick). */
+    val onboarded: StateFlow<Boolean> = _onboarded.asStateFlow()
     /** LAN Ollama AI (local data mode only): on/off, endpoint, model. */
     val ollamaEnabled: StateFlow<Boolean> = _ollamaEnabled.asStateFlow()
     val ollamaUrl: StateFlow<String> = _ollamaUrl.asStateFlow()
@@ -105,6 +110,12 @@ class ServerPrefs(context: Context) {
         plain.edit().putString(KEY_DATA_MODE, mode).apply()
     }
 
+    /** The intro (splash → tour → mode pick) has been completed once. */
+    fun markOnboarded() {
+        _onboarded.value = true
+        plain.edit().putBoolean(KEY_ONBOARDED, true).apply()
+    }
+
     fun setOllamaEnabled(value: Boolean) {
         _ollamaEnabled.value = value
         plain.edit().putBoolean(KEY_OLLAMA_ENABLED, value).apply()
@@ -136,6 +147,7 @@ class ServerPrefs(context: Context) {
         private const val KEY_LAST_SEEN_ID = "last_seen_update_id"
         private const val KEY_THEME = "pp_theme"
         private const val KEY_DATA_MODE = "data_mode"
+        private const val KEY_ONBOARDED = "onboarded"
         private const val KEY_OLLAMA_ENABLED = "ollama_enabled"
         private const val KEY_OLLAMA_URL = "ollama_url"
         private const val KEY_OLLAMA_MODEL = "ollama_model"
