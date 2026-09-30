@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Runtime-permissioned on Android 13+ (targetSdk 35). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Needed to open the system "ignore battery optimizations" screen so
+         background sync is not deferred by Doze. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".App"

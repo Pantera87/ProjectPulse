@@ -2,6 +2,11 @@
 
 package com.pantera87.projectpulse.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -32,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,12 +57,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.BuildConfig
 import com.pantera87.projectpulse.R
@@ -88,6 +97,7 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
     val theme = PpTheme.fromId(prefs.theme.value)
     var canPost by remember { mutableStateOf(Notifier.canNotify(context)) }
     var checkedNow by remember { mutableStateOf(false) }
+    val batteryOptimized = rememberBatteryOptimized()
     val uiMode = rememberUiMode()
 
     // -- AI (LAN Ollama) — Phase 5, on-device data mode only ---------------
@@ -379,6 +389,33 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
                                 color = LocalPpTokens.current.Error,
                             )
                         }
+                        // Battery-optimization guard: while the system still
+                        // "optimizes" this app, Doze defers the periodic sync,
+                        // which is why background checks arrive intermittently.
+                        if (batteryOptimized) {
+                            Text(
+                                "Battery optimization is on — Android may defer the " +
+                                    "background checks, so notifications can arrive late " +
+                                    "or not at all.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = LocalPpTokens.current.Error,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                            GlassButton(
+                                text = "Disable battery optimization",
+                                onClick = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                                .apply {
+                                                    data = Uri.parse("package:${context.packageName}")
+                                                },
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         GlassButton(
                             text = "Check now",
                             onClick = {
@@ -457,6 +494,36 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
         }
         }
     }
+}
+
+/**
+ * Whether the system is still applying battery optimization to this app.
+ * While it does, Doze can defer the periodic WorkManager sync — the reason
+ * background checks fire intermittently. Re-queried on resume so the row
+ * updates as soon as the user returns from the system battery-optimization
+ * picker having answered "Don't optimize".
+ */
+@Composable
+private fun rememberBatteryOptimized(): Boolean {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val isOptimized = remember { mutableStateOf(isBatteryOptimizing(context)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isOptimized.value = isBatteryOptimizing(context)
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    return isOptimized.value
+}
+
+/** True if Android is still applying battery optimizations to this package. */
+private fun isBatteryOptimizing(context: Context): Boolean {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    return !pm.isIgnoringBatteryOptimizations(context.packageName)
 }
 
 /**

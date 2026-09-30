@@ -6,9 +6,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.pantera87.projectpulse.MainActivity
+import com.pantera87.projectpulse.R
 import com.pantera87.projectpulse.data.Update
 
 /**
@@ -68,7 +70,11 @@ object Notifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            // Small icon: the app's pulse mark, white-on-transparent (the
+            // system recolors it). Large icon: the full-color logo, shown
+            // expanded in the shade.
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.logo_256))
             .setContentTitle(title)
             .setContentText(body.first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(body.joinToString("\n")))

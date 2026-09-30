@@ -1,9 +1,11 @@
 package com.pantera87.projectpulse.notif
 
 import android.content.Context
+import android.os.Build
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
@@ -27,9 +29,16 @@ object SyncScheduler {
     }
 
     fun runOnce(context: Context) {
-        val request = OneTimeWorkRequestBuilder<PpWorker>().build()
+        val builder = OneTimeWorkRequestBuilder<PpWorker>()
+        // "Check now" should surface quickly even while Doze is deferring
+        // background work. An expedited one-shot runs outside the deferral
+        // window; if the system's expedited quota is exhausted it degrades
+        // gracefully to a regular (possibly deferred) run.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+        }
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(ONCE_NAME, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(ONCE_NAME, ExistingWorkPolicy.REPLACE, builder.build())
     }
 
     fun cancel(context: Context) {

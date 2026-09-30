@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon (status bar + shade). Must be a solid-white
+  silhouette on a fully transparent background — Android recolors it per
+  theme and any color/detail is lost. Mirrors the app logo: a pulse
+  (heartbeat) waveform.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13.3,2.5 L5.9,15.5 L10.3,15.5 L8.8,21.5 L18.1,8.5 L12.9,8.5 L14.6,2.5 Z" />
+</vector>
