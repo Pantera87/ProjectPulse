@@ -79,7 +79,11 @@ fun AppRoot() {
                 )
                 Phase.MODE -> ModeSelectScreen(
                     onContinue = { mode ->
-                        prefs.setDataMode(
+                        // Swap the pref AND rebuild App.backend — flipping
+                        // the pref alone would leave the backend that was
+                        // built at launch (mode "remote" by default) serving
+                        // every screen until the app was restarted.
+                        App.instance.setBackendMode(
                             if (mode == AppMode.COMPANION) "remote" else "local",
                         )
                         prefs.markOnboarded()

@@ -109,7 +109,10 @@ fun RootNav() {
                     onOpenSearch = { nav.navigate(SEARCH) },
                     onOpenSource = { id -> nav.navigate("source/$id") },
                 )
-                else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+                // No navigation on success: the `configured` flip recomposes
+                // this tab into its real screen. (Popping DASHBOARD inclusive
+                // here emptied the back stack — blank app until restart.)
+                else ConnectScreen(onSuccess = { })
             }
             composable(UPDATES) { entry ->
                 if (ready) UpdatesScreen(
@@ -117,7 +120,9 @@ fun RootNav() {
                     onOpenSearch = { nav.navigate(SEARCH) },
                     isActive = nav.currentBackStackEntryAsState()?.value == entry,
                 )
-                else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+                // No navigation on success: the `configured` flip recomposes
+                // this tab into its real screen.
+                else ConnectScreen(onSuccess = { })
             }
             composable(SOURCES) {
                 if (ready) SourcesScreen(
@@ -125,13 +130,18 @@ fun RootNav() {
                     onOpenSource = { id -> nav.navigate("source/$id") },
                     onAdd = { nav.navigate(ADD_SOURCE) },
                 )
-                else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+                // No navigation on success: the `configured` flip recomposes
+                // this tab into its real screen.
+                else ConnectScreen(onSuccess = { })
             }
             composable(SETTINGS) {
                 SettingsScreen(onOpenConnect = { nav.navigate(CONNECT) })
             }
             composable(CONNECT) {
-                ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+                // Reached from Settings ("Change server"): on success pop back
+                // to where the user came from — the tabs pick up the
+                // `configured` flip on their own.
+                ConnectScreen(onSuccess = { nav.popBackStack() })
             }
             composable(SEARCH) { entry ->
                 SearchScreen(
@@ -148,7 +158,9 @@ fun RootNav() {
                     },
                     onBack = { nav.popBackStack() },
                 )
-                else ConnectScreen(onSuccess = { nav.popBackStack(DASHBOARD, inclusive = true) })
+                // No navigation on success: the `configured` flip recomposes
+                // this tab into its real screen.
+                else ConnectScreen(onSuccess = { })
             }
             composable(
                 SOURCE_DETAIL,
