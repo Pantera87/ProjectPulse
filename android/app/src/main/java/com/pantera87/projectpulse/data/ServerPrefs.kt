@@ -38,6 +38,9 @@ class ServerPrefs(context: Context) {
     private val _lastSeenId = MutableStateFlow(plain.getInt(KEY_LAST_SEEN_ID, 0))
     private val _theme = MutableStateFlow(plain.getString(KEY_THEME, "aurora") ?: "aurora")
     private val _dataMode = MutableStateFlow(plain.getString(KEY_DATA_MODE, "remote") ?: "remote")
+    private val _ollamaEnabled = MutableStateFlow(plain.getBoolean(KEY_OLLAMA_ENABLED, false))
+    private val _ollamaUrl = MutableStateFlow(plain.getString(KEY_OLLAMA_URL, DEFAULT_OLLAMA_URL) ?: DEFAULT_OLLAMA_URL)
+    private val _ollamaModel = MutableStateFlow(plain.getString(KEY_OLLAMA_MODEL, DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
 
     val url: StateFlow<String> = _url.asStateFlow()
     val password: StateFlow<String> = _password.asStateFlow()
@@ -49,6 +52,10 @@ class ServerPrefs(context: Context) {
     val theme: StateFlow<String> = _theme.asStateFlow()
     /** Which data source the app uses: "remote" (server) or "local" (on-device engine). */
     val dataMode: StateFlow<String> = _dataMode.asStateFlow()
+    /** LAN Ollama AI (local data mode only): on/off, endpoint, model. */
+    val ollamaEnabled: StateFlow<Boolean> = _ollamaEnabled.asStateFlow()
+    val ollamaUrl: StateFlow<String> = _ollamaUrl.asStateFlow()
+    val ollamaModel: StateFlow<String> = _ollamaModel.asStateFlow()
 
     fun saveUrl(value: String) {
         _url.value = value
@@ -98,6 +105,21 @@ class ServerPrefs(context: Context) {
         plain.edit().putString(KEY_DATA_MODE, mode).apply()
     }
 
+    fun setOllamaEnabled(value: Boolean) {
+        _ollamaEnabled.value = value
+        plain.edit().putBoolean(KEY_OLLAMA_ENABLED, value).apply()
+    }
+
+    fun setOllamaUrl(value: String) {
+        _ollamaUrl.value = value
+        plain.edit().putString(KEY_OLLAMA_URL, value).apply()
+    }
+
+    fun setOllamaModel(value: String) {
+        _ollamaModel.value = value
+        plain.edit().putString(KEY_OLLAMA_MODEL, value).apply()
+    }
+
     /** Highest update id this device has notified about; 0 = first run. */
     fun setLastSeenUpdateId(value: Int) {
         _lastSeenId.value = value
@@ -114,6 +136,14 @@ class ServerPrefs(context: Context) {
         private const val KEY_LAST_SEEN_ID = "last_seen_update_id"
         private const val KEY_THEME = "pp_theme"
         private const val KEY_DATA_MODE = "data_mode"
+        private const val KEY_OLLAMA_ENABLED = "ollama_enabled"
+        private const val KEY_OLLAMA_URL = "ollama_url"
+        private const val KEY_OLLAMA_MODEL = "ollama_model"
+
+        /** Same default model the server uses (DEFAULT_OLLAMA_MODEL). */
+        const val DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
+        /** Same LAN default as the server URL pref (the self-host box). */
+        const val DEFAULT_OLLAMA_URL = "http://192.168.1.100:11434"
     }
 }
 

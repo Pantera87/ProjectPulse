@@ -43,5 +43,16 @@ object LocalAi : EngineAi {
     override suspend fun semanticMatch(text: String, keywords: List<String>): SemanticMatch? = null
 }
 
-/** The engine's AI provider. Swap for a real on-device provider later. */
-val ai: EngineAi get() = LocalAi
+/**
+ * The swappable AI provider the checkers use ([ai]). [App] points it at
+ * [LanOllamaAi] when LAN Ollama is enabled in Settings (and data mode is
+ * local), and back to [LocalAi] otherwise. `@Volatile` keeps the WorkManager
+ * worker and the UI consistent; the two implementations are stateless.
+ */
+object AiProvider {
+    @Volatile
+    var current: EngineAi = LocalAi
+}
+
+/** The engine's AI provider (AI-off unless LAN Ollama is configured). */
+val ai: EngineAi get() = AiProvider.current

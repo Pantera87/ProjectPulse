@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,8 +60,11 @@ import androidx.compose.ui.unit.sp
 import com.pantera87.projectpulse.App
 import com.pantera87.projectpulse.BuildConfig
 import com.pantera87.projectpulse.R
+import com.pantera87.projectpulse.data.ServerPrefs
+import com.pantera87.projectpulse.engine.LanOllamaAi
 import com.pantera87.projectpulse.notif.Notifier
 import com.pantera87.projectpulse.notif.SyncScheduler
+import kotlinx.coroutines.launch
 
 private val INTERVALS = listOf(15 to "15 min", 30 to "30 min", 60 to "1 h", 240 to "4 h")
 
@@ -85,6 +89,47 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
     var canPost by remember { mutableStateOf(Notifier.canNotify(context)) }
     var checkedNow by remember { mutableStateOf(false) }
     val uiMode = rememberUiMode()
+
+    // -- AI (LAN Ollama) — Phase 5, on-device data mode only ---------------
+    val ollamaEnabled by prefs.ollamaEnabled.collectAsState()
+    val ollamaUrl by prefs.ollamaUrl.collectAsState()
+    val ollamaModel by prefs.ollamaModel.collectAsState()
+    var urlInput by remember { mutableStateOf(ollamaUrl) }
+    var modelInput by remember { mutableStateOf(ollamaModel) }
+    var aiTesting by remember { mutableStateOf(false) }
+    var aiTestOk by remember { mutableStateOf(true) }
+    var aiTestResult by remember { mutableStateOf<String?>(null) }
+    val aiScope = rememberCoroutineScope()
+
+    /** Persist the Ollama settings, then re-point the engine's AI provider. */
+    val saveAi: () -> Unit = {
+        if (!aiTesting && urlInput.isNotBlank()) {
+            prefs.setOllamaUrl(urlInput.trim().removeSuffix("/"))
+            prefs.setOllamaModel(modelInput.trim().ifBlank { ServerPrefs.DEFAULT_OLLAMA_MODEL })
+            app.applyAiProvider()
+            aiTestResult = null
+        }
+    }
+    /** One-shot probe against the (unsaved) fields, mirroring the server's test. */
+    val testAi: () -> Unit = {
+        if (!aiTesting) {
+            val u = urlInput.trim().removeSuffix("/").ifBlank { ServerPrefs.DEFAULT_OLLAMA_URL }
+            val m = modelInput.trim().ifBlank { ServerPrefs.DEFAULT_OLLAMA_MODEL }
+            aiTesting = true
+            aiTestResult = null
+            aiScope.launch {
+                val reply = runCatching { LanOllamaAi(u, m).ping() }.getOrNull()
+                aiTesting = false
+                aiTestOk = reply != null
+                aiTestResult = if (reply != null) {
+                    "Connected — the model replied: \"$reply\""
+                } else {
+                    "Could not get a reply from $u — check the address, that Ollama is " +
+                        "running on that machine, and that the model \"$m\" is pulled there."
+                }
+            }
+        }
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -177,6 +222,100 @@ fun SettingsScreen(onOpenConnect: () -> Unit) {
                     )
                 }
             }
+            if (dataMode == "local") {
+                SectionLabel(
+                    "AI · LAN Ollama",
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                )
+                GlassPanel(strong = true) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Use Ollama on your LAN",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = LocalPpTokens.current.Foreground,
+                                )
+                                Text(
+                                    "On-device checks ask an Ollama server on your local " +
+                                        "network for summaries and goals. Leave it off to " +
+                                        "keep the built-in rules only.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalPpTokens.current.TextSecondary,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                            }
+                            Switch(
+                                checked = ollamaEnabled,
+                                onCheckedChange = { v ->
+                                    prefs.setOllamaEnabled(v)
+                                    app.applyAiProvider()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = LocalPpTokens.current.BrandViolet,
+                                    uncheckedThumbColor = Color(0xB3FFFFFF),
+                                    uncheckedTrackColor = Color(0x26FFFFFF),
+                                    uncheckedBorderColor = Color(0x26FFFFFF),
+                                ),
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        if (ollamaEnabled) {
+                            GlassTextField(
+                                value = urlInput,
+                                onValueChange = { urlInput = it },
+                                placeholder = ServerPrefs.DEFAULT_OLLAMA_URL,
+                                singleLine = true,
+                            )
+                            GlassTextField(
+                                value = modelInput,
+                                onValueChange = { modelInput = it },
+                                placeholder = ServerPrefs.DEFAULT_OLLAMA_MODEL,
+                                singleLine = true,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                GlassButton(
+                                    text = "Test",
+                                    onClick = testAi,
+                                    enabled = !aiTesting,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                GlassButton(
+                                    text = "Save",
+                                    onClick = saveAi,
+                                    enabled = !aiTesting && urlInput.isNotBlank(),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            aiTestResult?.let { result ->
+                                Text(
+                                    result,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (aiTestOk) {
+                                        LocalPpTokens.current.TextSecondary
+                                    } else {
+                                        LocalPpTokens.current.Error
+                                    },
+                                )
+                            }
+                            LanOllamaAi.lastCall?.let { call ->
+                                Text(
+                                    "Last AI call: " + (if (call.status == "ok") "ok" else "error") +
+                                        (call.latencyMs?.let { String.format("%.1f s", it / 1000.0) } ?: "") +
+                                        (call.error?.let { " — $it" } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LocalPpTokens.current.TextTertiary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             SectionLabel(
                 "Notifications",
                 modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),

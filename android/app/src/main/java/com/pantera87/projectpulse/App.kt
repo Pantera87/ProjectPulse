@@ -9,6 +9,9 @@ import com.pantera87.projectpulse.data.RemoteBackend
 import com.pantera87.projectpulse.data.ServerPrefs
 import com.pantera87.projectpulse.data.SessionCookieJar
 import com.pantera87.projectpulse.data.db.AppDatabase
+import com.pantera87.projectpulse.engine.AiProvider
+import com.pantera87.projectpulse.engine.LanOllamaAi
+import com.pantera87.projectpulse.engine.LocalAi
 import com.pantera87.projectpulse.notif.Notifier
 import com.pantera87.projectpulse.notif.SyncScheduler
 
@@ -54,6 +57,7 @@ class App : Application() {
         cookieJar = SessionCookieJar()
         api = PpApi(prefs.url.value, cookieJar)
         backend = buildBackend()
+        applyAiProvider()
         Notifier.ensureChannel(this)
         if (prefs.configured.value && prefs.notificationsEnabled.value) {
             SyncScheduler.schedule(this, prefs.notifIntervalMin.value.toLong())
@@ -82,6 +86,22 @@ class App : Application() {
     fun setBackendMode(mode: String) {
         prefs.setDataMode(mode)
         backend = buildBackend()
+        applyAiProvider()
+    }
+
+    /**
+     * Rebuilds the engine's AI provider from the prefs (Phase 5, option B):
+     * LAN Ollama when enabled in local data mode, AI-off ([LocalAi]) otherwise.
+     * The checkers read [com.pantera87.projectpulse.engine.ai] on every run,
+     * so this takes effect on the next check with no restart.
+     */
+    fun applyAiProvider() {
+        val useOllama = prefs.dataMode.value == "local" &&
+            prefs.ollamaEnabled.value &&
+            prefs.ollamaUrl.value.isNotBlank()
+        AiProvider.current =
+            if (useOllama) LanOllamaAi(prefs.ollamaUrl.value, prefs.ollamaModel.value)
+            else LocalAi
     }
 
     /**

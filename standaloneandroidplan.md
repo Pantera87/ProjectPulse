@@ -27,7 +27,7 @@ Server side (`src/lib/`) being ported: `check.ts` (orchestration),
 | Phase 2 - Checkers + notification/sync pipeline | Done (compile + package green) |
 | Phase 3 - `LocalBackend` (local UI data path) | Done (on-device smoke test passed 2026-09-27) |
 | Phase 4 - UI wiring for local mode | Done: screens → `app.backend`, data-source toggle in Settings, local bypass of the connect gate |
-| Phase 5 - AI on device | Stub (graceful degradation works) |
+| Phase 5 - AI on device | Done (Option B: LAN Ollama + Settings UI; A kept as fallback) |
 | Phase 6 - On-device verification & QA | Partial (core runtime verified on-device 2026-09-27; engine/worker QA pending) |
 
 ## Phase 0 - Scaffolding & data layer (DONE)
@@ -164,30 +164,42 @@ status panel with database storage size.
 is usable: add a source, check it, browse dashboard / updates / detail
 / snapshots, mark read, edit rules, delete.
 
-## Phase 5 - AI on device (STUB, degrades gracefully)
+## Phase 5 - AI on device (DONE — Option B: LAN Ollama, 2026-09-30)
 
-`LocalAi` is the active implementation: `enabled = false`, every
-method returns null. Checkers already handle nulls by design: goal
-falls back to feed title (`"auto"`), summaries become plain-text
-truncation, semantic matching is skipped. The server's AI stack is
-Ollama-based (`ollama.ts`: detect/pull/unload/logs; `ai.ts`:
-summarize/extractGoal/semanticMatch prompts; `ai-activity.ts` /
-`ai-status.ts` + `/api/ai/*` routes for UI state).
+Option B is implemented on top of option A. A remains the floor:
+`LocalAi` (`enabled = false`, every method returns null) stays the
+active provider unless LAN Ollama is enabled, and every checker
+already handles nulls by design: goal falls back to feed title
+(`"auto"`), summaries become plain-text truncation, semantic matching
+is skipped.
 
-| Option | Effort | Notes |
-|---|---|---|
-| A. Keep degradation (status quo) | 0 | Floor; recommended |
-| B. LAN Ollama | Low-med | Phone -> user's Ollama host over the LAN (host:port in Settings, detect/health like the server, timeout, fallback to A). Reuses `ai.ts` prompts |
-| C. On-device inference | High | llama.cpp/MLC - GBs of assets, thermal/battery cost. Not recommended |
+Implementation:
 
-Recommendation: ship A; add B behind a setting (local-mode users
-typically already run Ollama since they self-host the server). Port
-minimal `ai-activity`/`ai-status` semantics (last-call status +
-latency) for the Settings screen.
+- `engine/OllamaAi.kt`: `LanOllamaAi(url, model)` — port of the
+  server's `OllamaProvider` (`/api/generate`, Qwen3 `/no_think`
+  suffix, one-JSON-object prompt contract, 120 s read timeout,
+  null-on-failure). No JSON lib in the engine layer: hand-rolled
+  `escapedJson` / `extractJsonObject` / `jsonStringField`.
+  `LanOllamaAi.lastCall` (companion `@Volatile`) records
+  status/latency of the most recent call — the port of the server's
+  `ai-activity`/`ai-status` line.
+- `EngineAi.kt`: `AiProvider` object (`@Volatile var current`); the
+  `ai` accessor reads `AiProvider.current` so the WorkManager worker
+  and UI always see the same provider.
+- `App.kt`: `applyAiProvider()` swaps `LanOllamaAi` ↔ `LocalAi` from
+  prefs; called at startup and on every data-mode / Ollama change.
+- `ServerPrefs`: `ollamaEnabled` / `ollamaUrl` / `ollamaModel`
+  (+ `setOllama*`), defaults `qwen3.5:4b` @ `http://192.168.1.100:11434`.
+- `SettingsScreen`: "AI · LAN Ollama" section (visible only in
+  on-device data mode) — enable toggle, URL + model fields, Test
+  (one-shot `ping()` probe with result/latency line), Save; all
+  changes re-run `applyAiProvider()` immediately.
 
 **Acceptance:** with AI disabled, all three checkers complete without
 crashing and produce updates; with option B, `extractGoal` /
 `summarizeUpdate` return real text and timeouts never kill a check.
+(Compile verified; on-device Ollama round trip pending the Phase 6
+device smoke test.)
 
 ## Phase 6 - Verification & QA (PARTIAL)
 
@@ -231,9 +243,12 @@ status panel.
 
 1. Device smoke test of `PpWorker.runLocal` with real GitHub + RSS +
    website sources - validates Phases 0-2 end to end. Do first.
-2. Phase 5 decision: A (degradation only) vs B (LAN Ollama).
+2. ~~Phase 5 decision: A (degradation only) vs B (LAN Ollama).~~
+   Decided + implemented: B (LAN Ollama) behind the Settings toggle,
+   A as the floor (2026-09-30).
 3. Phase 6 remainder: notifications, Doze, storage, edge cases,
-   mode-switch UX.
+   mode-switch UX. (An on-device Ollama round trip — Settings Test
+   button against the LAN host — slots into the item-1 smoke test.)
 
 ## Out of scope for the local port (server-only by design)
 
