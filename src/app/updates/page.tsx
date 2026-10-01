@@ -36,9 +36,7 @@ export default async function UpdatesPage({
       `SELECT u.*, s.name AS source_name, s.type AS source_type
        FROM updates u JOIN sources s ON s.id = u.source_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
-       ORDER BY
-         CASE u.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
-         u.created_at DESC
+       ORDER BY u.created_at DESC, u.id DESC
        LIMIT 200`
     )
     .all(...vals) as UpdateView[];

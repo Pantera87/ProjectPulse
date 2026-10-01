@@ -160,8 +160,7 @@ class LocalBackend : PpBackend {
         val sql = "SELECT u.*, s.name AS source_name, s.url AS source_url, s.type AS source_type" +
             " FROM updates u JOIN sources s ON s.id = u.sourceId" +
             (if (where.isEmpty()) "" else " WHERE " + where.joinToString(" AND ")) +
-            " ORDER BY CASE u.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END," +
-            " u.createdAt DESC, u.id DESC LIMIT ? OFFSET ?"
+            " ORDER BY u.createdAt DESC, u.id DESC LIMIT ? OFFSET ?"
         val rows = db.rawSelect(sql, (args + listOf(lim, off)).toTypedArray()).map { r ->
             UpdateSourceRow(
                 id = r[0]?.toLong() ?: 0,

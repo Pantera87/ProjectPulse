@@ -258,7 +258,10 @@ private fun PhoneDashboard(
     TypeTabs(selected = selectedTab, onSelect = onSelectedTab)
     ProjectGrid(
         sources = filteredSources(sources, selectedTab),
-        columns = 2,
+        density = SourceCardDensity.Compact,
+        activityBySource = d.activityBySource,
+        newsSinceCheck = d.newsSinceCheck,
+        latestBySource = d.latestBySource,
         onOpenSource = onOpenSource,
     )
     UpdateLists(
@@ -328,7 +331,10 @@ private fun TabletDashboard(
         TypeTabs(selected = selectedTab, onSelect = onSelectedTab)
         ProjectGrid(
             sources = filteredSources(sources, selectedTab),
-            columns = 5,
+            density = SourceCardDensity.Comfortable,
+            activityBySource = d.activityBySource,
+            newsSinceCheck = d.newsSinceCheck,
+            latestBySource = d.latestBySource,
             onOpenSource = onOpenSource,
         )
     }

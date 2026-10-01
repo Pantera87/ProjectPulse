@@ -50,9 +50,7 @@ export function GET(req: Request) {
       `SELECT u.*, s.name AS source_name, s.url AS source_url, s.type AS source_type
        FROM updates u JOIN sources s ON s.id = u.source_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
-       ORDER BY
-         CASE u.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
-         u.created_at DESC, u.id DESC
+       ORDER BY u.created_at DESC, u.id DESC
        LIMIT ? OFFSET ?`
     )
     .all(...vals, limit, offset);

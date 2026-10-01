@@ -37,6 +37,8 @@ data class Dashboard(
     val latest: List<Update> = emptyList(),
     val latestBySource: Map<String, LatestUpdate> = emptyMap(),
     val activityBySource: Map<String, List<Int>> = emptyMap(),
+    /** Updates created since the last check of each source ("+N since last check"). */
+    val newsSinceCheck: Map<String, Int> = emptyMap(),
     val attention: List<Update> = emptyList(),
     val aggregates: Aggregates? = null,
 )
@@ -138,8 +140,19 @@ data class Source(
     val release_severity: String? = null,
     val readme_severity: String? = null,
     val commit_severity: String? = null,
+    /** Last scheduler/checker run (ISO 8601); null on very old servers. */
+    val last_checked_at: String? = null,
+    /** Error message of the last failed check, if any. */
+    val last_error: String? = null,
+    /** While this timestamp is in the future, new updates are hidden (muted). */
+    val muted_until: String? = null,
 ) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: url
+    /** Web parity: the source is muted while `muted_until` is still ahead of now. */
+    val isMuted: Boolean
+        get() = muted_until?.let { iso ->
+            try { java.time.Instant.parse(iso).isAfter(java.time.Instant.now()) } catch (e: Exception) { false }
+        } ?: false
     /** Web parity: `track_releases ?? 1 !== 0` — tracked unless explicitly off. */
     val tracksReleases: Boolean get() = track_releases?.let { it != 0 } ?: true
     val tracksReadme: Boolean get() = track_readme == 1
