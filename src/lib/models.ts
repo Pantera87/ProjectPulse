@@ -273,6 +273,9 @@ const PATCHABLE = [
   "track_releases",
   "track_readme",
   "track_commits",
+  "release_severity",
+  "readme_severity",
+  "commit_severity",
   "summary_size",
 ] as const;
 
@@ -328,6 +331,9 @@ export function sourceToPlain(
     track_releases: s.track_releases,
     track_readme: s.track_readme,
     track_commits: s.track_commits,
+    release_severity: s.release_severity,
+    readme_severity: s.readme_severity,
+    commit_severity: s.commit_severity,
     summary_size: s.summary_size,
   };
 }

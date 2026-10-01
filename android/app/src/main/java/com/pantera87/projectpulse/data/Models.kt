@@ -46,12 +46,20 @@ data class Dashboard(
 data class Aggregates(
     val totalUpdates: Int = 0,
     val readUpdates: Int = 0,
+    /** 7-day windowed pair — feeds the read-rate gauge (null on pre-window servers). */
+    val totalUpdates7d: Int? = null,
+    val readUpdates7d: Int = 0,
     val sourcesTotal: Int = 0,
     val sourcesUpdatedThisWeek: Int = 0,
     val updatesThisWeek: Int = 0,
     val updatesPrevWeek: Int = 0,
     val activityTotalByDay: List<Int> = emptyList(),
-)
+) {
+    /** Read-rate card denominator: the 7-day window when the server provides it, all-time otherwise. */
+    val readRateTotal: Int get() = totalUpdates7d ?: totalUpdates
+    /** Read-rate card numerator, matched to [readRateTotal]. */
+    val readRateRead: Int get() = if (totalUpdates7d != null) readUpdates7d else readUpdates
+}
 
 @Serializable
 data class UnreadCounts(
@@ -126,12 +134,23 @@ data class Source(
     val track_releases: Int? = null,
     val track_readme: Int? = null,
     val track_commits: Int? = null,
+    /** Per-track severity floor ("normal" | "high" | "critical"); null on older servers. */
+    val release_severity: String? = null,
+    val readme_severity: String? = null,
+    val commit_severity: String? = null,
 ) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: url
     /** Web parity: `track_releases ?? 1 !== 0` — tracked unless explicitly off. */
     val tracksReleases: Boolean get() = track_releases?.let { it != 0 } ?: true
     val tracksReadme: Boolean get() = track_readme == 1
     val tracksCommits: Boolean get() = track_commits == 1
+
+    /** Per-track severity floors for keywordless updates (default "normal"). */
+    val releaseSeverity: String get() = release_severity?.takeIf { it.isNotBlank() } ?: "normal"
+
+    val readmeSeverity: String get() = readme_severity?.takeIf { it.isNotBlank() } ?: "normal"
+
+    val commitSeverity: String get() = commit_severity?.takeIf { it.isNotBlank() } ?: "normal"
 }
 
 /** One stored snapshot version of a source (GET /api/sources/:id). */

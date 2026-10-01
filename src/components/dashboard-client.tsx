@@ -329,8 +329,10 @@ export default function DashboardClient({
     [categoryUnread]
   );
   const labels = useMemo(() => dayLabels(), []);
+  // 7-day rolling window: of the updates created in the last 7 days, how many
+  // are marked read (the all-time totals still feed the "no updates" state).
   const readFraction =
-    aggregates.totalUpdates > 0 ? aggregates.readUpdates / aggregates.totalUpdates : 0;
+    aggregates.totalUpdates7d > 0 ? aggregates.readUpdates7d / aggregates.totalUpdates7d : 0;
   const weekFraction =
     aggregates.sourcesTotal > 0
       ? aggregates.sourcesUpdatedThisWeek / aggregates.sourcesTotal
@@ -384,7 +386,7 @@ export default function DashboardClient({
           style={delay(150)}
         >
           <span
-            className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-gradient-to-b from-amber-400 to-rose-500"
+            className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-linear-to-b from-amber-400 to-rose-500"
             aria-hidden="true"
           />
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-amber-300">
@@ -486,13 +488,12 @@ export default function DashboardClient({
               "linear-gradient(127.09deg, rgba(6, 11, 40, 0.94) 19.41%, rgba(10, 14, 35, 0.49) 76.65%)",
           }}
         >
-          <h2 className="text-lg font-bold text-white">Read rate</h2>
-          <p className="text-sm text-[#a0aec0]">of all stored updates</p>
+          <h2 className="text-lg font-bold text-white">Read rate </h2>
           <div className="mt-4 flex flex-1 flex-col items-center justify-center">
             <SatisfactionGauge
               fraction={readFraction}
               value={`${Math.round(readFraction * 100)}%`}
-              caption={`${aggregates.readUpdates} of ${aggregates.totalUpdates} read`}
+              caption={`${aggregates.readUpdates7d} of ${aggregates.totalUpdates7d} read`}
             />
           </div>
         </div>
@@ -684,7 +685,7 @@ export default function DashboardClient({
               {groupedRows.map(({ cat, items }) => (
                 <div
                   key={cat}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                  className="rounded-2xl border border-white/10 bg-white/3 p-3"
                 >
                   <button
                     onClick={() => setCollapsed((m) => ({ ...m, [cat]: !m[cat] }))}
@@ -774,6 +775,8 @@ export default function DashboardClient({
                   ...a,
                   totalUpdates: 0,
                   readUpdates: 0,
+                  totalUpdates7d: 0,
+                  readUpdates7d: 0,
                   updatesThisWeek: 0,
                   updatesPrevWeek: 0,
                   activityTotalByDay: [0, 0, 0, 0, 0, 0, 0],

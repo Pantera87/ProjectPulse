@@ -110,8 +110,8 @@ export async function POST(req: Request) {
       `INSERT INTO sources (id, type, url, name, goal, goal_source, category, subcategory, category_source, subcategory_source, notes, watch_enabled,
         check_interval_hours, last_checked_at, last_content_hash, last_error,
         muted_until, rules_json, state_json, created_at, logo, project_summary, summary_size,
-        track_releases, track_readme, track_commits)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        track_releases, track_readme, track_commits, release_severity, readme_severity, commit_severity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const s of body.sources ?? [])
       insSource.run(
@@ -122,7 +122,8 @@ export async function POST(req: Request) {
         s.last_checked_at ?? null, s.last_content_hash ?? null, s.last_error ?? null,
         s.muted_until ?? null, s.rules_json ?? "[]", s.state_json ?? "{}",
         s.created_at ?? new Date().toISOString(), s.logo ?? null, s.project_summary ?? null,
-        s.summary_size ?? null, s.track_releases ?? 1, s.track_readme ?? 0, s.track_commits ?? 0
+        s.summary_size ?? null, s.track_releases ?? 1, s.track_readme ?? 0, s.track_commits ?? 0,
+        s.release_severity ?? "normal", s.readme_severity ?? "normal", s.commit_severity ?? "normal"
       );
     const insSnap = d.prepare(
       `INSERT INTO snapshots (id, source_id, version, fetched_at, html, content_hash, title, screenshot, html_local)

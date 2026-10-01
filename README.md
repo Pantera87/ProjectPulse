@@ -22,7 +22,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-9be15d?style=for-the-badge" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub: pantera87/projectpulse" />
+  <a href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">
+    <img src="https://img.shields.io/badge/Docker-pantera87%2Fprojectpulse-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub: pantera87/projectpulse" />
+  </a>
   <img src="https://img.shields.io/github/stars/Pantera87/ProjectPulse?style=for-the-badge" alt="GitHub stars" />
 </p>
 
@@ -124,6 +126,32 @@ persistent notification, always the latest).
 - **Settings** — server address, notification toggle + interval, and the
   Aurora / Pulse theme (matching the web app); adaptive launcher icons and a
   minified R8 release build.
+
+### Standalone mode (no server)
+
+The app can also run **fully standalone — without a ProjectPulse server at
+all**. In Settings, switch the **data source** from *Remote* (the default) to
+*Local*: the phone then *is* the server. The same source checkers
+(websites, GitHub, feeds), keyword rules and scheduler run on-device in a
+WorkManager worker, and all data (sources, snapshots, updates) lives in a
+local Room database instead of the server.
+
+- **Everything works on-device** — dashboard, updates, sources, search,
+  snapshot viewer, add source and the keyword-rules editor are all served
+  from the local store; the connection screen shows the local database state
+  instead of asking for a server URL and password.
+- **Background sync & notifications** are unchanged in local mode: the same
+  WorkManager job checks your sources on the interval you pick (default
+  15 min) and posts local notifications for new updates.
+- **AI** — point the app at a LAN Ollama server in Settings and summaries,
+  classification and the semantic rule pass work as on the server; without
+  one, AI-backed features are simply skipped and everything else keeps
+  working.
+- **Separate data worlds** — local and remote data are stored
+  independently; switching modes does not migrate data between them.
+- **Server-only by design** — not available in local mode: snapshot *asset*
+  archiving (fully offline page assets), backup/restore, Ollama management
+  and multi-device sync.
 
 ### Building & installing
 

@@ -52,6 +52,9 @@ export async function PATCH(
     "track_releases",
     "track_readme",
     "track_commits",
+    "release_severity",
+    "readme_severity",
+    "commit_severity",
     "summary_size",
   ];
   const patch: Record<string, unknown> = {};
@@ -62,6 +65,14 @@ export async function PATCH(
     patch.watch_enabled = patch.watch_enabled ? 1 : 0;
   for (const k of ["track_releases", "track_readme", "track_commits"]) {
     if (patch[k] !== undefined) patch[k] = patch[k] ? 1 : 0;
+  }
+  // Per-track severity floors — validated against the allowed set (fallback "normal").
+  const SEVERITIES = ["normal", "high", "critical"];
+  for (const k of ["release_severity", "readme_severity", "commit_severity"]) {
+    if (k in body) {
+      const v = String(body[k]);
+      patch[k] = SEVERITIES.includes(v) ? v : "normal";
+    }
   }
   if (patch.muted_until === "clear") patch.muted_until = null;
   // Per-project AI summary length override (null/"" = follow global).

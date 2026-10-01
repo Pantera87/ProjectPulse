@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.pantera87.projectpulse.ui
 
@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -218,6 +216,38 @@ fun SourceDetailScreen(
         }
     }
 
+    /**
+     * Per-track severity floor for keywordless events (web parity: the severity
+     * `<select>` in `TrackingToggles`). Mirrors [toggleTrack]: optimistic update
+     * of [detail], rolled back if the PATCH fails.
+     */
+    fun setTrackSeverity(key: String, value: String) {
+        val before = detail ?: return
+        val updatedSource = when (key) {
+            "release_severity" -> before.source.copy(release_severity = value)
+            "readme_severity" -> before.source.copy(readme_severity = value)
+            else -> before.source.copy(commit_severity = value)
+        }
+        detail = before.copy(source = updatedSource)
+        scope.launch {
+            when (val r = app.backend.patchSource(sourceId, """"$key":"$value"""")) {
+                is ApiResult.Error -> {
+                    detail = before
+                    if (r.needsAuth) {
+                        app.prefs.markConfigured(false)
+                        return@launch
+                    }
+                    trackFailed = true
+                    trackMsg = "Save failed"
+                }
+                is ApiResult.Ok -> {
+                    trackFailed = false
+                    trackMsg = "Saved"
+                }
+            }
+        }
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
@@ -336,26 +366,27 @@ fun SourceDetailScreen(
                                     fontSize = 12.sp,
                                     color = LocalPpTokens.current.TextSecondary,
                                 )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    GlassChip(
-                                        text = "New releases",
-                                        active = d.source.tracksReleases,
-                                        onClick = { toggleTrack("track_releases", d.source.tracksReleases) },
-                                    )
-                                    GlassChip(
-                                        text = "README changes",
-                                        active = d.source.tracksReadme,
-                                        onClick = { toggleTrack("track_readme", d.source.tracksReadme) },
-                                    )
-                                    GlassChip(
-                                        text = "New commits",
-                                        active = d.source.tracksCommits,
-                                        onClick = { toggleTrack("track_commits", d.source.tracksCommits) },
-                                    )
-                                }
+                                TrackRow(
+                                    label = "New releases",
+                                    active = d.source.tracksReleases,
+                                    onToggle = { toggleTrack("track_releases", d.source.tracksReleases) },
+                                    severity = d.source.releaseSeverity,
+                                    onSeverity = { setTrackSeverity("release_severity", it) },
+                                )
+                                TrackRow(
+                                    label = "README changes",
+                                    active = d.source.tracksReadme,
+                                    onToggle = { toggleTrack("track_readme", d.source.tracksReadme) },
+                                    severity = d.source.readmeSeverity,
+                                    onSeverity = { setTrackSeverity("readme_severity", it) },
+                                )
+                                TrackRow(
+                                    label = "New commits",
+                                    active = d.source.tracksCommits,
+                                    onToggle = { toggleTrack("track_commits", d.source.tracksCommits) },
+                                    severity = d.source.commitSeverity,
+                                    onSeverity = { setTrackSeverity("commit_severity", it) },
+                                )
                                 trackMsg?.let { msg ->
                                     Text(
                                         msg,
@@ -518,6 +549,43 @@ fun SourceDetailScreen(
                     }
                 },
             )
+        }
+    }
+}
+
+/**
+ * One keywordless tracking option (web parity: a `TrackingToggles` row).
+ * The [GlassChip] toggles the track; while active, a Normal/High/Critical
+ * segmented control sets that track's per-update severity floor.
+ */
+@Composable
+private fun TrackRow(
+    label: String,
+    active: Boolean,
+    severity: String,
+    onToggle: () -> Unit,
+    onSeverity: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        GlassChip(text = label, active = active, onClick = onToggle)
+        if (active) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                GlassChip(
+                    text = "Normal",
+                    active = severity == "normal",
+                    onClick = { onSeverity("normal") },
+                )
+                GlassChip(
+                    text = "High",
+                    active = severity == "high",
+                    onClick = { onSeverity("high") },
+                )
+                GlassChip(
+                    text = "Critical",
+                    active = severity == "critical",
+                    onClick = { onSeverity("critical") },
+                )
+            }
         }
     }
 }

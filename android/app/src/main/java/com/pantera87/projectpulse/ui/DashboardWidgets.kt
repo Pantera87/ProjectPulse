@@ -283,15 +283,10 @@ fun ReadRateGaugeBox(
     ) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Text(
-                "Read rate",
+                "Read rate (7d)",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = t.Foreground,
-            )
-            Text(
-                "of all stored updates",
-                fontSize = 12.sp,
-                color = t.TextSecondary,
             )
             // Web SatisfactionGauge: "0%" / "100%" pinned to the left and
             // right of the circle, white check icon above the value.

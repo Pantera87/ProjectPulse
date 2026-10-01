@@ -92,6 +92,7 @@ class LocalBackend : PpBackend {
         // Whole-dashboard aggregates (hero card, gauges, 7-day chart).
         val totals = db.updateDao().updateTotals()
         val week = db.updateDao().windowStats(since7)
+        val weekTotals = db.updateDao().windowTotals(since7)
         val activityTotalByDay = MutableList(7) { 0 }
         for (r in db.updateDao().activityByDay(since7)) {
             val idx = dayIndex[r.day] ?: continue
@@ -118,6 +119,8 @@ class LocalBackend : PpBackend {
                 aggregates = Aggregates(
                     totalUpdates = totals.total.toInt(),
                     readUpdates = totals.read?.toInt() ?: 0,
+                    totalUpdates7d = weekTotals.total.toInt(),
+                    readUpdates7d = weekTotals.read?.toInt() ?: 0,
                     sourcesTotal = sources.size,
                     sourcesUpdatedThisWeek = week.sources.toInt(),
                     updatesThisWeek = week.updates.toInt(),
@@ -314,6 +317,12 @@ class LocalBackend : PpBackend {
             s = s.copy(trackReadme = obj["track_readme"]?.jsonPrimitive?.booleanOrNull ?: false)
         if (obj.containsKey("track_commits"))
             s = s.copy(trackCommits = obj["track_commits"]?.jsonPrimitive?.booleanOrNull ?: false)
+        // Per-track severity floors (release/readme/commit) are NOT persisted in
+        // local mode yet: the sources table has no column for them. The PATCH body
+        // may still carry these keys (web parity), so they are accepted and ignored
+        // here. The server (Companion/remote mode) persists and enforces them.
+        // TODO(local-db): persist per-track severity once SourceEntity gains the
+        // release_severity / readme_severity / commit_severity columns (Room v3).
         if (obj.containsKey("summary_size")) {
             val v = obj["summary_size"]?.jsonPrimitive?.contentOrNull
             s = s.copy(

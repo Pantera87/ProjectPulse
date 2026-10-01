@@ -241,8 +241,9 @@ private fun PhoneDashboard(
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         ReadRateGaugeBox(
-            totalUpdates = agg.totalUpdates,
-            readUpdates = agg.readUpdates,
+            // 7-day rolling window; fall back to all-time on pre-window servers.
+            totalUpdates = agg.readRateTotal,
+            readUpdates = agg.readRateRead,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
@@ -300,8 +301,9 @@ private fun TabletDashboard(
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             ReadRateGaugeBox(
-                totalUpdates = agg.totalUpdates,
-                readUpdates = agg.readUpdates,
+                // 7-day rolling window; fall back to all-time on pre-window servers.
+                totalUpdates = agg.readRateTotal,
+                readUpdates = agg.readRateRead,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             ThisWeekBox(

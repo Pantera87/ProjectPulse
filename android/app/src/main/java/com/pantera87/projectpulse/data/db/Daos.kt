@@ -146,6 +146,10 @@ interface UpdateDao {
     @Query("SELECT COUNT(DISTINCT sourceId) AS sources, COUNT(*) AS updates FROM updates WHERE date(createdAt) >= :since")
     suspend fun windowStats(since: String): WindowStatsRow
 
+    /** Updates created within the window: total + how many are read (read-rate gauge). */
+    @Query("SELECT COUNT(*) AS total, SUM(CASE WHEN readAt IS NOT NULL THEN 1 ELSE 0 END) AS read FROM updates WHERE date(createdAt) >= :since")
+    suspend fun windowTotals(since: String): UpdateTotalsRow
+
     /** Total update count and how many are read. */
     @Query("SELECT COUNT(*) AS total, SUM(CASE WHEN readAt IS NOT NULL THEN 1 ELSE 0 END) AS read FROM updates")
     suspend fun updateTotals(): UpdateTotalsRow

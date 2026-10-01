@@ -64,6 +64,12 @@ export interface SourceRow {
   track_readme: number;
   /** Track every new commit without keywords (1/0, default 0, github) */
   track_commits: number;
+  /** Per-track severity for keywordless release events (critical/high/normal). */
+  release_severity: Priority;
+  /** Per-track severity for keywordless README events (critical/high/normal). */
+  readme_severity: Priority;
+  /** Per-track severity for keywordless commit events (critical/high/normal). */
+  commit_severity: Priority;
 }
 
 export interface SnapshotRow {
@@ -230,6 +236,10 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "track_releases", "INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing(d, "sources", "track_readme", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(d, "sources", "track_commits", "INTEGER NOT NULL DEFAULT 0");
+  // Per-track severity for the keywordless events (critical / high / normal).
+  addColumnIfMissing(d, "sources", "release_severity", "TEXT NOT NULL DEFAULT 'normal'");
+  addColumnIfMissing(d, "sources", "readme_severity", "TEXT NOT NULL DEFAULT 'normal'");
+  addColumnIfMissing(d, "sources", "commit_severity", "TEXT NOT NULL DEFAULT 'normal'");
   // Per-project AI summary length override (null = follow the global setting).
   addColumnIfMissing(d, "sources", "summary_size", "TEXT");
   // Self-contained archived HTML of a snapshot (offline view, compressed).

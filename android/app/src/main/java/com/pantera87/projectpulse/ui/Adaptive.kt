@@ -13,6 +13,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,37 @@ fun rememberUiMode(): UiMode {
     return remember(wsc) {
         if (wsc.widthSizeClass == WindowWidthSizeClass.Expanded) UiMode.Tablet
         else UiMode.Mobile
+    }
+}
+
+/**
+ * Design baseline: the screens were drawn against a large phone (~411dp
+ * smallest width, i.e. a 1080p-class display). Phones whose smallest
+ * width falls below this carry the same fixed dp sizes in a physically
+ * smaller space, which is why desktop-ported widgets crowd, overlap or
+ * clip on smaller screens.
+ */
+private const val DESIGN_SWP_DP = 400
+
+/** Hard floor: even on very small screens the UI never shrinks past 85%. */
+private const val MIN_SCREEN_SCALE = 0.85f
+
+/**
+ * Resolution-based UI scale for the current screen, in `0.85f..1f`.
+ *
+ * Derived from `smallestScreenWidthDp` — the width of the screen in dp,
+ * which already normalises out DPI, so a 1440p 400dp phone and an
+ * 720p 400dp phone both scale identically. Phones narrower than the
+ * design baseline get the whole UI scaled down proportionally
+ * ([ProjectPulseTheme] applies it through `LocalDensity`, so every `dp`
+ * and `sp` value in the app follows); at the baseline and above
+ * (large phones, tablets) the factor is 1 and nothing changes.
+ */
+@Composable
+fun rememberScreenScale(): Float {
+    val swpDp = LocalConfiguration.current.smallestScreenWidthDp
+    return remember(swpDp) {
+        (swpDp / DESIGN_SWP_DP.toFloat()).coerceIn(MIN_SCREEN_SCALE, 1f)
     }
 }
 

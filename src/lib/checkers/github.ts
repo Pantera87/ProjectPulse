@@ -115,6 +115,10 @@ export async function checkGithub(
   const trackReleases = (source.track_releases ?? 1) !== 0;
   const trackReadme = source.track_readme === 1;
   const trackCommits = source.track_commits === 1;
+  // Per-track severity floors for the keywordless events (default "normal").
+  const releaseSeverity = (source.release_severity ?? "normal") as Priority;
+  const readmeSeverity = (source.readme_severity ?? "normal") as Priority;
+  const commitSeverity = (source.commit_severity ?? "normal") as Priority;
   const rulesTarget = (k: string) => rules.some((r) => r.sources.includes(k));
   const watchReadme = trackReadme || rulesTarget("readme");
   const watchCommits = trackCommits || rulesTarget("commits");
@@ -326,6 +330,9 @@ export async function checkGithub(
         if (hit) priority = hit.priority;
         else if (isMajorBump(prevTag, r.tag_name) || looksLikeMilestoneRelease(r.name ?? r.tag_name))
           priority = "high";
+        // Per-track severity floor for keywordless release events (the keyword
+        // rule's own priority still governs keyword hits).
+        if (!hit) priority = higherPriority(priority, releaseSeverity);
         // Optional AI summary + importance classification of the release
         // notes (skipped when a semantic rule match already summarized it).
         // Without AI, the raw multi-line notes are reduced to their salient
@@ -461,7 +468,7 @@ export async function checkGithub(
               .filter(Boolean);
             // Optional AI summary + importance classification of the README
             // change (diff as the input; heuristic added-lines as fallback).
-            let readmePriority: Priority = "normal";
+            let readmePriority: Priority = readmeSeverity;
             let readmeSummary = truncate(
               added.slice(0, 10).join("\n") || "README changed",
               1000
@@ -506,7 +513,7 @@ export async function checkGithub(
             const ai = getAI();
             const useAI = fresh.length <= 10;
             for (const c of fresh) {
-              let commitPriority: Priority = "normal";
+              let commitPriority: Priority = commitSeverity;
               let commitSummary: string | null = null;
               if (useAI) {
                 const aiRes = await ai.summarizeUpdate(

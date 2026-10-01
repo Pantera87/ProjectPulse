@@ -9,6 +9,10 @@ export interface DashboardAggregates {
   totalUpdates: number;
   /** Updates marked as read. */
   readUpdates: number;
+  /** Updates created in the last 7 days (rolling window of the read-rate gauge). */
+  totalUpdates7d: number;
+  /** Of those, updates marked as read. */
+  readUpdates7d: number;
   /** All tracked sources. */
   sourcesTotal: number;
   /** Distinct sources with at least one update in the last 7 days. */
@@ -41,6 +45,17 @@ export function getDashboardAggregates(d: Database.Database): DashboardAggregate
        WHERE substr(created_at, 1, 10) >= date('now', '-6 day')`
     )
     .get() as { sources: number; updates: number };
+
+  // Same 7-day UTC window as the "This week" stats: total created + how many
+  // are read (the read-rate gauge is windowed, not all-time).
+  const weekRead = d
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) AS read
+       FROM updates
+       WHERE substr(created_at, 1, 10) >= date('now', '-6 day')`
+    )
+    .get() as { total: number; read: number | null };
 
   const dayRows = d
     .prepare(
@@ -77,6 +92,8 @@ export function getDashboardAggregates(d: Database.Database): DashboardAggregate
   return {
     totalUpdates: upd.total,
     readUpdates: upd.read ?? 0,
+    totalUpdates7d: weekRead.total,
+    readUpdates7d: weekRead.read ?? 0,
     sourcesTotal: src.total,
     sourcesUpdatedThisWeek: week.sources,
     updatesThisWeek: week.updates,
