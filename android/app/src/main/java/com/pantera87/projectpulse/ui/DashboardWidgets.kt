@@ -289,6 +289,12 @@ private fun StatMini(
  * card is wide enough for the ring plus the "0%" / "100%" side labels it
  * keeps the web layout; narrower cards drop the decorative labels and hand
  * the full-size ring the whole width instead of clipping it.
+ *
+ * Landscape phones make the card much wider than the web's, where the 256 dp
+ * row height — not the width — is the real limit: when the width budget
+ * clearly exceeds the default ring, the ring grows to fill the available
+ * height (capped at 168 dp) and its contents scale with it, instead of
+ * floating as a small 112 dp circle in a wide empty card.
  */
 @Composable
 fun ReadRateGaugeBox(
@@ -320,10 +326,28 @@ fun ReadRateGaugeBox(
                 BoxWithConstraints {
                     // "0%" + 10 dp + 112 dp ring + 10 dp + "100%" ≈ 194 dp.
                     val labelled = maxWidth >= 194.dp
-                    val gauge = (if (labelled) maxWidth - 82.dp else maxWidth)
-                        .coerceIn(48.dp, 112.dp)
-                    // The ring's innards shrink in step with the ring.
-                    val k = (gauge.value / 112f).coerceIn(0.42f, 1f)
+                    // Width the ring itself may use (the side labels eat
+                    // ~82 dp total).
+                    val widthBudget = if (labelled) maxWidth - 82.dp else maxWidth
+                    // Default ring is 112 dp — right while width is the tight
+                    // dimension (portrait phones). When the box is much wider
+                    // (landscape phones, tablet columns) width stops limiting:
+                    // grow the ring to the available height instead of
+                    // pinning it at 112 dp, which left the wide card mostly
+                    // empty.
+                    val gauge =
+                        if (widthBudget > 160.dp) {
+                            // The row holds the ring plus two equal-width
+                            // label slots (32k) and gaps (10k), all scaled
+                            // by k, so the full row ≈ 1.75 × ring; cap the
+                            // ring so the row never overflows the card.
+                            minOf(widthBudget, maxHeight, maxWidth / 1.75f)
+                                .coerceIn(112.dp, 168.dp)
+                        } else {
+                            widthBudget.coerceIn(48.dp, 112.dp)
+                        }
+                    // The ring's innards scale in step with the ring.
+                    val k = (gauge.value / 112f).coerceIn(0.42f, 1.5f)
                     val ring: @Composable () -> Unit = {
                         CircleGauge(
                             fraction = fraction,
@@ -341,21 +365,40 @@ fun ReadRateGaugeBox(
                     }
                     if (labelled) {
                         // Web SatisfactionGauge: "0%" / "100%" pinned to the
-                        // left and right of the circle.
+                        // left and right of the circle; both scale with the
+                        // ring so they don't dwarf a grown ring in landscape.
+                        val sideLabel: @Composable (Int) -> Unit = { which ->
+                            Text(
+                                if (which == 0) "0%" else "100%",
+                                fontSize = (12f * k).sp,
+                                color = t.TextSecondary,
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "0%",
-                                fontSize = 12.sp,
-                                color = t.TextSecondary,
-                            )
-                            Spacer(Modifier.width(10.dp))
+                            // "0%" and "100%" have different widths, so a
+                            // plain centered Row would shift the ring toward
+                            // the shorter side. Give each label an
+                            // equal-width slot (32k ≥ "100%") hugging the
+                            // ring side; the weighted spacers eat the rest,
+                            // leaving the ring exactly centered with both
+                            // labels the same gap away from it.
+                            Spacer(Modifier.weight(1f))
+                            Box(
+                                Modifier.width((32f * k).dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                sideLabel(0)
+                            }
+                            Spacer(Modifier.width((10f * k).dp))
                             ring()
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                "100%",
-                                fontSize = 12.sp,
-                                color = t.TextSecondary,
-                            )
+                            Spacer(Modifier.width((10f * k).dp))
+                            Box(
+                                Modifier.width((32f * k).dp),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                sideLabel(1)
+                            }
+                            Spacer(Modifier.weight(1f))
                         }
                     } else {
                         ring()
