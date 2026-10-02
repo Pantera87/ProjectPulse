@@ -19,9 +19,14 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.ProjectPulse">
+        <!-- The Compose tree handles rotation itself: without this the
+             activity is recreated on every orientation change, which replays
+             the system splash window and resets AppRoot to its SPLASH phase,
+             flashing the branded splash for a second. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
