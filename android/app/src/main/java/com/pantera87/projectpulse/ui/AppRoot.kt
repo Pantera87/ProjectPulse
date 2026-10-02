@@ -39,7 +39,7 @@ fun AppRoot() {
     val onboarded by prefs.onboarded.collectAsState()
     var phase by remember { mutableStateOf(Phase.SPLASH) }
     // Notification permission is only asked once the splash has finished
-    // (not on top of the Lottie logo).
+    // (not on top of the splash logo).
     var askedNotif by remember { mutableStateOf(false) }
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),

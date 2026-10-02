@@ -184,9 +184,7 @@ fun UpdatesScreen(
                     error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(error!!, color = LocalPpTokens.current.Error)
                     }
-                    updates.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No updates", color = LocalPpTokens.current.TextTertiary)
-                    }
+                    updates.isEmpty() -> BrandedEmptyState("No updates")
                     else -> if (uiMode.isTablet) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),

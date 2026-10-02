@@ -255,9 +255,7 @@ fun SourcesScreen(
                 error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(error!!, color = LocalPpTokens.current.Error)
                 }
-                sources.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No sources yet", color = LocalPpTokens.current.TextTertiary)
-                }
+                sources.isEmpty() -> BrandedEmptyState("No sources yet")
                 else -> if (uiMode.isTablet) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),

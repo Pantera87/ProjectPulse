@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -115,22 +116,35 @@ fun CircleGauge(
             }
             val f = anim.value.coerceIn(0f, 1f)
             if (f > 0.0005f) {
-                drawArc(
-                    // Web's SVG fade: the gradient vector is rotated 90° so the
-                    // right side of the ring is transparent and the left side is
-                    // full color — the arc head brightens as it sweeps around.
-                    brush = Brush.linearGradient(
-                        colors = listOf(color.copy(alpha = 0f), color),
-                        start = Offset(totalPx, totalPx / 2f),
-                        end = Offset(0f, totalPx / 2f),
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = 360f * f,
-                    useCenter = false,
-                    topLeft = tl,
-                    size = arcSize,
-                    style = Stroke(width = swPx, cap = StrokeCap.Round),
-                )
+                val arcEnd = 360f * f
+                // Fade that follows the line: transparent at the 12 o'clock
+                // start, ramping to full color exactly at the arc head. The
+                // canvas is rotated -90° about the ring center so the sweep
+                // gradient (which begins at 3 o'clock) begins at the arc's
+                // start — the web's left-right linear gradient instead faded
+                // from the right side of the ring.
+                rotate(
+                    degrees = -90f,
+                    pivot = Offset(tl.x + arcSize.width / 2f, tl.y + arcSize.height / 2f),
+                ) {
+                    drawArc(
+                        // Both ends of the circle are transparent so the arc's
+                        // round start cap (which pokes just before the 12
+                        // o'clock start) is invisible; full color exactly at
+                        // the arc head.
+                        brush = Brush.sweepGradient(
+                            0f to color.copy(alpha = 0f),
+                            (arcEnd / 360f).coerceIn(0.001f, 0.999f) to color,
+                            1f to color.copy(alpha = 0f),
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = arcEnd,
+                        useCenter = false,
+                        topLeft = tl,
+                        size = arcSize,
+                        style = Stroke(width = swPx, cap = StrokeCap.Round),
+                    )
+                }
             }
         }
         center()
@@ -283,7 +297,7 @@ fun ReadRateGaugeBox(
     ) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Text(
-                "Read rate (7d)",
+                "Read rate",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = t.Foreground,
@@ -329,6 +343,9 @@ fun ReadRateGaugeBox(
                                 color = t.TextTertiary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                // Pull the caption up against the % number
+                                // (no spacer between the two lines).
+                                modifier = Modifier.offset(y = (-3).dp),
                             )
                         }
                     }
@@ -363,6 +380,13 @@ fun ThisWeekBox(
     modifier: Modifier = Modifier,
 ) {
     val t = LocalPpTokens.current
+    // Cap so the gauge's "Sources active" caption fits inside the ring hole
+    // (hole diameter = gauge size - stroke; a bold char is ~0.58 em wide).
+    val gaugeDp = if (compact) 88f else 104f
+    val labelFontSp = minOf(
+        if (compact) 10f else 11f,
+        (gaugeDp - gaugeDp * 0.075f - 8f) / ("Sources active".length * 0.58f),
+    )
     val fraction =
         if (sourcesTotal > 0) sourcesUpdatedThisWeek.toFloat() / sourcesTotal else 0f
     val weekDelta = updatesThisWeek - updatesPrevWeek
@@ -490,7 +514,7 @@ fun ThisWeekBox(
                         )
                         Text(
                             "Sources active",
-                            fontSize = if (compact) 10.sp else 11.sp,
+                            fontSize = labelFontSp.sp,
                             fontWeight = FontWeight.Bold,
                             color = t.TextSecondary,
                             maxLines = 1,

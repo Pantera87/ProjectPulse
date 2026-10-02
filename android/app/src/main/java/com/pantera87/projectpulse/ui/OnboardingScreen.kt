@@ -28,9 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.TextStyle
@@ -130,41 +127,15 @@ fun OnboardingScreen(
 }
 
 private data class OnboardPage(
-    val icon: ImageVector,
+    /** null → the pulsing brand logo tile instead of a Material icon. */
+    val icon: ImageVector?,
     val title: String,
     val subtitle: String,
 )
 
-/** ECG "pulse" glyph — no stock material icon ships one, so it is drawn inline. */
-private val PulseIcon: ImageVector = ImageVector.Builder(
-    name = "Pulse",
-    defaultWidth = 24.dp,
-    defaultHeight = 24.dp,
-    viewportWidth = 24f,
-    viewportHeight = 24f,
-).apply {
-    // 1.7.6 idiom: the `path { }` builder DSL (no `buildPath` exists pre-1.8).
-    // The line is stroked, not filled: an open polyline has no area to fill, and
-    // the opaque-black stroke is recoloured by Icon(tint = ...) via the painter's
-    // ColorFilter.
-    path(
-        stroke = SolidColor(Color.Black),
-        strokeLineWidth = 2f,
-        strokeLineCap = StrokeCap.Round,
-        strokeLineJoin = StrokeJoin.Round,
-    ) {
-        moveTo(3f, 12f)
-        lineTo(7f, 12f)
-        lineTo(10f, 5f)
-        lineTo(14f, 19f)
-        lineTo(17f, 12f)
-        lineTo(21f, 12f)
-    }
-}.build()
-
 private val OnboardingPages = listOf(
     OnboardPage(
-        icon = PulseIcon,
+        icon = null,
         title = "Know every project at a glance",
         subtitle = "Releases, commits, RSS and websites — one calm feed, one dashboard.",
     ),
@@ -191,19 +162,27 @@ private fun OnboardingPageView(page: OnboardPage) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(1f))
-        // Brand-glass icon tile (`.glass-tile` glow).
+        // Brand-glass icon tile (`.glass-tile` glow); page 1 shows the
+        // pulsing logo instead of a Material icon.
         Box(
             modifier = Modifier
                 .size(88.dp)
                 .glass(strong = true, tile = true, radius = 24.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = page.icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(40.dp),
-            )
+            if (page.icon == null) {
+                PulseLogo(
+                    size = 44.dp,
+                    pulse = true,
+                )
+            } else {
+                Icon(
+                    imageVector = page.icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
         }
         Spacer(Modifier.height(28.dp))
         Text(

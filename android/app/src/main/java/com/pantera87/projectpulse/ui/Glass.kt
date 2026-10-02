@@ -552,18 +552,20 @@ private fun BadgePill(
  * `.grad-text`: brand-gradient headline text.
  *
  * Compose's TextStyle only takes a solid color, so the gradient is faked with
- * per-character spans across the 5-stop ramp (A, oklab(A,B), B, oklab(B,C), C)
- * — the same stops the web paints, so the hue interpolates evenly.
+ * per-character spans across the ramp (default: the 5-stop theme ramp
+ * A, oklab(A,B), B, oklab(B,C), C — the same stops the web paints). Pass a
+ * custom [ramp] to lock the text to a fixed brand ramp, e.g. [BrandWordRamp].
  */
 @Composable
 fun GradText(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
+    ramp: List<Color>? = null,
 ) {
     val t = LocalPpTokens.current
-    val stops = remember(t) {
-        listOf(
+    val stops = remember(t, ramp) {
+        ramp ?: listOf(
             t.GradA,
             oklabMix(t.GradA, t.GradB, 0.5f),
             t.GradB,
@@ -571,13 +573,17 @@ fun GradText(
             t.GradC,
         )
     }
-    val spanned: AnnotatedString = remember(text, t) {
+    val spanned: AnnotatedString = remember(text, stops) {
         val builder = AnnotatedString.Builder()
         val n = text.length.coerceAtLeast(1)
+        val segs = (stops.size - 1).toFloat()
         for (i in text.indices) {
             val u = if (n == 1) 0f else i.toFloat() / (n - 1)
-            val seg = (u * 4f).coerceIn(0f, 3f)
-            val idx = seg.toInt()
+            // Full-range piecewise linear: the first char lands on stops.first()
+            // and the last on stops.last(), so the ramp's true endpoints are
+            // always painted (clamping to the segment count, not count-1).
+            val seg = (u * segs).coerceIn(0f, segs)
+            val idx = seg.toInt().coerceAtMost(stops.size - 2)
             val c = lerpColor(stops[idx], stops[idx + 1], seg - idx)
             builder.pushStyle(SpanStyle(color = c))
             builder.append(text[i])
@@ -587,6 +593,18 @@ fun GradText(
     }
     Text(spanned, modifier = modifier, style = style)
 }
+
+/**
+ * The "ProjectPulse" wordmark ramp, mirroring the web `.brand-word`: locked
+ * to the neon cyan → blue → magenta of the logo itself and deliberately NOT
+ * theme-reactive (see `src/app/globals.css`), so it is one shared constant
+ * instead of per-theme tokens.
+ */
+val BrandWordRamp = listOf(
+    Color(0xFF33D4FD), // #33d4fd
+    Color(0xFF4F8CFF), // #4f8cff
+    Color(0xFFEC4FF0), // #ec4ff0
+)
 
 private fun lerpColor(a: Color, b: Color, f: Float): Color {
     val t = f.coerceIn(0f, 1f)

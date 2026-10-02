@@ -259,7 +259,19 @@ private fun FloatingTabBar(
         Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
         ) {
-            TABS.forEach { tab ->
+            // Two tabs, then the brand chip, then the other two — the logo
+            // anchors the centre of the pill (decorative, non-interactive).
+            TABS.take(2).forEach { tab ->
+                TabItem(
+                    label = tab.label,
+                    active = current == tab.route,
+                    onClick = { onSelect(tab.route) },
+                    icon = tab.icon,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            BrandTabChip()
+            TABS.drop(2).forEach { tab ->
                 TabItem(
                     label = tab.label,
                     active = current == tab.route,
@@ -269,6 +281,27 @@ private fun FloatingTabBar(
                 )
             }
         }
+    }
+}
+
+/**
+ * Non-interactive brand mark centred in the tab pill: a quiet logo (no pulse,
+ * no label) between the two tab groups. Decorative only — it is not tappable
+ * and takes no navigation weight.
+ */
+@Composable
+private fun BrandTabChip(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(vertical = 8.dp)
+            .width(44.dp)
+            .height(30.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        PulseLogo(
+            size = 26.dp,
+            pulse = false,
+        )
     }
 }
 

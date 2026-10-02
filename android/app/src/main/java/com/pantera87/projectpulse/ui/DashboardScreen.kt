@@ -115,14 +115,24 @@ fun DashboardScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    GradText(
-                        "ProjectPulse",
-                        style = TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.02f).sp,
-                        ),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // The 3x lockup only lives on wide (expanded) windows;
+                        // compact screens keep the small icon (uiMode breakpoint).
+                        PulseLogo(
+                            size = if (uiMode.isTablet) 72.dp else 24.dp,
+                            pulse = false,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        GradText(
+                            "ProjectPulse",
+                            ramp = BrandWordRamp,
+                            style = TextStyle(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.02f).sp,
+                            ),
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors().copy(
                     containerColor = Color.Transparent,

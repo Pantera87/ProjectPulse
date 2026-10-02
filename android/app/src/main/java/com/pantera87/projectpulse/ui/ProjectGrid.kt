@@ -7,16 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -92,22 +88,39 @@ fun ProjectGrid(
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val minCol = if (density == SourceCardDensity.Comfortable) 260.dp else 170.dp
         val cols = (maxWidth / (minCol + 10.dp) + 0.5f).toInt().coerceIn(1, 6)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(cols),
+        // Eager chunked rows, NOT a LazyVerticalGrid: this grid lives inside
+        // the dashboard's outer verticalScroll column, where a nested vertical
+        // scroll container is measured with an unbounded (infinite) max height
+        // and Compose throws "Vertically scrollable component was measured
+        // with an infinity maximum height constraints". Source lists are
+        // small (a few dozen at most), so eager rendering is fine.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 5.dp),
         ) {
-            items(sources, key = { it.id }) { s ->
-                SourceCard(
-                    source = s,
-                    density = density,
-                    activity = activityBySource[s.id.toString()],
-                    newsSinceCheck = newsSinceCheck[s.id.toString()] ?: 0,
-                    latest = latestBySource[s.id.toString()],
-                    onClick = { onOpenSource(s.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            sources.chunked(cols).forEach { rowSources ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    rowSources.forEach { s ->
+                        SourceCard(
+                            source = s,
+                            density = density,
+                            activity = activityBySource[s.id.toString()],
+                            newsSinceCheck = newsSinceCheck[s.id.toString()] ?: 0,
+                            latest = latestBySource[s.id.toString()],
+                            onClick = { onOpenSource(s.id) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    // Keep the last row's cells the same width as the others.
+                    repeat(cols - rowSources.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
@@ -209,9 +222,13 @@ private fun SourceCard(
                 }
                 Spacer(Modifier.weight(1f))
                 if (activity != null && activity.size >= 2) {
+                    // Kept compact so it doesn't visually fuse with the logo
+                    // tile on narrow cards (2–3-column grids).
                     Sparkline(
                         data = activity,
-                        modifier = Modifier.size(width = 72.dp, height = 28.dp),
+                        modifier = Modifier
+                            .size(width = 54.dp, height = 20.dp)
+                            .padding(start = 8.dp),
                     )
                 }
                 if (newsSinceCheck > 0) {

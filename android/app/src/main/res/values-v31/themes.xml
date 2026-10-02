@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Android 12+ (API 31+): system splash screen. MainActivity calls
+        installSplashControlDefaults() to hold this window until the Compose
+        tree first has focus, so the launch goes: branded system splash to
+        Compose splash (PulseLogo) with no unbranded flash in between.
+        The base theme lives in ../values/themes.xml; this qualifier overrides
+        it only on API 31+ where the windowSplashScreen* attributes exist.
+    -->
+    <style name="Theme.ProjectPulse" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF04102A</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">#FF04102A</item>
+        <!-- Splash icon: transparent-background vector-equivalent of the logo,
+             pre-fit into the circular safe zone (see tools/make-splash-icon.ps1).
+             The raw logo_256.png is a square with the badge background baked in
+             and gets visibly clipped by the system's circular mask. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+    </style>
+</resources>

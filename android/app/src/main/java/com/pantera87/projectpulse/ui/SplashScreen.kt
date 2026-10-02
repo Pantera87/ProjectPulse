@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,29 +18,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.pantera87.projectpulse.R
 import kotlinx.coroutines.delay
 
 /**
- * First-run splash: the animated app logo (Lottie, `R.raw.splash_logo`) over
- * the aurora backdrop, held for [SPLASH_MS]. Fixed duration, no skip — the
- * intro just plays and [onDone] fires.
- *
- * The asset in `res/raw/splash_logo.json` is a placeholder; drop the final
- * logo animation over the same filename and no code changes are needed.
+ * First-run splash: the pulsing logo ([PulseLogo]) over the aurora backdrop,
+ * held for [SPLASH_MS]. Fixed duration, no skip — the intro just plays and
+ * [onDone] fires.
  */
 @Composable
 fun SplashScreen(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val compositionResult = rememberLottieComposition(
-        spec = LottieCompositionSpec.RawRes(R.raw.splash_logo),
-    )
-    val composition = compositionResult.value
     // Wordmark fades in while the logo is settling.
     val wordmarkAlpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -54,18 +42,16 @@ fun SplashScreen(
     }
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (composition != null) {
-                LottieAnimation(
-                    composition = composition,
-                    modifier = Modifier.size(200.dp),
-                    iterations = 1, // one-shot: the splash holds its duration
-                )
-            }
+            PulseLogo(
+                size = 312.dp,
+                pulse = true,
+            )
             GradText(
                 "ProjectPulse",
+                ramp = BrandWordRamp,
                 modifier = Modifier
                     .alpha(wordmarkAlpha.value)
-                    .padding(top = 12.dp),
+                    .padding(top = 4.dp),
                 style = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold),
             )
         }
