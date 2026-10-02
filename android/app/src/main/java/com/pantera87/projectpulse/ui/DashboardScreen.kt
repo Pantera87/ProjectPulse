@@ -237,10 +237,12 @@ private fun PhoneDashboard(
     Row(
         // Fixed height: the row lives in a vertically scrolling column, where
         // an unbounded height would let fillMaxHeight children collapse.
+        // Sized with headroom over the welcome card's tallest content so the
+        // stat boxes never clip at larger system font scales.
         Modifier
             .fillMaxWidth()
             .padding(vertical = 5.dp)
-            .height(224.dp),
+            .height(256.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         WelcomeBox(

@@ -438,6 +438,9 @@ val AuroraTokens = PpTokens(
         colors = listOf(Color(0xFF060B28), Color(0xFF0A0E23)),
         stops = listOf(0.2826f, 0.912f),
     ),
+    // Brand ramp, reverted 2026-10-02: back to the original blue→cyan→emerald
+    // (the web's aurora --grad-a/b/c). The interim Royal ramp, if ever wanted
+    // again: brandBrush(0xFF3B82F6, 0xFF6366F1, 0xFF8B5CF6) + same for GradA-C.
     BrandBrush = brandBrush(
         Color(0xFF4F8CFF),
         Color(0xFF21D4FD),

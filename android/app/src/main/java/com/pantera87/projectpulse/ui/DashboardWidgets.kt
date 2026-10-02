@@ -218,7 +218,7 @@ fun WelcomeBox(
                     "$unread unread update${if (unread == 1) "" else "s"} — $updatesThisWeek new from $sourcesUpdatedThisWeek of $sourcesTotal tracked source${if (sourcesTotal == 1) "" else "s"} this week.",
                     fontSize = 13.sp,
                     color = Color(0xFF94A3B8),
-                    maxLines = 4,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp),
                 )
@@ -228,7 +228,7 @@ fun WelcomeBox(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     StatMini(unread, "Unread", Color.White, Modifier.weight(1f))
-                    StatMini(updatesThisWeek, "This week", Color(0xFF35D28A), Modifier.weight(1f))
+                    StatMini(updatesThisWeek, "Week", Color(0xFF35D28A), Modifier.weight(1f))
                     StatMini(sourcesTotal, "Sources", Color.White, Modifier.weight(1f))
                 }
             }
@@ -258,7 +258,7 @@ private fun StatMini(
                     style = Stroke(width = 1f),
                 )
             }
-            .padding(horizontal = 6.dp, vertical = 8.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -270,8 +270,8 @@ private fun StatMini(
             )
             Text(
                 label.uppercase(),
-                fontSize = 11.sp,
-                letterSpacing = 0.5.sp,
+                fontSize = 8.5.sp,
+                letterSpacing = 0.15.sp,
                 color = t.TextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -281,7 +281,15 @@ private fun StatMini(
     }
 }
 
-/** Web "Satisfaction Rate" card: read-rate gauge, % value + caption centered. */
+/**
+ * Web "Satisfaction Rate" card: read-rate gauge, % value + caption centered.
+ *
+ * On phone this box is only half the screen wide, so the ring is measured
+ * against the available width instead of trusting a fixed 112 dp: when the
+ * card is wide enough for the ring plus the "0%" / "100%" side labels it
+ * keeps the web layout; narrower cards drop the decorative labels and hand
+ * the full-size ring the whole width instead of clipping it.
+ */
 @Composable
 fun ReadRateGaugeBox(
     totalUpdates: Int,
@@ -302,8 +310,6 @@ fun ReadRateGaugeBox(
                 fontWeight = FontWeight.Bold,
                 color = t.Foreground,
             )
-            // Web SatisfactionGauge: "0%" / "100%" pinned to the left and
-            // right of the circle, white check icon above the value.
             Box(
                 Modifier
                     .weight(1f)
@@ -311,53 +317,103 @@ fun ReadRateGaugeBox(
                     .padding(top = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "0%",
-                        fontSize = 12.sp,
-                        color = t.TextSecondary,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    CircleGauge(
-                        fraction = fraction,
-                        color = t.BrandBlue,
-                        trackColor = Color(0xFF22234B),
-                        size = 112.dp,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = Color.White,
-                            )
-                            Text(
-                                "${(fraction * 100f).toInt()}%",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = t.Foreground,
-                            )
-                            Text(
-                                "$readUpdates of $totalUpdates read",
-                                fontSize = 11.sp,
-                                color = t.TextTertiary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                // Pull the caption up against the % number
-                                // (no spacer between the two lines).
-                                modifier = Modifier.offset(y = (-3).dp),
+                BoxWithConstraints {
+                    // "0%" + 10 dp + 112 dp ring + 10 dp + "100%" ≈ 194 dp.
+                    val labelled = maxWidth >= 194.dp
+                    val gauge = (if (labelled) maxWidth - 82.dp else maxWidth)
+                        .coerceIn(48.dp, 112.dp)
+                    // The ring's innards shrink in step with the ring.
+                    val k = (gauge.value / 112f).coerceIn(0.42f, 1f)
+                    val ring: @Composable () -> Unit = {
+                        CircleGauge(
+                            fraction = fraction,
+                            color = t.BrandBlue,
+                            trackColor = Color(0xFF22234B),
+                            size = gauge,
+                        ) {
+                            ReadRateGaugeCenter(
+                                fraction = fraction,
+                                readUpdates = readUpdates,
+                                totalUpdates = totalUpdates,
+                                k = k,
                             )
                         }
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "100%",
-                        fontSize = 12.sp,
-                        color = t.TextSecondary,
-                    )
+                    if (labelled) {
+                        // Web SatisfactionGauge: "0%" / "100%" pinned to the
+                        // left and right of the circle.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "0%",
+                                fontSize = 12.sp,
+                                color = t.TextSecondary,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            ring()
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "100%",
+                                fontSize = 12.sp,
+                                color = t.TextSecondary,
+                            )
+                        }
+                    } else {
+                        ring()
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * Center of the read-rate ring: white check above the % value and the
+ * "n of m read" caption, sized in step with the ring via [k] and width-capped
+ * by the ring's box so nothing spills past the stroke on small sizes.
+ */
+@Composable
+private fun ReadRateGaugeCenter(
+    fraction: Float,
+    readUpdates: Int,
+    totalUpdates: Int,
+    k: Float,
+) {
+    val t = LocalPpTokens.current
+    // The stack must be centered vertically: a fillMaxSize Column defaults to
+    // Arrangement.Top, which pinned the icon/%/caption to the top of the ring
+    // (the web centers the flex stack with justify-content: center).
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            modifier = Modifier.size((20f * k).dp),
+            tint = Color.White,
+        )
+        Text(
+            "${(fraction * 100f).toInt()}%",
+            fontSize = (22f * k).sp,
+            fontWeight = FontWeight.Medium,
+            color = t.Foreground,
+        )
+        Text(
+            "$readUpdates of $totalUpdates read",
+            fontSize = (11f * k).sp,
+            color = t.TextTertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            // Center the text itself: with fillMaxWidth the Text box spans the
+            // whole ring, so the default left alignment pushed the caption to
+            // the ring's left edge. The width is capped at 80% of the ring —
+            // the chord of the inner circle (inner diameter = 85% of the box)
+            // at the caption's height below center — so it stays inside the
+            // ring at every size.
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(fraction = 0.8f),
+        )
     }
 }
 
