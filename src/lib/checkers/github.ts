@@ -115,8 +115,9 @@ export async function checkGithub(
   const trackReleases = (source.track_releases ?? 1) !== 0;
   const trackReadme = source.track_readme === 1;
   const trackCommits = source.track_commits === 1;
-  // Per-track severity floors for the keywordless events (default "normal").
-  const releaseSeverity = (source.release_severity ?? "normal") as Priority;
+  // Per-track severity floors for the keywordless events (releases default
+  // to "high"; the other two to "normal").
+  const releaseSeverity = (source.release_severity ?? "high") as Priority;
   const readmeSeverity = (source.readme_severity ?? "normal") as Priority;
   const commitSeverity = (source.commit_severity ?? "normal") as Priority;
   const rulesTarget = (k: string) => rules.some((r) => r.sources.includes(k));

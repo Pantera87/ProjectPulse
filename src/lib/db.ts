@@ -237,9 +237,18 @@ function migrate(d: Database.Database) {
   addColumnIfMissing(d, "sources", "track_readme", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing(d, "sources", "track_commits", "INTEGER NOT NULL DEFAULT 0");
   // Per-track severity for the keywordless events (critical / high / normal).
-  addColumnIfMissing(d, "sources", "release_severity", "TEXT NOT NULL DEFAULT 'normal'");
+  // Releases default to "high" — releases are the headline event for most
+  // projects, so they surface in the attention strip out of the box.
+  addColumnIfMissing(d, "sources", "release_severity", "TEXT NOT NULL DEFAULT 'high'");
   addColumnIfMissing(d, "sources", "readme_severity", "TEXT NOT NULL DEFAULT 'normal'");
   addColumnIfMissing(d, "sources", "commit_severity", "TEXT NOT NULL DEFAULT 'normal'");
+  // One-time backfill: the release-track default moved from "normal" to "high".
+  // Existing rows carry the legacy default; lift them in one pass. Sources the
+  // user later downgrades to "normal" are safe — the flag only runs once.
+  if (getSetting(d, "release_severity_high_default_v1") !== "1") {
+    d.prepare(`UPDATE sources SET release_severity = 'high' WHERE release_severity = 'normal'`).run();
+    setSetting(d, "release_severity_high_default_v1", "1");
+  }
   // Per-project AI summary length override (null = follow the global setting).
   addColumnIfMissing(d, "sources", "summary_size", "TEXT");
   // Self-contained archived HTML of a snapshot (offline view, compressed).

@@ -40,6 +40,12 @@ data class SourceEntity(
     val trackReleases: Boolean = true,
     val trackReadme: Boolean = false,
     val trackCommits: Boolean = false,
+    // Per-track severity floors for the keywordless events (normal/high/critical).
+    // Releases default to "high" — they are the headline event for most projects
+    // (server parity, see src/lib/db.ts).
+    val releaseSeverity: String = "high",
+    val readmeSeverity: String = "normal",
+    val commitSeverity: String = "normal",
 )
 
 /** Mirrors the server's `snapshots` table (one row per checked version). */

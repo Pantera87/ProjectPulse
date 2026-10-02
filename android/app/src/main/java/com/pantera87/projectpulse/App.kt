@@ -45,6 +45,7 @@ class App : Application() {
     val db: AppDatabase
         get() = _db ?: synchronized(this) {
             _db ?: Room.databaseBuilder(this, AppDatabase::class.java, "projectpulse.db")
+                .addMigrations(AppDatabase.MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
                 .also { _db = it }

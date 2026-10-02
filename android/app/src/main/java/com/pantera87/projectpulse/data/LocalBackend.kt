@@ -316,12 +316,15 @@ class LocalBackend : PpBackend {
             s = s.copy(trackReadme = obj["track_readme"]?.jsonPrimitive?.booleanOrNull ?: false)
         if (obj.containsKey("track_commits"))
             s = s.copy(trackCommits = obj["track_commits"]?.jsonPrimitive?.booleanOrNull ?: false)
-        // Per-track severity floors (release/readme/commit) are NOT persisted in
-        // local mode yet: the sources table has no column for them. The PATCH body
-        // may still carry these keys (web parity), so they are accepted and ignored
-        // here. The server (Companion/remote mode) persists and enforces them.
-        // TODO(local-db): persist per-track severity once SourceEntity gains the
-        // release_severity / readme_severity / commit_severity columns (Room v3).
+        // Per-track severity floors (server parity): validated against the
+        // allowed set; an invalid value falls back to the track's default —
+        // "high" for releases (the headline track), "normal" for the rest.
+        if (obj.containsKey("release_severity"))
+            s = s.copy(releaseSeverity = severityField(obj["release_severity"], "high"))
+        if (obj.containsKey("readme_severity"))
+            s = s.copy(readmeSeverity = severityField(obj["readme_severity"], "normal"))
+        if (obj.containsKey("commit_severity"))
+            s = s.copy(commitSeverity = severityField(obj["commit_severity"], "normal"))
         if (obj.containsKey("summary_size")) {
             val v = obj["summary_size"]?.jsonPrimitive?.contentOrNull
             s = s.copy(
@@ -444,6 +447,9 @@ class LocalBackend : PpBackend {
         track_releases = if (trackReleases) 1 else 0,
         track_readme = if (trackReadme) 1 else 0,
         track_commits = if (trackCommits) 1 else 0,
+        release_severity = releaseSeverity,
+        readme_severity = readmeSeverity,
+        commit_severity = commitSeverity,
     )
 
     private fun UpdateEntity.toModel(byId: Map<Long, SourceEntity>): Update = Update(
@@ -480,6 +486,12 @@ class LocalBackend : PpBackend {
 
     private fun strField(el: kotlinx.serialization.json.JsonElement?): String? =
         el?.jsonPrimitive?.contentOrNull
+
+    /** Per-track severity validation (server parity): "normal"/"high"/"critical", else [fallback]. */
+    private fun severityField(el: kotlinx.serialization.json.JsonElement?, fallback: String): String {
+        val v = el?.jsonPrimitive?.contentOrNull
+        return if (v == "normal" || v == "high" || v == "critical") v else fallback
+    }
 }
 /**
  * In-process progress of the current "check all" run - the local stand-in

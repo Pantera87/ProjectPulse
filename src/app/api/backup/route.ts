@@ -123,7 +123,7 @@ export async function POST(req: Request) {
         s.muted_until ?? null, s.rules_json ?? "[]", s.state_json ?? "{}",
         s.created_at ?? new Date().toISOString(), s.logo ?? null, s.project_summary ?? null,
         s.summary_size ?? null, s.track_releases ?? 1, s.track_readme ?? 0, s.track_commits ?? 0,
-        s.release_severity ?? "normal", s.readme_severity ?? "normal", s.commit_severity ?? "normal"
+        s.release_severity ?? "high", s.readme_severity ?? "normal", s.commit_severity ?? "normal"
       );
     const insSnap = d.prepare(
       `INSERT INTO snapshots (id, source_id, version, fetched_at, html, content_hash, title, screenshot, html_local)

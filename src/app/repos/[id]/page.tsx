@@ -118,7 +118,7 @@ export default async function RepoDetailPage({
             releases: (source.track_releases ?? 1) !== 0,
             readme: source.track_readme === 1,
             commits: source.track_commits === 1,
-            releaseSeverity: source.release_severity ?? "normal",
+            releaseSeverity: source.release_severity ?? "high",
             readmeSeverity: source.readme_severity ?? "normal",
             commitSeverity: source.commit_severity ?? "normal",
           }}

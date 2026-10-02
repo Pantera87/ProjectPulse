@@ -66,12 +66,19 @@ export async function PATCH(
   for (const k of ["track_releases", "track_readme", "track_commits"]) {
     if (patch[k] !== undefined) patch[k] = patch[k] ? 1 : 0;
   }
-  // Per-track severity floors — validated against the allowed set (fallback "normal").
+  // Per-track severity floors — validated against the allowed set. An invalid
+  // value falls back to the track's default: "high" for releases (the headline
+  // track), "normal" for the other two.
   const SEVERITIES = ["normal", "high", "critical"];
+  const SEVERITY_DEFAULT: Record<string, string> = {
+    release_severity: "high",
+    readme_severity: "normal",
+    commit_severity: "normal",
+  };
   for (const k of ["release_severity", "readme_severity", "commit_severity"]) {
     if (k in body) {
       const v = String(body[k]);
-      patch[k] = SEVERITIES.includes(v) ? v : "normal";
+      patch[k] = SEVERITIES.includes(v) ? v : SEVERITY_DEFAULT[k];
     }
   }
   if (patch.muted_until === "clear") patch.muted_until = null;

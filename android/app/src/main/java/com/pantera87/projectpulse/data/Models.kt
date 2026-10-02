@@ -158,8 +158,8 @@ data class Source(
     val tracksReadme: Boolean get() = track_readme == 1
     val tracksCommits: Boolean get() = track_commits == 1
 
-    /** Per-track severity floors for keywordless updates (default "normal"). */
-    val releaseSeverity: String get() = release_severity?.takeIf { it.isNotBlank() } ?: "normal"
+    /** Per-track severity floors (releases default to "high" — server parity). */
+    val releaseSeverity: String get() = release_severity?.takeIf { it.isNotBlank() } ?: "high"
 
     val readmeSeverity: String get() = readme_severity?.takeIf { it.isNotBlank() } ?: "normal"
 

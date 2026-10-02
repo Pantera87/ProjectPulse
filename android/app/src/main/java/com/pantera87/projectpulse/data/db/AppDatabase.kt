@@ -2,6 +2,8 @@ package com.pantera87.projectpulse.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Room database for the local engine — the on-device equivalent of the
@@ -20,7 +22,7 @@ import androidx.room.RoomDatabase
         SnapshotEntity::class,
         MetaEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +30,22 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun updateDao(): UpdateDao
     abstract fun snapshotDao(): SnapshotDao
     abstract fun metaDao(): MetaDao
+
+    companion object {
+        /**
+         * Per-track severity floors (server parity): new columns on the
+         * `sources` table. SQLite backfills existing rows with the default,
+         * so every existing source starts at the new track defaults
+         * ("high" for releases, "normal" for the other two).
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sources ADD COLUMN releaseSeverity TEXT NOT NULL DEFAULT 'high'")
+                db.execSQL("ALTER TABLE sources ADD COLUMN readmeSeverity TEXT NOT NULL DEFAULT 'normal'")
+                db.execSQL("ALTER TABLE sources ADD COLUMN commitSeverity TEXT NOT NULL DEFAULT 'normal'")
+            }
+        }
+    }
 
     /**
      * Deletes a source and everything pointing at it — snapshots, then

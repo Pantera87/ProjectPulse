@@ -278,7 +278,7 @@ suspend fun checkGithub(
                 }
                 // Per-track severity floor for the keywordless release event
                 // (a keyword rule's own priority still wins — web parity).
-                if (hit == null) priority = higherPriority(priority, "normal") // local: per-track severity not stored yet (floor = normal)
+                if (hit == null) priority = higherPriority(priority, source.releaseSeverity)
                 // Optional AI summary + importance classification of the release
                 // notes (skipped when a semantic rule match already summarised
                 // them). Without AI, the raw multi-line notes are reduced to
@@ -397,7 +397,7 @@ suspend fun checkGithub(
                             // Optional AI summary + importance classification of the
                             // README change (diff as input; heuristic added lines as
                             // the fallback).
-                            var readmePriority: String = "normal" // local: per-track severity not stored yet
+                            var readmePriority: String = source.readmeSeverity
                             var readmeSummary = truncate(added.take(10).joinToString("\n").ifEmpty { "README changed" }, 1000)
                             val aiRes = ai.summarizeUpdate(patch, "$owner/$repo README")
                             if (aiRes != null) {
@@ -436,7 +436,7 @@ suspend fun checkGithub(
                         // of LLM calls for little extra value.
                         val useAI = fresh.size <= 10
                         for (c in fresh) {
-                            var commitPriority: String = "normal" // local: per-track severity not stored yet
+                            var commitPriority: String = source.commitSeverity
                             var commitSummary: String? = null
                             if (useAI) {
                                 val aiRes = ai.summarizeUpdate(c.commit.message, "$owner/$repo commit")
