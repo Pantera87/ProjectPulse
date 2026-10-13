@@ -178,3 +178,27 @@ footer {
   padding: 2rem 1rem 3rem;
 }
 footer p { margin: 0; }
+
+/* Android section */
+.android-shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 380px));
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.android-shots figure { margin: 0; }
+.android-shots img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: block;
+}
+.android-shots figcaption {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.apk-note { margin: 0 0 0.25rem; }
+.apk-cta { justify-content: center; }

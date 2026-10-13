@@ -33,6 +33,7 @@
       <div class="nav-links">
         <a href="#features">Features</a>
         <a href="#screens">Screenshots</a>
+        <a href="#android">Android</a>
         <a href="#install">Install</a>
         <a class="btn btn-ghost" href="https://github.com/Pantera87/ProjectPulse">Source</a>
         <a class="btn" href="#install">Get started</a>
@@ -51,8 +52,8 @@
       </p>
       <div class="cta">
         <a class="btn btn-lg" href="#install">Run it with Docker</a>
+        <a class="btn btn-ghost btn-lg" href="#android">Android APK</a>
         <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse" rel="noopener">View on GitHub</a>
-        <a class="btn btn-ghost btn-lg" href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">Docker Hub</a>
       </div>
       <div class="badges">
         <a href="https://hub.docker.com/r/pantera87/projectpulse" rel="noopener">
@@ -132,6 +133,33 @@ docker run -d --name projectpulse -p 4701:4701 -v pp_data:/data \
         AI off entirely — the app is fully functional without it.
         <a href="https://github.com/Pantera87/ProjectPulse#configuration">Full configuration →</a>
       </p>
+    </section>
+
+    <section id="android" class="section">
+      <h2>A native Android companion app</h2>
+      <p class="muted">
+        A native <strong>Kotlin / Jetpack Compose</strong> app, optimized for phones
+        <em>and</em> tablets. Point it at your ProjectPulse server (LAN or
+        Tailscale, <code>http</code> / <code>https</code>) — or switch it to
+        <strong>standalone mode</strong> and let the phone be the server, with a
+        local Room database, background sync and notifications. No Play Store:
+        grab an APK and sideload it.
+      </p>
+      <div class="android-shots">
+        <figure><img src="assets/android-app.png" alt="ProjectPulse Android app in portrait on a phone" loading="lazy" /><figcaption>Phone · portrait</figcaption></figure>
+        <figure><img src="assets/android-landscape.png" alt="ProjectPulse Android app in landscape on a tablet" loading="lazy" /><figcaption>Tablet · landscape</figcaption></figure>
+      </div>
+      <p class="apk-note">
+        Download the latest release (<strong>v1.4.2</strong>). Pick the APK for
+        your device — most modern phones are <strong>arm64-v8a</strong>.
+      </p>
+      <div class="cta apk-cta">
+        <a class="btn btn-lg" href="https://github.com/Pantera87/ProjectPulse/releases/download/v1.4.2/ProjectPulse-1.4.2-arm64-v8a.apk" rel="noopener">arm64-v8a</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse/releases/download/v1.4.2/ProjectPulse-1.4.2-armeabi-v7a.apk" rel="noopener">armeabi-v7a</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse/releases/download/v1.4.2/ProjectPulse-1.4.2-x86_64.apk" rel="noopener">x86_64</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse/releases/download/v1.4.2/ProjectPulse-1.4.2-x86.apk" rel="noopener">x86</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/Pantera87/ProjectPulse/releases/latest" rel="noopener">All releases →</a>
+      </div>
     </section>
 
     <section class="section">
