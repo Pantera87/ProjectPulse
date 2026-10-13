@@ -44,6 +44,7 @@ import com.pantera87.projectpulse.R
 import com.pantera87.projectpulse.data.ApiResult
 import com.pantera87.projectpulse.data.Health
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * First-launch / re-authentication screen: server URL + password.
@@ -62,46 +63,77 @@ fun ConnectScreen(onSuccess: () -> Unit) {
     val dataMode by prefs.dataMode.collectAsState()
     val isLocal = dataMode == "local"
     var url by remember { mutableStateOf(prefs.url.value) }
+    var localUrl by remember { mutableStateOf(prefs.fallbackUrl.value) }
     var password by remember { mutableStateOf(prefs.password.value) }
     var requiresAuth by remember { mutableStateOf(prefs.authEnabled.value) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val uiMode = rememberUiMode()
 
+    // Normalizes a user-entered address: trims it, defaults to http:// when no
+    // scheme is present, and returns null when OkHttp can't parse it — a
+    // malformed URL would otherwise crash the health/login probe.
+    fun normalize(raw: String): String? {
+        val t = raw.trim().removeSuffix("/")
+        if (t.isBlank()) return null
+        val withScheme =
+            if (t.startsWith("http://") || t.startsWith("https://")) t else "http://$t"
+        return withScheme.toHttpUrlOrNull()?.let { withScheme }
+    }
+
     fun connect() {
-        val u = url.trim().removeSuffix("/")
-        if (u.isBlank()) {
-            error = "Enter your server URL"
+        val primary = normalize(url)
+        if (url.isNotBlank() && primary == null) {
+            error = "That doesn't look like a valid MagicDNS address"
+            return
+        }
+        val fallback = normalize(localUrl)
+        if (localUrl.isNotBlank() && fallback == null) {
+            error = "That doesn't look like a valid local address"
+            return
+        }
+        // Try the MagicDNS address first, then the local address. Blanks and
+        // duplicates collapse into a single candidate.
+        val candidates = listOfNotNull(primary, fallback).distinct()
+        if (candidates.isEmpty()) {
+            error = "Enter your MagicDNS address (and optionally a local address)"
             return
         }
         busy = true
         error = null
         scope.launch {
-            // A new client bound to this URL before probing it.
-            app.rebuildApi(u)
-            val health = app.api.health()
-            if (health is ApiResult.Error) {
+            // The first address whose /api/health answers (and which logs in,
+            // if the server is gated) wins and becomes the active server.
+            var lastError = "Cannot reach the server — check the URL and that " +
+                "the server is running"
+            for (candidate in candidates) {
+                app.rebuildApi(candidate)
+                val health = app.api.health()
+                if (health is ApiResult.Error) {
+                    lastError = health.message
+                    continue
+                }
+                val h = (health as ApiResult.Ok<Health>).value
+                val needsAuth = h.auth
+                if (needsAuth) {
+                    val a = app.api.login(password)
+                    if (a is ApiResult.Error) {
+                        lastError = a.message
+                        continue
+                    }
+                }
+                prefs.saveUrl(candidate)
+                prefs.saveFallbackUrl(fallback ?: "")
+                prefs.savePassword(password)
+                prefs.serverRequiresAuth(needsAuth)
+                prefs.markConfigured(true)
+                app.startBackgroundSync()
                 busy = false
-                error = health.message
+                onSuccess()
                 return@launch
             }
-            val h = (health as ApiResult.Ok<Health>).value
-            val needsAuth = h.auth
-            if (needsAuth) {
-                val a = app.api.login(password)
-                if (a is ApiResult.Error) {
-                    busy = false
-                    error = a.message
-                    return@launch
-                }
-            }
-            prefs.saveUrl(u)
-            prefs.savePassword(password)
-            prefs.serverRequiresAuth(needsAuth)
-            prefs.markConfigured(true)
-            app.startBackgroundSync()
             busy = false
-            onSuccess()
+            error = lastError
         }
     }
 
@@ -171,13 +203,31 @@ fun ConnectScreen(onSuccess: () -> Unit) {
                     }
                 }
             } else {
+                SectionLabel("Tailscale address (MagicDNS)")
                 GlassTextField(
                     value = url,
                     onValueChange = { url = it },
+                    placeholder = "http://myhost.tailnet.ts.net",
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SectionLabel("Local address (fallback)")
+                GlassTextField(
+                    value = localUrl,
+                    onValueChange = { localUrl = it },
                     placeholder = "http://192.168.1.100:4701",
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "The Tailscale address is tried first. If it can't be " +
+                        "reached (Tailscale off or MagicDNS unavailable), the " +
+                        "local address is used instead. The local address is " +
+                        "optional.",
+                    color = LocalPpTokens.current.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
                 )
                 if (requiresAuth || password.isNotEmpty()) {
                     GlassTextField(

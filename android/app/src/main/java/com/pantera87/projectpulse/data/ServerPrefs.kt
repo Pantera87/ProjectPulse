@@ -30,6 +30,7 @@ class ServerPrefs(context: Context) {
     )
 
     private val _url = MutableStateFlow(plain.getString(KEY_URL, "http://192.168.1.100:4701") ?: "")
+    private val _fallbackUrl = MutableStateFlow(plain.getString(KEY_FALLBACK_URL, "") ?: "")
     private val _password = MutableStateFlow(secret.getString(KEY_PASSWORD, "") ?: "")
     private val _authEnabled = MutableStateFlow(plain.getBoolean(KEY_AUTH, false))
     private val _configured = MutableStateFlow(plain.getBoolean(KEY_CONFIGURED, false))
@@ -46,6 +47,8 @@ class ServerPrefs(context: Context) {
     private val _ollamaModel = MutableStateFlow(plain.getString(KEY_OLLAMA_MODEL, DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
 
     val url: StateFlow<String> = _url.asStateFlow()
+    /** Local/LAN address used when the primary (MagicDNS) URL is unreachable. */
+    val fallbackUrl: StateFlow<String> = _fallbackUrl.asStateFlow()
     val password: StateFlow<String> = _password.asStateFlow()
     val authEnabled: StateFlow<Boolean> = _authEnabled.asStateFlow()
     val configured: StateFlow<Boolean> = _configured.asStateFlow()
@@ -65,6 +68,11 @@ class ServerPrefs(context: Context) {
     fun saveUrl(value: String) {
         _url.value = value
         plain.edit().putString(KEY_URL, value).apply()
+    }
+
+    fun saveFallbackUrl(value: String) {
+        _fallbackUrl.value = value
+        plain.edit().putString(KEY_FALLBACK_URL, value).apply()
     }
 
     fun savePassword(value: String) {
@@ -139,6 +147,7 @@ class ServerPrefs(context: Context) {
 
     companion object {
         private const val KEY_URL = "server_url"
+        private const val KEY_FALLBACK_URL = "server_fallback_url"
         private const val KEY_PASSWORD = "server_password"
         private const val KEY_AUTH = "server_auth_enabled"
         private const val KEY_CONFIGURED = "configured"

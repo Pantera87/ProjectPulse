@@ -82,17 +82,20 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) : PpBackend {
             }
         } catch (e: IOException) {
             ApiResult.Error("Cannot reach server — check the URL and that the server is running")
+        } catch (e: IllegalArgumentException) {
+            // Malformed base URL — OkHttp's HttpUrl parser rejects it.
+            ApiResult.Error("That doesn't look like a valid server URL")
         }
     }
 
     /** POST /api/auth — sets the pp_session cookie in the jar. */
     override suspend fun login(password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
         val payload = json.encodeToString(LoginBody(password))
-        val req = Request.Builder()
-            .url("$base/api/auth")
-            .post(payload.toRequestBody(JSON))
-            .build()
         try {
+            val req = Request.Builder()
+                .url("$base/api/auth")
+                .post(payload.toRequestBody(JSON))
+                .build()
             client.newCall(req).execute().use { resp ->
                 when {
                     resp.code == 200 -> ApiResult.Ok(Unit)
@@ -108,6 +111,9 @@ class PpApi(baseUrl: String, private val jar: SessionCookieJar) : PpBackend {
             }
         } catch (e: IOException) {
             ApiResult.Error("Cannot reach server")
+        } catch (e: IllegalArgumentException) {
+            // Malformed base URL — OkHttp's HttpUrl parser rejects it.
+            ApiResult.Error("That doesn't look like a valid server URL")
         }
     }
 

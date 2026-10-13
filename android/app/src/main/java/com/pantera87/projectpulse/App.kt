@@ -3,6 +3,7 @@ package com.pantera87.projectpulse
 import android.app.Application
 import androidx.room.Room
 import com.pantera87.projectpulse.data.LocalBackend
+import com.pantera87.projectpulse.data.ApiResult
 import com.pantera87.projectpulse.data.PpApi
 import com.pantera87.projectpulse.data.PpBackend
 import com.pantera87.projectpulse.data.RemoteBackend
@@ -14,6 +15,9 @@ import com.pantera87.projectpulse.engine.LanOllamaAi
 import com.pantera87.projectpulse.engine.LocalAi
 import com.pantera87.projectpulse.notif.Notifier
 import com.pantera87.projectpulse.notif.SyncScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Tiny service locator — the app has a single long-lived server session, so
@@ -62,6 +66,27 @@ class App : Application() {
         Notifier.ensureChannel(this)
         if (prefs.configured.value && prefs.notificationsEnabled.value) {
             SyncScheduler.schedule(this, prefs.notifIntervalMin.value.toLong())
+        }
+        resolveConnectionAtStartup()
+    }
+
+    /**
+     * When a local fallback address is configured and the primary (MagicDNS)
+     * address can't be reached, switch the live client to the fallback so the
+     * UI and background sync keep working off-Tailscale. Runs off the main
+     * thread and is a no-op when no fallback is set or in local data mode.
+     */
+    private fun resolveConnectionAtStartup() {
+        if (prefs.dataMode.value == "local") return
+        val primary = prefs.url.value
+        val fallback = prefs.fallbackUrl.value
+        if (fallback.isBlank() || fallback == primary) return
+        if (!prefs.configured.value) return
+        CoroutineScope(Dispatchers.IO).launch {
+            if (PpApi(primary, cookieJar).health() is ApiResult.Ok<*>) return@launch
+            if (PpApi(fallback, cookieJar).health() is ApiResult.Ok<*>) {
+                rebuildApi(fallback)
+            }
         }
     }
 
