@@ -14,8 +14,8 @@ android {
         applicationId = "com.pantera87.projectpulse"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.1"
+        versionCode = 6
+        versionName = "1.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
